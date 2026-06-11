@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Force tabs with width 4 globally
+indent_style = tab
+tab_width = 4
+indent_size = 4
+
+[*.{cpp,h,lua,xml}]
+indent_style = tab
+tab_width = 4
+indent_size = 4
+
+[*.yml]
+indent_style = space
+indent_size = 2
+
+# Enforce for all C++ source/header variations
+[**.{cpp,h,cxx,hpp,cc}]
+indent_style = tab
+tab_width = 4
+indent_size = 4
