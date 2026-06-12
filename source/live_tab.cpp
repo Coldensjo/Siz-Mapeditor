@@ -101,6 +101,12 @@ LiveLogTab::LiveLogTab(MapTabbook* aui, LiveSocket* socket) :
 }
 
 LiveLogTab::~LiveLogTab() {
+	// Clear the socket's back-reference so it does not dangle if the tab is
+	// destroyed while the socket is still alive.
+	if (socket) {
+		socket->log = nullptr;
+		socket = nullptr;
+	}
 }
 
 bool LiveLogTab::IsCurrent() const {

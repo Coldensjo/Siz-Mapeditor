@@ -1189,12 +1189,14 @@ void GUI::CloseLiveEditors(LiveSocket* sender) {
 
 	// First, detach any live log tab so the socket's back-reference is cleared
 	// before the editor (and the socket it owns) gets destroyed.
+	// LiveClient::close() may already have detached the log tab (socket == nullptr),
+	// so remove detached log tabs here as well — otherwise the tab lingers after
+	// a menu disconnect and the user has to close it by hand.
 	for (int i = 0; i < tabbook->GetTabCount(); ++i) {
 		auto* logTab = dynamic_cast<LiveLogTab*>(tabbook->GetTab(i));
-		if (logTab && logTab->GetSocket() == sender) {
+		if (logTab && (logTab->GetSocket() == sender || logTab->GetSocket() == nullptr)) {
 			logTab->Disconnect();
-			tabbook->DeleteTab(i);
-			break;
+			tabbook->DeleteTab(i--);
 		}
 	}
 

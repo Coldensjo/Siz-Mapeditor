@@ -21,6 +21,8 @@
 #include "editor.h"
 #include "map_tab.h"
 #include "gui.h"
+#include "live_tab.h"
+#include "live_client.h"
 
 EditorTab::EditorTab() {
 	;
@@ -67,7 +69,31 @@ void MapTabbook::CycleTab(bool forward) {
 void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 	EditorTab* editorTab = GetTab(evt.GetInt());
 
+	// Closing a live tab with the X must go through the full disconnect path,
+	// otherwise the socket stays open (the server never notices the disconnect)
+	// and the menu bar keeps a stale "connected" state.
+	if (auto* logTab = dynamic_cast<LiveLogTab*>(editorTab)) {
+		if (auto* client = dynamic_cast<LiveClient*>(logTab->GetSocket())) {
+			evt.Veto();
+			wxTheApp->CallAfter([client]() {
+				client->close();
+				g_gui.CloseLiveEditors(client);
+			});
+			return;
+		}
+	}
+
 	MapTab* mapTab = dynamic_cast<MapTab*>(editorTab);
+	if (mapTab && mapTab->GetEditor() && mapTab->GetEditor()->IsLiveClient()) {
+		evt.Veto();
+		auto* client = static_cast<LiveClient*>(&mapTab->GetEditor()->GetLive());
+		wxTheApp->CallAfter([client]() {
+			client->close();
+			g_gui.CloseLiveEditors(client);
+		});
+		return;
+	}
+
 	if (mapTab && mapTab->IsUniqueReference() && mapTab->GetMap()) {
 		if (mapTab->GetMap()->hasChanged()) {
 			SetFocusedTab(evt.GetInt());
