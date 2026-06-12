@@ -57,10 +57,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>$(ProjectName)_x64</TargetName>
     <OutDir>$(SolutionDir)..\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\Editor\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>$(ProjectName)_x64</TargetName>
     <OutDir>$(SolutionDir)..\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\Editor\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>true</VcpkgEnableManifest>

@@ -148,9 +148,11 @@ void LivePeer::send(NetworkMessage& message, std::function<void()> onSent) {
 
 	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound), onSent = std::move(onSent)]() mutable {
 		memcpy(&outbound.buffer[0], &outbound.size, 4);
+		const size_t packetLength = outbound.size + 4;
+		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
 		asio::async_write(socket,
-			asio::buffer(outbound.buffer, outbound.size + 4),
-			[this, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
+			asio::buffer(packet->buffer.data(), packetLength),
+			[this, packet, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
 				if (error) {
 					livePeerLog(log, wxString() + getHostName() + ": " + error.message());
 				} else if (onSent) {

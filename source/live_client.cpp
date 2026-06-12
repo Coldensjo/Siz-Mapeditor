@@ -210,9 +210,11 @@ void LiveClient::send(NetworkMessage& message) {
 
 	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound)]() mutable {
 		memcpy(&outbound.buffer[0], &outbound.size, 4);
+		const size_t packetLength = outbound.size + 4;
+		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
 		asio::async_write(*socket,
-			asio::buffer(outbound.buffer, outbound.size + 4),
-			[this](const net_error_code& error, size_t bytesTransferred) -> void {
+			asio::buffer(packet->buffer.data(), packetLength),
+			[this, packet](const net_error_code& error, size_t bytesTransferred) -> void {
 				if (error) {
 					wxTheApp->CallAfter([this, error]() {
 						logMessage(wxString() + getHostName() + ": " + error.message());
@@ -230,9 +232,11 @@ void LiveClient::send(NetworkMessage& message, std::function<void()> onSent) {
 
 	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound), onSent = std::move(onSent)]() mutable {
 		memcpy(&outbound.buffer[0], &outbound.size, 4);
+		const size_t packetLength = outbound.size + 4;
+		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
 		asio::async_write(*socket,
-			asio::buffer(outbound.buffer, outbound.size + 4),
-			[this, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
+			asio::buffer(packet->buffer.data(), packetLength),
+			[this, packet, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
 				if (error) {
 					wxTheApp->CallAfter([this, error]() {
 						logMessage(wxString() + getHostName() + ": " + error.message());
@@ -539,13 +543,13 @@ void LiveClient::parseChangeClientVersion(NetworkMessage& message) {
 }
 
 void LiveClient::parseAssetFileBegin(NetworkMessage& message) {
-	if (ignoreIncomingAssets) {
-		return;
-	}
-
 	const LiveAssetKind kind = static_cast<LiveAssetKind>(message.read<uint8_t>());
 	const std::string filename = message.read<std::string>();
 	const uint32_t size = message.read<uint32_t>();
+
+	if (ignoreIncomingAssets) {
+		return;
+	}
 
 	wxString error;
 	if (!beginLiveAssetReceive(assetReceiveState, pendingVersionId, kind, filename, size, error)) {
@@ -556,11 +560,12 @@ void LiveClient::parseAssetFileBegin(NetworkMessage& message) {
 }
 
 void LiveClient::parseAssetFileChunk(NetworkMessage& message) {
+	const std::string chunk = message.read<std::string>();
+
 	if (ignoreIncomingAssets) {
 		return;
 	}
 
-	const std::string chunk = message.read<std::string>();
 	assetBytesReceived += chunk.size();
 	if (assetBytesExpected > 0) {
 		const int percent = static_cast<int>((assetBytesReceived * 100) / assetBytesExpected);
