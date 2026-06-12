@@ -25,7 +25,6 @@
 #include <unordered_map>
 
 class wxTextCtrl;
-class wxGrid;
 
 class MapTabbook;
 class LiveSocket;
@@ -59,13 +58,10 @@ public:
 	void OnLogContextMenu(wxContextMenuEvent& evt);
 	void OnLogMenu(wxCommandEvent& evt);
 
-	void OnResizeClientList(wxSizeEvent& evt);
-
 protected:
 	MapTabbook* aui;
 	LiveSocket* socket;
 	wxTextCtrl* log;
-	wxGrid* user_list;
 
 	std::unordered_map<uint32_t, LivePeer*> clients;
 };

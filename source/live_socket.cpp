@@ -91,6 +91,15 @@ std::vector<LiveCursor> LiveSocket::getCursorList() const {
 	return cursorList;
 }
 
+bool LiveSocket::getCursorPosition(uint32_t clientId, Position& position) const {
+	const auto cursorEntry = cursors.find(clientId);
+	if (cursorEntry == cursors.end()) {
+		return false;
+	}
+	position = cursorEntry->second.pos;
+	return true;
+}
+
 void LiveSocket::logMessage(const wxString& message) {
 	std::cout << "[live] " << message.ToStdString() << std::endl;
 	std::cout.flush();

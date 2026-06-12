@@ -65,6 +65,7 @@ public:
 
 	virtual std::string getHostName() const;
 	std::vector<LiveCursor> getCursorList() const;
+	bool getCursorPosition(uint32_t clientId, Position& position) const;
 	const std::vector<LiveParticipant>& getParticipantList() const {
 		return participants;
 	}

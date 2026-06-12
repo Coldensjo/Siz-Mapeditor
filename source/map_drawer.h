@@ -124,6 +124,7 @@ public:
 
 	bool dragging;
 	bool dragging_draw;
+	uint32_t hovered_live_participant = 0;
 
 	void SetupVars();
 	void SetupGL();
@@ -144,6 +145,9 @@ public:
 	void DrawTooltips();
 	void DrawLiveCursors();
 	void DrawLiveParticipants();
+	bool HitTestLiveParticipant(int screenX, int screenY, uint32_t& participantId);
+	// Returns true if the hovered participant changed (caller should refresh).
+	bool UpdateLiveParticipantHover(int screenX, int screenY);
 	void DrawMapComments();
 	void DrawMapCommentTooltips();
 	void DrawLight();

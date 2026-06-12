@@ -17,7 +17,6 @@
 
 #include "main.h"
 
-#include <wx/grid.h>
 #include <wx/menu.h>
 #include <wx/textctrl.h>
 
@@ -37,8 +36,7 @@ LiveLogTab::LiveLogTab(MapTabbook* aui, LiveSocket* socket) :
 	wxPanel(aui),
 	aui(aui),
 	socket(socket),
-	log(nullptr),
-	user_list(nullptr) {
+	log(nullptr) {
 	if (this->socket) {
 		this->socket->log = this;
 		for (const wxString& pending : this->socket->pendingLogMessages) {
@@ -49,17 +47,10 @@ LiveLogTab::LiveLogTab(MapTabbook* aui, LiveSocket* socket) :
 
 	wxSizer* topsizer = newd wxBoxSizer(wxVERTICAL);
 
-	wxPanel* splitter = newd wxPanel(this);
-	topsizer->Add(splitter, 1, wxEXPAND);
-
-	// Setup left panel (the log)
-	wxPanel* left_pane = newd wxPanel(splitter);
-	wxSizer* left_sizer = newd wxBoxSizer(wxVERTICAL);
-
 	wxFont time_font(*wxSWISS_FONT);
 
 	log = newd wxTextCtrl(
-		left_pane,
+		this,
 		wxID_ANY,
 		wxEmptyString,
 		wxDefaultPosition,
@@ -70,32 +61,9 @@ LiveLogTab::LiveLogTab(MapTabbook* aui, LiveSocket* socket) :
 	log->Bind(wxEVT_CONTEXT_MENU, &LiveLogTab::OnLogContextMenu, this);
 	log->Bind(wxEVT_MENU, &LiveLogTab::OnLogMenu, this);
 
-	left_sizer->Add(log, 1, wxEXPAND);
-	left_pane->SetSizerAndFit(left_sizer);
+	topsizer->Add(log, 1, wxEXPAND);
 
-	// Setup right panel (connected users)
-	user_list = newd wxGrid(splitter, wxID_ANY, wxDefaultPosition, wxSize(280, 100));
-	user_list->CreateGrid(0, 3);
-	user_list->DisableDragRowSize();
-	user_list->DisableDragColSize();
-	user_list->SetSelectionMode(wxGrid::wxGridSelectRows);
-	user_list->SetRowLabelSize(0);
-	user_list->EnableEditing(false);
-
-	user_list->SetColLabelValue(0, "");
-	user_list->SetColSize(0, 24);
-	user_list->SetColLabelValue(1, "#");
-	user_list->SetColSize(1, 36);
-	user_list->SetColLabelValue(2, "Name");
-	user_list->SetColSize(2, 200);
-
-	// Finalize
 	SetSizerAndFit(topsizer);
-
-	wxSizer* split_sizer = newd wxBoxSizer(wxHORIZONTAL);
-	split_sizer->Add(left_pane, wxSizerFlags(1).Expand());
-	split_sizer->Add(user_list, wxSizerFlags(0).Expand());
-	splitter->SetSizerAndFit(split_sizer);
 
 	aui->AddTab(this, true);
 }
@@ -183,24 +151,6 @@ void LiveLogTab::OnLogMenu(wxCommandEvent& evt) {
 	}
 }
 
-void LiveLogTab::OnResizeClientList(wxSizeEvent& evt) {
-	evt.Skip();
-}
-
 void LiveLogTab::UpdateClientList(const std::unordered_map<uint32_t, LivePeer*>& updatedClients) {
-	if (user_list->GetNumberRows() > 0) {
-		user_list->DeleteRows(0, user_list->GetNumberRows());
-	}
-
 	clients = updatedClients;
-	user_list->AppendRows(clients.size());
-
-	int32_t i = 0;
-	for (auto& clientEntry : clients) {
-		LivePeer* peer = clientEntry.second;
-		user_list->SetCellBackgroundColour(i, 0, peer->getUsedColor());
-		user_list->SetCellValue(i, 1, i2ws((peer->getClientId() >> 1) + 1));
-		user_list->SetCellValue(i, 2, peer->getName());
-		++i;
-	}
 }

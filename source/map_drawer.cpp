@@ -17,6 +17,8 @@
 
 #include "main.h"
 
+#include <cmath>
+
 #ifdef __APPLE__
 	#include <GLUT/glut.h>
 #else
@@ -66,6 +68,40 @@ void PopScreenSpaceGL() {
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
+}
+
+struct LiveParticipantPanelLayout {
+	float startX;
+	float startY;
+	float boxWidth;
+	float boxHeight;
+	float padding;
+	float headerHeight;
+	float lineHeight;
+	float textOffset;
+	float iconSpace; // room reserved at the right of each row for the go-to icon
+};
+
+LiveParticipantPanelLayout computeLiveParticipantPanelLayout(int screenWidth, const std::vector<LiveParticipant>& participants) {
+	const float swatchSize = 10.0f;
+	LiveParticipantPanelLayout layout;
+	layout.padding = 8.0f;
+	layout.headerHeight = 22.0f;
+	layout.lineHeight = 22.0f;
+	layout.textOffset = swatchSize + 8.0f;
+	layout.iconSpace = 24.0f;
+	layout.boxWidth = 170.0f;
+
+	for (const LiveParticipant& participant : participants) {
+		// " (you)" suffix can add up to 6 characters to the longest name
+		const float nameWidth = float(participant.name.length() + 6) * 7.0f + layout.textOffset + layout.iconSpace + layout.padding * 2.0f;
+		layout.boxWidth = std::max(layout.boxWidth, nameWidth);
+	}
+
+	layout.boxHeight = layout.headerHeight + layout.lineHeight * participants.size() + layout.padding;
+	layout.startX = screenWidth - layout.boxWidth - layout.padding;
+	layout.startY = layout.padding;
+	return layout;
 }
 
 void DrawScreenTextLabel(float right, float top, const wxString& text) {
@@ -1019,65 +1055,181 @@ void MapDrawer::DrawLiveParticipants() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	const LiveParticipantPanelLayout layout = computeLiveParticipantPanelLayout(screensize_x, participants);
+	const float swatchSize = 10.0f;
+	const uint32_t ownId = editor.GetLive().getOwnClientId();
+	const float right = layout.startX + layout.boxWidth;
+	const float bottom = layout.startY + layout.boxHeight;
+
 	PushScreenSpaceGL(screensize_x, screensize_y);
 
-	const float padding = 8.0f;
-	const float lineHeight = 16.0f;
-	const float swatchSize = 10.0f;
-	const float textOffset = swatchSize + 6.0f;
-	float boxWidth = 140.0f;
+	// Panel background
+	glColor4ub(20, 22, 26, 225);
+	glBegin(GL_QUADS);
+	glVertex2f(layout.startX, layout.startY);
+	glVertex2f(right, layout.startY);
+	glVertex2f(right, bottom);
+	glVertex2f(layout.startX, bottom);
+	glEnd();
 
-	for (const LiveParticipant& participant : participants) {
-		const float nameWidth = float(participant.name.length()) * 7.0f + textOffset + padding * 2.0f;
-		boxWidth = std::max(boxWidth, nameWidth);
+	// Header band
+	const float headerBottom = layout.startY + layout.headerHeight;
+	glColor4ub(45, 50, 60, 235);
+	glBegin(GL_QUADS);
+	glVertex2f(layout.startX, layout.startY);
+	glVertex2f(right, layout.startY);
+	glVertex2f(right, headerBottom);
+	glVertex2f(layout.startX, headerBottom);
+	glEnd();
+
+	glColor4ub(230, 230, 230, 255);
+	glRasterPos2f(layout.startX + layout.padding, layout.startY + 15.0f);
+	const wxString headerText = "Connected Users";
+	for (size_t i = 0; i < headerText.length(); ++i) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(headerText[i]));
 	}
 
-	const float boxHeight = padding * 2.0f + lineHeight * participants.size();
-	const float startX = screensize_x - boxWidth - padding;
-	const float startY = padding;
-
-	glColor4ub(24, 24, 24, 200);
-	glBegin(GL_QUADS);
-	glVertex2f(startX, startY);
-	glVertex2f(startX + boxWidth, startY);
-	glVertex2f(startX + boxWidth, startY + boxHeight);
-	glVertex2f(startX, startY + boxHeight);
-	glEnd();
-
-	glColor4ub(255, 255, 255, 180);
-	glLineWidth(1.0f);
-	glBegin(GL_LINE_LOOP);
-	glVertex2f(startX, startY);
-	glVertex2f(startX + boxWidth, startY);
-	glVertex2f(startX + boxWidth, startY + boxHeight);
-	glVertex2f(startX, startY + boxHeight);
-	glEnd();
-
-	float lineY = startY + padding + 12.0f;
+	float rowTop = headerBottom;
 	for (const LiveParticipant& participant : participants) {
+		const float rowBottom = rowTop + layout.lineHeight;
+		const bool isSelf = participant.id == ownId;
+		const bool isHovered = !isSelf && participant.id == hovered_live_participant;
+
+		if (isHovered) {
+			glColor4ub(70, 110, 180, 160);
+			glBegin(GL_QUADS);
+			glVertex2f(layout.startX + 2.0f, rowTop + 1.0f);
+			glVertex2f(right - 2.0f, rowTop + 1.0f);
+			glVertex2f(right - 2.0f, rowBottom - 1.0f);
+			glVertex2f(layout.startX + 2.0f, rowBottom - 1.0f);
+			glEnd();
+		}
+
+		const float swatchTop = rowTop + (layout.lineHeight - swatchSize) / 2.0f;
 		glColor4ub(participant.color.Red(), participant.color.Green(), participant.color.Blue(), 255);
 		glBegin(GL_QUADS);
-		glVertex2f(startX + padding, lineY - swatchSize + 2.0f);
-		glVertex2f(startX + padding + swatchSize, lineY - swatchSize + 2.0f);
-		glVertex2f(startX + padding + swatchSize, lineY + 2.0f);
-		glVertex2f(startX + padding, lineY + 2.0f);
+		glVertex2f(layout.startX + layout.padding, swatchTop);
+		glVertex2f(layout.startX + layout.padding + swatchSize, swatchTop);
+		glVertex2f(layout.startX + layout.padding + swatchSize, swatchTop + swatchSize);
+		glVertex2f(layout.startX + layout.padding, swatchTop + swatchSize);
 		glEnd();
 
-		glColor4ub(240, 240, 240, 255);
-		glRasterPos2f(startX + padding + textOffset, lineY);
-		const wxString& label = participant.name;
+		// Name text, dimmed for our own (non-clickable) row
+		if (isSelf) {
+			glColor4ub(160, 160, 160, 255);
+		} else {
+			glColor4ub(240, 240, 240, 255);
+		}
+		glRasterPos2f(layout.startX + layout.padding + layout.textOffset, rowTop + 15.0f);
+		wxString label = participant.name;
+		if (isSelf) {
+			label << " (you)";
+		}
 		for (size_t i = 0; i < label.length(); ++i) {
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(label[i]));
 		}
 
-		lineY += lineHeight;
+		// Go-to crosshair icon on clickable rows
+		if (!isSelf) {
+			const float cx = right - layout.iconSpace / 2.0f - 4.0f;
+			const float cy = rowTop + layout.lineHeight / 2.0f;
+			const float radius = 5.0f;
+			if (isHovered) {
+				glColor4ub(255, 255, 255, 255);
+			} else {
+				glColor4ub(170, 180, 195, 220);
+			}
+			glLineWidth(1.0f);
+			glBegin(GL_LINE_LOOP);
+			for (int seg = 0; seg < 12; ++seg) {
+				const float angle = seg * (2.0f * 3.14159265f / 12.0f);
+				glVertex2f(cx + radius * std::cos(angle), cy + radius * std::sin(angle));
+			}
+			glEnd();
+			glBegin(GL_LINES);
+			glVertex2f(cx - radius - 2.0f, cy);
+			glVertex2f(cx - radius + 2.0f, cy);
+			glVertex2f(cx + radius - 2.0f, cy);
+			glVertex2f(cx + radius + 2.0f, cy);
+			glVertex2f(cx, cy - radius - 2.0f);
+			glVertex2f(cx, cy - radius + 2.0f);
+			glVertex2f(cx, cy + radius - 2.0f);
+			glVertex2f(cx, cy + radius + 2.0f);
+			glEnd();
+		}
+
+		rowTop = rowBottom;
 	}
+
+	// Panel border
+	glColor4ub(255, 255, 255, 150);
+	glLineWidth(1.0f);
+	glBegin(GL_LINE_LOOP);
+	glVertex2f(layout.startX, layout.startY);
+	glVertex2f(right, layout.startY);
+	glVertex2f(right, bottom);
+	glVertex2f(layout.startX, bottom);
+	glEnd();
 
 	PopScreenSpaceGL();
 
 	if (textureWasEnabled) {
 		glEnable(GL_TEXTURE_2D);
 	}
+}
+
+bool MapDrawer::HitTestLiveParticipant(int screenX, int screenY, uint32_t& participantId) {
+	participantId = 0;
+
+	if (!editor.IsLive()) {
+		return false;
+	}
+
+	const std::vector<LiveParticipant>& participants = editor.GetLive().getParticipantList();
+	if (participants.empty()) {
+		return false;
+	}
+
+	const float scale = canvas->GetContentScaleFactor();
+	screenX = int(screenX * scale);
+	screenY = int(screenY * scale);
+
+	int viewScrollX = 0;
+	int viewScrollY = 0;
+	int screenWidth = 0;
+	int screenHeight = 0;
+	canvas->GetViewBox(&viewScrollX, &viewScrollY, &screenWidth, &screenHeight);
+
+	const LiveParticipantPanelLayout layout = computeLiveParticipantPanelLayout(screenWidth, participants);
+	if (screenX < layout.startX || screenX >= layout.startX + layout.boxWidth || screenY < layout.startY || screenY >= layout.startY + layout.boxHeight) {
+		return false;
+	}
+
+	// Row layout must match DrawLiveParticipants (rows start below the header band).
+	const float rowsTop = layout.startY + layout.headerHeight;
+	const int row = int((screenY - rowsTop) / layout.lineHeight);
+	if (screenY >= rowsTop && row >= 0 && row < static_cast<int>(participants.size())) {
+		participantId = participants[row].id;
+	}
+
+	// Consume any click inside the panel so it never falls through to map editing.
+	return true;
+}
+
+bool MapDrawer::UpdateLiveParticipantHover(int screenX, int screenY) {
+	uint32_t hoveredId = 0;
+	if (editor.IsLive()) {
+		uint32_t hitId = 0;
+		if (HitTestLiveParticipant(screenX, screenY, hitId) && hitId != editor.GetLive().getOwnClientId()) {
+			hoveredId = hitId;
+		}
+	}
+
+	if (hoveredId == hovered_live_participant) {
+		return false;
+	}
+	hovered_live_participant = hoveredId;
+	return true;
 }
 
 void MapDrawer::DrawMapComments() {

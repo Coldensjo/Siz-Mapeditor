@@ -479,6 +479,10 @@ void MapCanvas::OnMouseMove(wxMouseEvent& event) {
 	cursor_x = event.GetX();
 	cursor_y = event.GetY();
 
+	if (editor.IsLive() && drawer->UpdateLiveParticipantHover(cursor_x, cursor_y)) {
+		Refresh();
+	}
+
 	int mouse_map_x, mouse_map_y;
 	MouseToMap(&mouse_map_x, &mouse_map_y);
 
@@ -698,6 +702,20 @@ void MapCanvas::OnMouseRightRelease(wxMouseEvent& event) {
 void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 	SetFocus();
 
+	if (editor.IsLive()) {
+		uint32_t participantId = 0;
+		if (drawer->HitTestLiveParticipant(event.GetX(), event.GetY(), participantId)) {
+			const LiveSocket& live = editor.GetLive();
+			if (participantId != live.getOwnClientId()) {
+				Position position;
+				if (live.getCursorPosition(participantId, position) && position.isValid()) {
+					static_cast<MapWindow*>(GetParent())->SetScreenCenterPosition(position);
+				}
+			}
+			return;
+		}
+	}
+
 	int mouse_map_x, mouse_map_y;
 	ScreenToMap(event.GetX(), event.GetY(), &mouse_map_x, &mouse_map_y);
 
@@ -725,7 +743,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 			}
 		}
 	} else if (g_gui.IsSelectionMode()) {
-		if (isPasting() && !editor.IsLiveClient()) {
+		if (isPasting() && editor.IsClipboardAllowed()) {
 			// Set paste to false (no rendering etc.)
 			EndPasting();
 
