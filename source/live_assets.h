@@ -15,6 +15,8 @@
 enum LiveAssetKind : uint8_t {
 	LIVE_ASSET_CLIENT = 0,
 	LIVE_ASSET_ITEMS = 1,
+	LIVE_ASSET_MONSTERS = 2,
+	LIVE_ASSET_NPCS = 3,
 };
 
 struct LiveAssetFile {
@@ -28,6 +30,8 @@ struct LiveAssetReceiveState {
 	ClientVersionID versionId = CLIENT_VERSION_NONE;
 	wxFileName clientDir;
 	wxFileName itemsDir;
+	wxFileName monstersDir;
+	wxFileName npcsDir;
 	std::ofstream output;
 	LiveAssetKind currentKind = LIVE_ASSET_CLIENT;
 	std::string currentFilename;

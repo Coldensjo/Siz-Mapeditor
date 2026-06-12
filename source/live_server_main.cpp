@@ -27,13 +27,30 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include <wx/stdpaths.h>
+#include <wx/textfile.h>
+
 namespace {
+
+struct MapServerConfig {
+	FileName mapPath;
+	uint16_t port = 31313;
+	wxString password;
+	wxString sessionName;
+	LiveSessionBounds sessionBounds;
+	FileName assetsPath;
+	FileName itemsPath;
+	FileName monstersPath;
+	FileName npcsPath;
+	unsigned autosaveMinutes = 5;
+};
 
 std::atomic<bool> g_running { true };
 Editor* g_editor = nullptr;
@@ -45,18 +62,189 @@ std::vector<std::string> g_pendingCommands;
 
 void printUsage() {
 	std::cout << "MapServer - Live collaboration host for Remere's Map Editor\n"
-	          << "Usage: MapServer_x64.exe --map <file.otbm> [options]\n"
-	          << "Options:\n"
+	          << "Usage: MapServer_x64.exe [options]\n"
+	          << "\nSettings are read from mapserver.cfg next to the executable.\n"
+	          << "Copy mapserver.cfg.example to mapserver.cfg and edit it, then run MapServer_x64.exe.\n"
+	          << "\nCommand-line options override mapserver.cfg:\n"
+	          << "  --map <file.otbm>     Map file to host\n"
 	          << "  --port <number>       TCP port (default 31313)\n"
 	          << "  --password <pass>     Session password (default: empty)\n"
 	          << "  --name <name>         Session display name\n"
 	          << "  --autosave <minutes>  Auto-save interval (default 5, 0 disables)\n"
-	          << "  --x <coord>           Session center X (requires --y, --z, --radius)\n"
+	          << "  --x <coord>           Session center X (requires y, z, radius)\n"
 	          << "  --y <coord>           Session center Y\n"
 	          << "  --z <floor>           Session center floor\n"
 	          << "  --radius <sqm>        Editable/viewable radius around center\n"
-	          << "  --assets <directory>  Folder containing Tibia.dat/.spr and items.otb/.xml\n"
+	          << "  --assets <directory>  Folder with Tibia.dat, Tibia.spr, and Tibia.otfi\n"
+	          << "  --items <directory>   Folder with items.otb and items.xml\n"
+	          << "  --monsters <directory> Folder with monster XML files\n"
+	          << "  --npcs <directory>    Folder with NPC XML files\n"
 	          << "\nConsole commands: save, list, kick <name>, exit\n";
+}
+
+wxString getMapServerConfigPath() {
+	FileName execPath;
+	try {
+		execPath = dynamic_cast<wxStandardPaths&>(wxStandardPaths::Get()).GetExecutablePath();
+	} catch (const std::bad_cast&) {
+		execPath = FileName(".");
+	}
+
+	FileName configPath;
+	configPath.Assign(execPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), "mapserver.cfg");
+	return configPath.GetFullPath();
+}
+
+wxString trimMapServerConfigValue(const wxString& value) {
+	wxString trimmed = value;
+	trimmed.Trim(true).Trim(false);
+	if (trimmed.length() >= 2 &&
+	    ((trimmed.StartsWith("\"") && trimmed.EndsWith("\"")) || (trimmed.StartsWith("'") && trimmed.EndsWith("'")))) {
+		trimmed = trimmed.Mid(1, trimmed.length() - 2);
+	}
+	return trimmed;
+}
+
+bool parseMapServerConfigLong(const wxString& value, long& out) {
+	const wxString trimmed = trimMapServerConfigValue(value);
+	if (trimmed.empty()) {
+		return false;
+	}
+	return trimmed.ToLong(&out);
+}
+
+void waitForEnterOnStartupFailure(int argc) {
+	if (argc > 1) {
+		return;
+	}
+
+	std::cout << std::endl << "Press Enter to exit..." << std::endl;
+	std::cin.clear();
+	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	std::cin.get();
+}
+
+bool loadMapServerConfig(MapServerConfig& config) {
+	const wxString configPath = getMapServerConfigPath();
+	if (!wxFileName(configPath).FileExists()) {
+		return true;
+	}
+
+	wxTextFile file;
+	if (!file.Open(configPath)) {
+		std::cerr << "Could not read mapserver.cfg: " << configPath.ToStdString() << std::endl;
+		return false;
+	}
+
+	long centerX = -1;
+	long centerY = -1;
+	long centerZ = -1;
+	long radius = -1;
+	bool hasCenterX = false;
+	bool hasCenterY = false;
+	bool hasCenterZ = false;
+	bool hasRadius = false;
+
+	for (size_t lineNumber = 0; lineNumber < file.GetLineCount(); ++lineNumber) {
+		wxString line = file.GetLine(lineNumber);
+		line.Trim(true).Trim(false);
+		if (line.empty() || line.StartsWith("#") || line.StartsWith(";")) {
+			continue;
+		}
+		if (line.StartsWith("[") && line.EndsWith("]")) {
+			continue;
+		}
+
+		const int separator = line.Find('=');
+		if (separator == wxNOT_FOUND) {
+			continue;
+		}
+
+		wxString key = line.Left(separator);
+		key.Trim(true).Trim(false);
+		key.MakeUpper();
+
+		const wxString value = trimMapServerConfigValue(line.Mid(separator + 1));
+
+		if (key == "MAP") {
+			if (!value.empty()) {
+				config.mapPath.Assign(value);
+			}
+		} else if (key == "PORT") {
+			long port = 0;
+			if (parseMapServerConfigLong(value, port) && port >= 1 && port <= 65535) {
+				config.port = static_cast<uint16_t>(port);
+			}
+		} else if (key == "PASSWORD") {
+			config.password = value;
+		} else if (key == "NAME") {
+			config.sessionName = value;
+		} else if (key == "AUTOSAVE") {
+			long autosaveMinutes = -1;
+			if (parseMapServerConfigLong(value, autosaveMinutes) && autosaveMinutes >= 0) {
+				config.autosaveMinutes = static_cast<unsigned>(autosaveMinutes);
+			}
+		} else if (key == "ASSETS") {
+			if (!value.empty()) {
+				config.assetsPath.AssignDir(value);
+			}
+		} else if (key == "ITEMS" || key == "ITEM") {
+			if (!value.empty()) {
+				config.itemsPath.AssignDir(value);
+			}
+		} else if (key == "MONSTERS" || key == "MONSTER") {
+			if (!value.empty()) {
+				config.monstersPath.AssignDir(value);
+			}
+		} else if (key == "NPCS" || key == "NPC") {
+			if (!value.empty()) {
+				config.npcsPath.AssignDir(value);
+			}
+		} else if (key == "CENTER_X") {
+			hasCenterX = parseMapServerConfigLong(value, centerX);
+		} else if (key == "CENTER_Y") {
+			hasCenterY = parseMapServerConfigLong(value, centerY);
+		} else if (key == "CENTER_Z") {
+			hasCenterZ = parseMapServerConfigLong(value, centerZ);
+		} else if (key == "RADIUS") {
+			hasRadius = parseMapServerConfigLong(value, radius);
+		}
+	}
+
+	const bool anyBounds = hasCenterX || hasCenterY || hasCenterZ || hasRadius;
+	if (anyBounds) {
+		if (!hasCenterX || !hasCenterY || !hasCenterZ || !hasRadius || centerX < 0 || centerY < 0 || centerZ < 0 || radius <= 0) {
+			std::cerr << "mapserver.cfg: session bounds require CENTER_X, CENTER_Y, CENTER_Z, and RADIUS." << std::endl;
+			return false;
+		}
+		if (centerZ > 15) {
+			std::cerr << "mapserver.cfg: CENTER_Z must be between 0 and 15." << std::endl;
+			return false;
+		}
+		config.sessionBounds.enabled = true;
+		config.sessionBounds.centerX = static_cast<uint16_t>(centerX);
+		config.sessionBounds.centerY = static_cast<uint16_t>(centerY);
+		config.sessionBounds.centerZ = static_cast<uint8_t>(centerZ);
+		config.sessionBounds.radius = static_cast<uint32_t>(radius);
+	}
+
+	std::cout << "[live] Loaded settings from " << configPath.ToStdString() << std::endl;
+	return true;
+}
+
+bool validateMapServerConfig(MapServerConfig& config) {
+	if (!config.mapPath.FileExists()) {
+		std::cerr << "Map file not found";
+		if (!config.mapPath.GetFullPath().empty()) {
+			std::cerr << ": " << config.mapPath.GetFullPath().ToStdString();
+		}
+		std::cerr << std::endl;
+		std::cerr << "Set MAP in mapserver.cfg or pass --map <file.otbm>." << std::endl;
+		std::cerr << "Expected config file: " << getMapServerConfigPath().ToStdString() << std::endl;
+		printUsage();
+		return false;
+	}
+	return true;
 }
 
 size_t countMapCreatures(Map& map) {
@@ -127,17 +315,12 @@ void tickAutosave() {
 	}
 }
 
-bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxString& password, wxString& sessionName, LiveSessionBounds& sessionBounds, FileName& assetsPath) {
-	port = 31313;
-	password = wxEmptyString;
-	sessionName = wxEmptyString;
-	sessionBounds = LiveSessionBounds {};
-	assetsPath.Clear();
-
-	int boundsX = -1;
-	int boundsY = -1;
-	int boundsZ = -1;
-	int boundsRadius = -1;
+bool parseArgs(int argc, wxChar** argv, MapServerConfig& config) {
+	int boundsX = config.sessionBounds.enabled ? static_cast<int>(config.sessionBounds.centerX) : -1;
+	int boundsY = config.sessionBounds.enabled ? static_cast<int>(config.sessionBounds.centerY) : -1;
+	int boundsZ = config.sessionBounds.enabled ? static_cast<int>(config.sessionBounds.centerZ) : -1;
+	int boundsRadius = config.sessionBounds.enabled ? static_cast<int>(config.sessionBounds.radius) : -1;
+	bool boundsConfigured = config.sessionBounds.enabled;
 
 	for (int i = 1; i < argc; ++i) {
 		wxString arg = argv[i];
@@ -145,69 +328,203 @@ bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxStr
 			printUsage();
 			return false;
 		} else if (arg == wxT("--map") && i + 1 < argc) {
-			mapPath = FileName(argv[++i]);
+			config.mapPath.Assign(argv[++i]);
 		} else if (arg == wxT("--port") && i + 1 < argc) {
 			long parsedPort = wxAtoi(argv[++i]);
 			if (parsedPort < 1 || parsedPort > 65535) {
 				std::cerr << "Invalid port number." << std::endl;
 				return false;
 			}
-			port = static_cast<uint16_t>(parsedPort);
+			config.port = static_cast<uint16_t>(parsedPort);
 		} else if (arg == wxT("--password") && i + 1 < argc) {
-			password = argv[++i];
+			config.password = argv[++i];
 		} else if (arg == wxT("--name") && i + 1 < argc) {
-			sessionName = argv[++i];
+			config.sessionName = argv[++i];
 		} else if (arg == wxT("--autosave") && i + 1 < argc) {
 			long autosaveMinutes = wxAtoi(argv[++i]);
 			if (autosaveMinutes < 0) {
 				std::cerr << "Invalid autosave interval." << std::endl;
 				return false;
 			}
-			g_autosaveIntervalSeconds = static_cast<unsigned>(autosaveMinutes * 60);
+			config.autosaveMinutes = static_cast<unsigned>(autosaveMinutes);
 		} else if (arg == wxT("--x") && i + 1 < argc) {
 			boundsX = wxAtoi(argv[++i]);
+			boundsConfigured = true;
 		} else if (arg == wxT("--y") && i + 1 < argc) {
 			boundsY = wxAtoi(argv[++i]);
+			boundsConfigured = true;
 		} else if (arg == wxT("--z") && i + 1 < argc) {
 			boundsZ = wxAtoi(argv[++i]);
+			boundsConfigured = true;
 		} else if (arg == wxT("--radius") && i + 1 < argc) {
 			boundsRadius = wxAtoi(argv[++i]);
+			boundsConfigured = true;
 		} else if (arg == wxT("--assets") && i + 1 < argc) {
-			assetsPath = FileName(argv[++i]);
+			config.assetsPath.AssignDir(argv[++i]);
+		} else if (arg == wxT("--items") && i + 1 < argc) {
+			config.itemsPath.AssignDir(argv[++i]);
+		} else if (arg == wxT("--monsters") && i + 1 < argc) {
+			config.monstersPath.AssignDir(argv[++i]);
+		} else if (arg == wxT("--npcs") && i + 1 < argc) {
+			config.npcsPath.AssignDir(argv[++i]);
 		} else {
 			std::cerr << "Unknown argument: " << arg.ToStdString() << std::endl;
 			return false;
 		}
 	}
 
-	if (!mapPath.FileExists()) {
-		std::cerr << "Map file not found. Use --map <file.otbm>." << std::endl;
-		printUsage();
-		return false;
-	}
-
-	const bool anyBoundsArg = boundsX >= 0 || boundsY >= 0 || boundsZ >= 0 || boundsRadius >= 0;
-	if (anyBoundsArg) {
+	if (boundsConfigured) {
 		if (boundsX < 0 || boundsY < 0 || boundsZ < 0 || boundsRadius <= 0) {
-			std::cerr << "Session bounds require all of --x, --y, --z, and --radius." << std::endl;
+			std::cerr << "Session bounds require all of --x, --y, --z, and --radius (or CENTER_X/Y/Z and RADIUS in mapserver.cfg)." << std::endl;
 			return false;
 		}
-		if (boundsZ < 0 || boundsZ > 15) {
+		if (boundsZ > 15) {
 			std::cerr << "Invalid session floor (0-15)." << std::endl;
 			return false;
 		}
-		sessionBounds.enabled = true;
-		sessionBounds.centerX = static_cast<uint16_t>(boundsX);
-		sessionBounds.centerY = static_cast<uint16_t>(boundsY);
-		sessionBounds.centerZ = static_cast<uint8_t>(boundsZ);
-		sessionBounds.radius = static_cast<uint32_t>(boundsRadius);
+		config.sessionBounds.enabled = true;
+		config.sessionBounds.centerX = static_cast<uint16_t>(boundsX);
+		config.sessionBounds.centerY = static_cast<uint16_t>(boundsY);
+		config.sessionBounds.centerZ = static_cast<uint8_t>(boundsZ);
+		config.sessionBounds.radius = static_cast<uint32_t>(boundsRadius);
+	} else {
+		config.sessionBounds.enabled = false;
 	}
-	return true;
+
+	return validateMapServerConfig(config);
 }
 
-bool configureAssetsForMap(const FileName& mapPath, const FileName& assetsPath) {
+wxString normalizeConfigDirectory(const wxString& rawPath) {
+	if (rawPath.empty()) {
+		return wxEmptyString;
+	}
+
+	FileName directory;
+	directory.AssignDir(rawPath);
+	if (!directory.DirExists()) {
+		return wxEmptyString;
+	}
+
+	wxString normalized = directory.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+	if (!normalized.EndsWith(FileName::GetPathSeparator())) {
+		normalized << FileName::GetPathSeparator();
+	}
+	return normalized;
+}
+
+wxString getMapDataRoot(const MapServerConfig& config) {
+	FileName mapDirectory;
+	mapDirectory.AssignDir(config.mapPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
+	if (!mapDirectory.DirExists() || mapDirectory.GetDirCount() == 0) {
+		return wxEmptyString;
+	}
+
+	FileName dataDirectory = mapDirectory;
+	dataDirectory.RemoveLastDir();
+	return dataDirectory.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+}
+
+bool directoryHasItemsFiles(const FileName& directory) {
+	const FileName itemsOtb(directory.GetFullPath(), "items.otb");
+	const FileName itemsXml(directory.GetFullPath(), "items.xml");
+	return itemsOtb.FileExists() && itemsXml.FileExists();
+}
+
+void resolveDefaultServerDataPaths(MapServerConfig& config) {
+	const wxString dataRoot = getMapDataRoot(config);
+	if (dataRoot.empty()) {
+		return;
+	}
+
+	if (config.monstersPath.GetFullPath().empty()) {
+		FileName monstersDirectory;
+		monstersDirectory.AssignDir(dataRoot);
+		monstersDirectory.AppendDir("monster");
+		if (monstersDirectory.DirExists()) {
+			config.monstersPath = monstersDirectory;
+		}
+	}
+
+	if (config.npcsPath.GetFullPath().empty()) {
+		FileName npcsDirectory;
+		npcsDirectory.AssignDir(dataRoot);
+		npcsDirectory.AppendDir("npc");
+		if (npcsDirectory.DirExists()) {
+			config.npcsPath = npcsDirectory;
+		}
+	}
+
+	if (config.itemsPath.GetFullPath().empty()) {
+		FileName itemsDirectory;
+		itemsDirectory.AssignDir(dataRoot);
+		itemsDirectory.AppendDir("items");
+		if (itemsDirectory.DirExists() && directoryHasItemsFiles(itemsDirectory)) {
+			config.itemsPath = itemsDirectory;
+		}
+	}
+}
+
+void applyItemsPath(ClientVersion* clientVersion, const MapServerConfig& config) {
+	if (clientVersion == nullptr) {
+		return;
+	}
+
+	if (config.itemsPath.GetFullPath().empty()) {
+		return;
+	}
+
+	if (!config.itemsPath.DirExists()) {
+		std::cerr << "[live] Warning: ITEMS path does not exist: "
+		          << config.itemsPath.GetFullPath().ToStdString() << std::endl;
+		return;
+	}
+
+	if (!directoryHasItemsFiles(config.itemsPath)) {
+		std::cerr << "[live] Warning: ITEMS path is missing items.otb or items.xml: "
+		          << config.itemsPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR).ToStdString()
+		          << std::endl;
+		return;
+	}
+
+	clientVersion->setItemsPath(config.itemsPath);
+	std::cout << "[live] Using items from "
+	          << config.itemsPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR).ToStdString()
+	          << std::endl;
+}
+
+void applyCreaturePaths(ClientVersion* clientVersion, const MapServerConfig& config) {
+	if (clientVersion == nullptr) {
+		return;
+	}
+
+	if (!config.monstersPath.GetFullPath().empty()) {
+		if (config.monstersPath.DirExists()) {
+			clientVersion->setMonstersPath(config.monstersPath);
+			std::cout << "[live] Using monsters from "
+			          << config.monstersPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR).ToStdString()
+			          << std::endl;
+		} else {
+			std::cerr << "[live] Warning: MONSTERS path does not exist: "
+			          << config.monstersPath.GetFullPath().ToStdString() << std::endl;
+		}
+	}
+
+	if (!config.npcsPath.GetFullPath().empty()) {
+		if (config.npcsPath.DirExists()) {
+			clientVersion->setNpcsPath(config.npcsPath);
+			std::cout << "[live] Using NPCs from "
+			          << config.npcsPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR).ToStdString()
+			          << std::endl;
+		} else {
+			std::cerr << "[live] Warning: NPCS path does not exist: "
+			          << config.npcsPath.GetFullPath().ToStdString() << std::endl;
+		}
+	}
+}
+
+bool configureClientForMap(const MapServerConfig& config) {
 	MapVersion version;
-	if (!IOMapOTBM::getVersionInfo(mapPath, version)) {
+	if (!IOMapOTBM::getVersionInfo(config.mapPath, version)) {
 		std::cerr << "Could not read client version from map file." << std::endl;
 		return false;
 	}
@@ -218,9 +535,16 @@ bool configureAssetsForMap(const FileName& mapPath, const FileName& assetsPath) 
 		return false;
 	}
 
+	if (!config.itemsPath.GetFullPath().empty()) {
+		clientVersion->clearItemsPath();
+	}
+
 	wxArrayString searchDirs;
-	if (assetsPath.DirExists()) {
-		searchDirs.Add(assetsPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
+	const wxString configuredAssetsDir = normalizeConfigDirectory(config.assetsPath.GetFullPath());
+	if (!configuredAssetsDir.empty()) {
+		searchDirs.Add(configuredAssetsDir);
+	} else if (!config.assetsPath.GetFullPath().empty()) {
+		std::cerr << "[live] ASSETS path does not exist: " << config.assetsPath.GetFullPath().ToStdString() << std::endl;
 	}
 	searchDirs.Add(g_gui.GetExecDirectory());
 
@@ -248,7 +572,9 @@ bool configureAssetsForMap(const FileName& mapPath, const FileName& assetsPath) 
 		}
 
 		if (clientVersion->tryConfigureFromDirectory(FileName(candidate))) {
-			std::cout << "[live] Using assets from " << candidate.ToStdString() << std::endl;
+			std::cout << "[live] Using client assets from " << candidate.ToStdString() << std::endl;
+			applyItemsPath(clientVersion, config);
+			applyCreaturePaths(clientVersion, config);
 			ClientVersion::saveVersions();
 			return true;
 		}
@@ -256,8 +582,14 @@ bool configureAssetsForMap(const FileName& mapPath, const FileName& assetsPath) 
 
 	std::cerr << "Could not locate Tibia.dat/Tibia.spr for map client version "
 	          << clientVersion->getName() << "." << std::endl;
-	std::cerr << "Place the asset files next to MapServer_x64.exe or pass --assets <directory>."
-	          << std::endl;
+	std::cerr << "Set ASSETS in mapserver.cfg or pass --assets <directory>." << std::endl;
+	if (!config.itemsPath.GetFullPath().empty() && !directoryHasItemsFiles(config.itemsPath)) {
+		std::cerr << "Set ITEMS in mapserver.cfg or pass --items <directory> for items.otb/items.xml." << std::endl;
+	}
+	std::cerr << "Searched:" << std::endl;
+	for (const wxString& candidate : searchDirs) {
+		std::cerr << "  - " << candidate.ToStdString() << std::endl;
+	}
 	return false;
 }
 
@@ -337,68 +669,80 @@ public:
 		ClientVersion::loadVersions();
 		g_settings.setInteger(Config::ALWAYS_MAKE_BACKUP, 1);
 
-		FileName mapPath;
-		uint16_t port = 31313;
-		wxString password;
-		wxString sessionName;
-		LiveSessionBounds sessionBounds;
-		FileName assetsPath;
-		if (!parseArgs(argc, argv, mapPath, port, password, sessionName, sessionBounds, assetsPath)) {
+		const auto startupFailed = [this]() {
+			waitForEnterOnStartupFailure(argc);
 			return false;
+		};
+
+		MapServerConfig config;
+		const bool configFileExists = wxFileName(getMapServerConfigPath()).FileExists();
+		if (!loadMapServerConfig(config)) {
+			return startupFailed();
+		}
+		if (!configFileExists) {
+			std::cout << "[live] No mapserver.cfg found. Copy mapserver.cfg.example to mapserver.cfg and edit it." << std::endl;
+			std::cout << "[live] Expected path: " << getMapServerConfigPath().ToStdString() << std::endl;
+		}
+		if (!parseArgs(argc, argv, config)) {
+			return startupFailed();
 		}
 
-		if (!configureAssetsForMap(mapPath, assetsPath)) {
-			return false;
+		g_autosaveIntervalSeconds = config.autosaveMinutes * 60;
+
+		resolveDefaultServerDataPaths(config);
+
+		if (!configureClientForMap(config)) {
+			return startupFailed();
 		}
 
 		try {
-			g_editor = newd Editor(g_gui.copybuffer, mapPath);
+			g_editor = newd Editor(g_gui.copybuffer, config.mapPath);
 		} catch (const std::runtime_error& e) {
 			std::cerr << "Failed to load map: " << e.what() << std::endl;
-			return false;
+			return startupFailed();
 		} catch (const std::string& e) {
 			std::cerr << "Failed to load map: " << e << std::endl;
-			return false;
+			return startupFailed();
 		}
 
-		if (!sessionName.empty()) {
-			g_editor->getMap().setName(nstr(sessionName));
+		if (!config.sessionName.empty()) {
+			g_editor->getMap().setName(nstr(config.sessionName));
 		}
 
 		Map& map = g_editor->getMap();
-		if (!IOMapOTBM::loadAuxiliaryHouses(map, mapPath)) {
+		if (!IOMapOTBM::loadAuxiliaryHouses(map, config.mapPath)) {
 			std::cerr << "[live] Warning: no house data loaded." << std::endl;
 		}
 		if (countMapCreatures(map) == 0) {
-			if (!IOMapOTBM::loadAuxiliarySpawns(map, mapPath)) {
+			if (!IOMapOTBM::loadAuxiliarySpawns(map, config.mapPath)) {
 				std::cerr << "[live] Warning: no creatures loaded from spawn file." << std::endl;
 			}
 		}
-		if (!IOMapOTBM::loadAuxiliaryComments(map, mapPath)) {
+		if (!IOMapOTBM::loadAuxiliaryComments(map, config.mapPath)) {
 			std::cerr << "[live] Warning: no map comments loaded." << std::endl;
 		}
 		logMapLoadSummary(map);
 
 		g_server = g_editor->StartLiveServer();
-		g_server->setPort(port);
-		g_server->setPassword(password);
-		if (sessionBounds.enabled) {
-			g_server->setSessionBounds(sessionBounds);
+		g_server->setPort(config.port);
+		g_server->setPassword(config.password);
+		if (config.sessionBounds.enabled) {
+			g_server->setSessionBounds(config.sessionBounds);
 		}
 
 		if (!g_server->bind()) {
 			std::cerr << g_server->getLastError().ToStdString() << std::endl;
-			return false;
+			return startupFailed();
 		}
 
 		std::cout << "[live] Hosting '" << g_editor->getMap().getName()
-		          << "' on port " << port << std::endl;
-		if (sessionBounds.enabled) {
+		          << "' on port " << config.port << std::endl;
+		if (config.sessionBounds.enabled) {
 			std::cout << "[live] Session area: center ("
-			          << sessionBounds.centerX << ","
-			          << sessionBounds.centerY << ","
-			          << static_cast<unsigned>(sessionBounds.centerZ) << ") radius "
-			          << sessionBounds.radius << std::endl;
+			          << config.sessionBounds.centerX << ","
+			          << config.sessionBounds.centerY << ","
+			          << static_cast<unsigned>(config.sessionBounds.centerZ) << ") radius "
+			          << config.sessionBounds.radius << std::endl;
 		}
 		if (g_autosaveIntervalSeconds > 0) {
 			std::cout << "[live] Auto-save every " << (g_autosaveIntervalSeconds / 60)

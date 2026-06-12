@@ -13,7 +13,8 @@ CMakeLists.txt.user*
 rme
 rme.cfg
 data/user
-*.cfg
+editor.cfg
+mapserver.cfg
 *.txt
 
 # exe and dll

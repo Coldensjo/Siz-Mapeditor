@@ -80,19 +80,64 @@ MapServer hosts a map so multiple editors can edit it together over the network.
 
 ### Start the server
 
+**Recommended:** copy `mapserver.cfg.example` to `mapserver.cfg` next to `MapServer_x64.exe`, edit it, then run:
+
+```text
+MapServer_x64.exe
+```
+
+**Or** pass options on the command line (they override `mapserver.cfg`):
+
 ```text
 MapServer_x64.exe --map path\to\map.otbm [options]
 ```
 
-**Options**
+#### mapserver.cfg
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `MAP` | Path to the `.otbm` file to host | *(required)* |
+| `PORT` | TCP port | `31313` |
+| `PASSWORD` | Session password | empty |
+| `NAME` | Session display name | map file name |
+| `AUTOSAVE` | Auto-save interval in minutes (`0` = off) | `5` |
+| `ASSETS` | Client folder with `Tibia.dat`, `Tibia.spr`, `Tibia.otfi` | search next to exe |
+| `ITEMS` | Server folder with `items.otb` and `items.xml` | `<map-parent>/items` if both files exist |
+| `MONSTERS` | Folder with monster XML files | `<map-parent>/monster` if it exists |
+| `NPCS` | Folder with NPC XML files | `<map-parent>/npc` if it exists |
+| `CENTER_X`, `CENTER_Y`, `CENTER_Z`, `RADIUS` | Limit editing to an area (all four required) | whole map |
+
+Example `mapserver.cfg`:
+
+```ini
+MAP=C:\Servers\Ironcore\data\world\Ironcore.otbm
+PORT=31313
+PASSWORD=secret
+NAME=Ironcore
+AUTOSAVE=1
+ASSETS=C:\Servers\Ironcore Client\data\things\800
+ITEMS=C:\Servers\Ironcore\data\items
+MONSTERS=C:\Servers\Ironcore\data\monster
+NPCS=C:\Servers\Ironcore\data\npc
+CENTER_X=2564
+CENTER_Y=1618
+CENTER_Z=7
+RADIUS=350
+```
+
+#### Command-line options
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--map <file.otbm>` | Map file to host | from `mapserver.cfg` |
 | `--port <number>` | TCP port | `31313` |
 | `--password <pass>` | Session password | empty |
 | `--name <name>` | Session display name | map name |
 | `--autosave <minutes>` | Auto-save interval (`0` = off) | `5` |
-| `--assets <directory>` | Folder with `Tibia.dat`, `Tibia.spr`, `Tibia.otfi`, `items.otb`, and `items.xml` | next to `MapServer_x64.exe`, then current directory |
+| `--assets <directory>` | Client folder with `Tibia.dat`, `Tibia.spr`, `Tibia.otfi` | next to `MapServer_x64.exe`, then current directory |
+| `--items <directory>` | Server folder with `items.otb` and `items.xml` | from `mapserver.cfg` or auto-detected |
+| `--monsters <directory>` | Folder with monster XML files | from `mapserver.cfg` or auto-detected |
+| `--npcs <directory>` | Folder with NPC XML files | from `mapserver.cfg` or auto-detected |
 | `--x`, `--y`, `--z`, `--radius` | Limit editing to an area around a center tile | whole map |
 
 **Example**
@@ -143,16 +188,19 @@ The editor and MapServer need Tibia client files to display items and sprites. M
 
 ### MapServer
 
-Point MapServer at a folder that contains at least:
+Point MapServer at separate folders (see `mapserver.cfg`):
 
-- `Tibia.dat`, `Tibia.spr` (and optionally `Tibia.otfi`)
-- `items.otb`, `items.xml`
+- **ASSETS** — `Tibia.dat`, `Tibia.spr`, `Tibia.otfi`
+- **ITEMS** — `items.otb`, `items.xml`
+- **MONSTERS** / **NPCS** — creature XML (used for spawn looktypes)
+
+Connecting editors download all of the above from the host during live join.
 
 ```text
-.\MapServer_x64.exe --map path\to\map.otbm --assets C:\path\to\assets\ [other options]
+.\MapServer_x64.exe --map path\to\map.otbm --assets C:\path\to\things\800 --items C:\path\to\items [other options]
 ```
 
-If you omit `--assets`, MapServer looks next to the executable and in the current working directory. On startup it prints which folder it picked, for example: `[live] Using assets from ...`.
+If you omit paths, MapServer looks next to the executable and in the current working directory. On startup it prints which folders it picked, for example: `[live] Using client assets from ...`, `[live] Using items from ...`, `[live] Using monsters from ...`.
 
 ### Editor (offline / normal use)
 
@@ -166,8 +214,10 @@ On first connect to a live server, the editor downloads the server's asset set a
 
 ```text
 {Editor_x64.exe folder}\data\user\data\live_cache\{client version}\
-├── client\   ← Tibia.dat, Tibia.spr, Tibia.otfi
-└── items\    ← items.otb, items.xml
+├── client\    ← Tibia.dat, Tibia.spr, Tibia.otfi
+├── items\     ← items.otb, items.xml
+├── monsters\  ← monster XML from the server
+└── npcs\      ← NPC XML from the server
 ```
 
 Later connections reuse the cache if file sizes match; the live log may show **Using cached assets from a previous live session.**
@@ -187,9 +237,9 @@ MapServer's `--assets` path controls **what you send**; it does not encrypt or r
 
 ## Settings
 
-Editor and MapServer read settings from `editor.cfg` in the same folder as the executable. If the file is missing, defaults are used.
+The editor reads `editor.cfg` from the same folder as `Editor_x64.exe`. MapServer reads **`mapserver.cfg`** from the same folder as `MapServer_x64.exe`. Copy `mapserver.cfg.example` to get started. If a config file is missing, defaults are used (MapServer still requires `MAP` via config or `--map`).
 
-Live connection defaults (under the **Network** section):
+Live connection defaults in the editor (under the **Network** section of `editor.cfg`):
 
 | Setting | Default | Used for |
 |---------|---------|----------|
@@ -198,7 +248,7 @@ Live connection defaults (under the **Network** section):
 | `LIVE_USERNAME` | `User` | Your display name on the server |
 | `LIVE_PASSWORD` | empty | Session password |
 
-These are updated when you connect from the editor. MapServer session options (`--port`, `--password`, etc.) are set on the command line when you start the server, not in `editor.cfg`.
+These are updated when you connect from the editor. MapServer session options are set in `mapserver.cfg` or on the command line when you start the server.
 
 You can edit other editor preferences in `editor.cfg` or through the editor's settings UI.
 

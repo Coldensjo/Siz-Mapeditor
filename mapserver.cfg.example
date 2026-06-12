@@ -1,0 +1,45 @@
+# MapServer configuration
+# Copy this file to mapserver.cfg (same folder as MapServer_x64.exe) and edit the values below.
+# Then run MapServer_x64.exe with no command-line arguments.
+#
+# Command-line options still work and override these settings when provided.
+
+# Required: path to the .otbm map file to host
+# Windows paths may use single backslashes, for example:
+# MAP=C:\Servers\Ironcore\data\world\Ironcore.otbm
+MAP=C:\Path\To\Your\Map.otbm
+
+# TCP port for live editing (default: 31313)
+PORT=31313
+
+# Session password (leave empty for no password)
+PASSWORD=
+
+# Display name shown to connected editors (leave empty to use the map file name)
+NAME=My Live Map
+
+# Auto-save interval in minutes (0 = disabled, default: 5)
+AUTOSAVE=5
+
+# Client graphics folder: Tibia.dat, Tibia.spr, Tibia.otfi
+# Example: C:\Servers\Ironcore Client\data\things\800
+# WARNING: CONNECTED EDITORS DOWNLOAD THESE FILES FROM THE SERVER.
+ASSETS=C:\Path\To\client\things\800
+
+# Server items folder: items.otb and items.xml
+# If omitted, MapServer tries <map-parent>/items when it contains both files
+# Example: C:\Servers\Ironcore\data\items
+ITEMS=C:\Path\To\server\items
+
+# Monster and NPC XML folders (for spawn/creature looktypes)
+# If omitted, MapServer tries <map-parent>/monster and <map-parent>/npc
+# WARNING: CONNECTED EDITORS DOWNLOAD THE .XML FILES FROM THE SERVER.
+MONSTERS=C:\Path\To\server\monster
+NPCS=C:\Path\To\server\npc
+
+# Optional session bounds: limit editing to an area around a center tile
+# Set all four values, or leave them empty for the whole map
+CENTER_X=
+CENTER_Y=
+CENTER_Z=
+RADIUS=
