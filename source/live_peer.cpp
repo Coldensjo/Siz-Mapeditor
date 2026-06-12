@@ -421,11 +421,22 @@ void LivePeer::parseReceiveChanges(NetworkMessage& message) {
 	Editor& editor = *server->getEditor();
 
 	const std::string data = message.read<std::string>();
+	if (data.empty()) {
+		livePeerLog(log, "Received empty or invalid change packet.");
+		return;
+	}
+
 	std::vector<uint8_t> buffer(data.begin(), data.end());
 	buffer.insert(buffer.begin(), 0); // Leading byte skipped by OTBM node reader
 	mapReader.assign(buffer.data(), buffer.size());
 
 	BinaryNode* rootNode = mapReader.getRootNode();
+	if (!rootNode) {
+		livePeerLog(log, "Could not parse change packet.");
+		mapReader.close();
+		return;
+	}
+
 	BinaryNode* tileNode = rootNode->getChild();
 
 	NetworkedAction* action = static_cast<NetworkedAction*>(editor.createAction(ACTION_REMOTE));
