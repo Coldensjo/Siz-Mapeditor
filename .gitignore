@@ -13,6 +13,7 @@ CMakeLists.txt.user*
 rme
 rme.cfg
 data/user
+*.cfg
 
 # exe and dll
 *.dll
@@ -83,7 +84,6 @@ cmake-build-debug/
 
 # Local History Extension
 /.history
-
 
 # vcpkg
 /vcpkg_installed/
