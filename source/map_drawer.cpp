@@ -302,13 +302,13 @@ void MapDrawer::Draw() {
 	if (options.show_ingame_box) {
 		DrawIngameBox();
 	}
-	if (options.show_tooltips) {
+	DrawMapCommentTooltips();
+	if (options.show_tooltips || !tooltips.empty()) {
 		DrawTooltips();
 	}
 	DrawLiveCursors();
 	DrawLiveParticipants();
 	DrawMapComments();
-	DrawMapCommentTooltips();
 
 	if (editor.live_client) {
 		editor.live_client->sendNodeRequests();
