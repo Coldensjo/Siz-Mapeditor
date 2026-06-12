@@ -198,6 +198,10 @@ LiveSocket& Editor::GetLive() const {
 	return static_cast<LiveSocket&>(*live_client);
 }
 
+bool Editor::IsClipboardAllowed() const {
+	return !IsLiveClient() || g_settings.getBoolean(Config::LIVE_ALLOW_CLIPBOARD);
+}
+
 LiveServer* Editor::StartLiveServer() {
 	ASSERT(IsLocal());
 	live_server = newd LiveServer(*this);

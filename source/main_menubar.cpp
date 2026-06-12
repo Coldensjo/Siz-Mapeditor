@@ -352,7 +352,7 @@ void MainMenuBar::Update() {
 	if (editor) {
 		EnableItem(UNDO, editor->actionQueue->canUndo());
 		EnableItem(REDO, editor->actionQueue->canRedo());
-		EnableItem(PASTE, editor->copybuffer.canPaste() && !is_live_client);
+		EnableItem(PASTE, editor->copybuffer.canPaste() && editor->IsClipboardAllowed());
 	} else {
 		EnableItem(UNDO, false);
 		EnableItem(REDO, false);
@@ -418,8 +418,8 @@ void MainMenuBar::Update() {
 	EnableItem(REMOVE_ON_SELECTION_ITEM, has_selection && is_host);
 	EnableItem(EXPORT_CREATURES_IN_SELECTION, has_selection && is_host);
 
-	EnableItem(CUT, has_map && !is_live_client);
-	EnableItem(COPY, has_map && !is_live_client);
+	EnableItem(CUT, has_map && editor->IsClipboardAllowed());
+	EnableItem(COPY, has_map && editor->IsClipboardAllowed());
 
 	EnableItem(BORDERIZE_SELECTION, has_map && has_selection);
 	EnableItem(BORDERIZE_MAP, is_local);

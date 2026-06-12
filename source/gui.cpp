@@ -1740,7 +1740,7 @@ void GUI::DoCut() {
 	}
 
 	Editor* editor = GetCurrentEditor();
-	if (!editor || editor->IsLiveClient()) {
+	if (!editor || !editor->IsClipboardAllowed()) {
 		return;
 	}
 
@@ -1755,7 +1755,7 @@ void GUI::DoCopy() {
 	}
 
 	Editor* editor = GetCurrentEditor();
-	if (!editor || editor->IsLiveClient()) {
+	if (!editor || !editor->IsClipboardAllowed()) {
 		return;
 	}
 
@@ -1766,7 +1766,7 @@ void GUI::DoCopy() {
 
 void GUI::DoPaste() {
 	Editor* editor = GetCurrentEditor();
-	if (editor && editor->IsLiveClient()) {
+	if (editor && !editor->IsClipboardAllowed()) {
 		return;
 	}
 
@@ -1778,7 +1778,7 @@ void GUI::DoPaste() {
 
 void GUI::PreparePaste() {
 	Editor* editor = GetCurrentEditor();
-	if (!editor || editor->IsLiveClient()) {
+	if (!editor || !editor->IsClipboardAllowed()) {
 		return;
 	}
 	SetSelectionMode();
@@ -1790,7 +1790,7 @@ void GUI::PreparePaste() {
 }
 
 void GUI::StartPasting() {
-	if (GetCurrentEditor() && !GetCurrentEditor()->IsLiveClient()) {
+	if (GetCurrentEditor() && GetCurrentEditor()->IsClipboardAllowed()) {
 		pasting = true;
 		secondary_map = &copybuffer.getBufferMap();
 	}

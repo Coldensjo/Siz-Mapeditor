@@ -194,7 +194,7 @@ void MainToolBar::UpdateButtons() {
 	if (editor) {
 		standard_toolbar->EnableTool(wxID_UNDO, editor->actionQueue->canUndo());
 		standard_toolbar->EnableTool(wxID_REDO, editor->actionQueue->canRedo());
-		standard_toolbar->EnableTool(wxID_PASTE, editor->copybuffer.canPaste() && !is_live_client);
+		standard_toolbar->EnableTool(wxID_PASTE, editor->copybuffer.canPaste() && editor->IsClipboardAllowed());
 	} else {
 		standard_toolbar->EnableTool(wxID_UNDO, false);
 		standard_toolbar->EnableTool(wxID_REDO, false);
@@ -206,8 +206,8 @@ void MainToolBar::UpdateButtons() {
 
 	standard_toolbar->EnableTool(wxID_SAVE, is_host);
 	standard_toolbar->EnableTool(wxID_SAVEAS, is_host);
-	standard_toolbar->EnableTool(wxID_CUT, has_map && !is_live_client);
-	standard_toolbar->EnableTool(wxID_COPY, has_map && !is_live_client);
+	standard_toolbar->EnableTool(wxID_CUT, has_map && editor->IsClipboardAllowed());
+	standard_toolbar->EnableTool(wxID_COPY, has_map && editor->IsClipboardAllowed());
 
 	brushes_toolbar->EnableTool(PALETTE_TERRAIN_OPTIONAL_BORDER_TOOL, has_map);
 	brushes_toolbar->EnableTool(PALETTE_TERRAIN_ERASER, has_map);

@@ -371,6 +371,7 @@ void Settings::IO(IOMode mode) {
 	Int(LIVE_PORT, 31313);
 	String(LIVE_USERNAME, "User");
 	String(LIVE_PASSWORD, "");
+	Int(LIVE_ALLOW_CLIPBOARD, 0);
 
 	section("Window");
 	String(PALETTE_LAYOUT, "name=02c30f6048629894000011bc00000002;caption=Palette;state=2099148;dir=4;layer=0;row=0;pos=0;prop=100000;bestw=295;besth=100;minw=-1;minh=-1;maxw=-1;maxh=-1;floatx=-1;floaty=-1;floatw=-1;floath=-1");

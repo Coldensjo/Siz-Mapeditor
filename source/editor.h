@@ -74,6 +74,7 @@ public: // Functions
 	bool IsLiveClient() const {
 		return live_client != nullptr;
 	}
+	bool IsClipboardAllowed() const;
 	bool IsLiveServer() const {
 		return live_server != nullptr;
 	}

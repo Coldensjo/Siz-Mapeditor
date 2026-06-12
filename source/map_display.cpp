@@ -1906,7 +1906,7 @@ void MapCanvas::OnKeyUp(wxKeyEvent& event) {
 }
 
 void MapCanvas::OnCopy(wxCommandEvent& WXUNUSED(event)) {
-	if (editor.IsLiveClient()) {
+	if (!editor.IsClipboardAllowed()) {
 		return;
 	}
 	if (g_gui.IsSelectionMode()) {
@@ -1915,7 +1915,7 @@ void MapCanvas::OnCopy(wxCommandEvent& WXUNUSED(event)) {
 }
 
 void MapCanvas::OnCut(wxCommandEvent& WXUNUSED(event)) {
-	if (editor.IsLiveClient()) {
+	if (!editor.IsClipboardAllowed()) {
 		return;
 	}
 	if (g_gui.IsSelectionMode()) {
@@ -1925,7 +1925,7 @@ void MapCanvas::OnCut(wxCommandEvent& WXUNUSED(event)) {
 }
 
 void MapCanvas::OnPaste(wxCommandEvent& WXUNUSED(event)) {
-	if (editor.IsLiveClient()) {
+	if (!editor.IsClipboardAllowed()) {
 		return;
 	}
 	g_gui.DoPaste();
@@ -2534,7 +2534,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 	AppendSeparator();
 
 	bool anything_selected = editor.selection.size() != 0;
-	const bool allow_clipboard = !editor.IsLiveClient();
+	const bool allow_clipboard = editor.IsClipboardAllowed();
 
 	wxMenuItem* cutItem = Append(MAP_POPUP_MENU_CUT, "&Cut\tCTRL+X", "Cut out all selected items");
 	cutItem->Enable(anything_selected && allow_clipboard);

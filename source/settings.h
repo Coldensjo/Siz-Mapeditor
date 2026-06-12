@@ -204,6 +204,7 @@ namespace Config {
 		LIVE_PORT,
 		LIVE_USERNAME,
 		LIVE_PASSWORD,
+		LIVE_ALLOW_CLIPBOARD,
 
 		LAST,
 	};

@@ -70,6 +70,7 @@ protected:
 	wxCheckBox* allow_multiple_orderitems_chkbox;
 	wxCheckBox* merge_move_chkbox;
 	wxCheckBox* merge_paste_chkbox;
+	wxCheckBox* live_allow_clipboard_chkbox;
 
 	// Graphics
 	wxCheckBox* icon_selection_shadow_chkbox;
