@@ -463,6 +463,14 @@ bool MainFrame::DoQuerySave(bool doclose) {
 	}
 
 	Editor& editor = *g_gui.GetCurrentEditor();
+	if (editor.IsLiveClient()) {
+		// Live mapping clients cannot save; the host server owns the map.
+		if (doclose) {
+			UnnamedRenderingLock();
+			g_gui.CloseCurrentEditor();
+		}
+		return true;
+	}
 	if (g_gui.ShouldSave()) {
 		if (g_settings.getBoolean(Config::AUTO_SAVE_ON_CLOSE)) {
 			if (g_gui.GetCurrentMap().hasFile()) {
