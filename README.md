@@ -148,3 +148,7 @@ Live connection defaults (under the **Network** section):
 These are updated when you connect from the editor. MapServer session options (`--port`, `--password`, etc.) are set on the command line when you start the server, not in `editor.cfg`.
 
 You can edit other editor preferences in `editor.cfg` or through the editor's settings UI.
+
+## License
+
+MIT [LICENSE](LICENSE)
