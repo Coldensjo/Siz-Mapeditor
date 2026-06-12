@@ -297,7 +297,7 @@ public:
 
 	// Load/unload a client version (takes care of dialogs aswell)
 	void UnloadVersion();
-	bool LoadVersion(ClientVersionID ver, wxString& error, wxArrayString& warnings, bool force = false);
+	bool LoadVersion(ClientVersionID ver, wxString& error, wxArrayString& warnings, bool force = false, bool promptForPaths = true);
 	// The current version loaded (returns CLIENT_VERSION_NONE if no version is loaded)
 	const ClientVersion& GetCurrentVersion() const;
 	ClientVersionID GetCurrentVersionID() const;

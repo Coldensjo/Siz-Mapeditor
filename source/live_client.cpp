@@ -20,6 +20,7 @@
 #include "live_client.h"
 #include "live_tab.h"
 #include "live_action.h"
+#include "live_assets.h"
 #include "editor.h"
 #include "gui.h"
 #include "map_tab.h"
@@ -31,7 +32,9 @@ LiveClient::LiveClient() :
 	LiveSocket(),
 	readMessage(), queryNodeList(), currentOperation(),
 	resolver(nullptr), socket(nullptr), editor(nullptr), stopped(false),
-	ownClientColor(0, 166, 0, 200) {
+	ownClientColor(0, 166, 0, 200), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
+	assetReceiveState(), ignoreIncomingAssets(false), waitingForServerAssets(false),
+	assetBytesExpected(0), assetBytesReceived(0), assetProgressReported(0) {
 	//
 }
 
@@ -46,14 +49,20 @@ bool LiveClient::connect(const std::string& address, uint16_t port) {
 		return false;
 	}
 
+	stopped = false;
+
 	auto& service = connection.get_service();
 	if (!resolver) {
 		resolver = std::make_shared<asio::ip::tcp::resolver>(service);
+	} else {
+		resolver->cancel();
 	}
 
-	if (!socket) {
-		socket = std::make_shared<asio::ip::tcp::socket>(service);
+	if (socket) {
+		net_error_code closeError;
+		socket->close(closeError);
 	}
+	socket = std::make_shared<asio::ip::tcp::socket>(service);
 
 	resolver->async_resolve(address, std::to_string(port), [this](const net_error_code& error, asio::ip::tcp::resolver::results_type results) -> void {
 		if (error) {
@@ -278,6 +287,7 @@ void LiveClient::sendHello() {
 	message.write<std::string>(nstr(password));
 
 	send(message, [this]() {
+		logMessage("Hello sent, waiting for server response...");
 		NetworkConnection::getInstance().post([this]() {
 			receiveHeader();
 		});
@@ -390,6 +400,18 @@ void LiveClient::parsePacket(NetworkMessage message) {
 			case PACKET_CHANGE_CLIENT_VERSION:
 				parseChangeClientVersion(message);
 				break;
+			case PACKET_ASSET_FILE_BEGIN:
+				parseAssetFileBegin(message);
+				break;
+			case PACKET_ASSET_FILE_CHUNK:
+				parseAssetFileChunk(message);
+				break;
+			case PACKET_ASSET_FILE_END:
+				parseAssetFileEnd(message);
+				break;
+			case PACKET_ASSET_FILES_DONE:
+				parseAssetFilesDone(message);
+				break;
 			case PACKET_NODE:
 				parseNode(message);
 				break;
@@ -481,17 +503,132 @@ void LiveClient::parseClientAccepted(NetworkMessage& message) {
 }
 
 void LiveClient::parseChangeClientVersion(NetworkMessage& message) {
-	ClientVersionID clientVersion = static_cast<ClientVersionID>(message.read<uint32_t>());
-	logMessage("Switching to server client version...");
+	pendingVersionId = static_cast<ClientVersionID>(message.read<uint32_t>());
+	const uint32_t fileCount = message.read<uint32_t>();
+
+	pendingAssetManifest.clear();
+	pendingAssetManifest.reserve(fileCount);
+	for (uint32_t i = 0; i < fileCount; ++i) {
+		LiveAssetFile file;
+		file.kind = static_cast<LiveAssetKind>(message.read<uint8_t>());
+		file.filename = message.read<std::string>();
+		file.size = message.read<uint32_t>();
+		pendingAssetManifest.push_back(file);
+	}
+
+	resetLiveAssetReceiveState(assetReceiveState);
+	waitingForServerAssets = true;
+	ignoreIncomingAssets = false;
+	assetBytesExpected = 0;
+	assetBytesReceived = 0;
+	assetProgressReported = 0;
+	for (const LiveAssetFile& file : pendingAssetManifest) {
+		assetBytesExpected += file.size;
+	}
+
+	if (isLiveAssetCacheComplete(pendingVersionId, pendingAssetManifest)) {
+		logMessage("Using cached assets from a previous live session.");
+		ignoreIncomingAssets = true;
+		wxTheApp->CallAfter([this]() {
+			finishLiveVersionLoad();
+		});
+		return;
+	}
+
+	logMessage("Downloading assets from server...");
+}
+
+void LiveClient::parseAssetFileBegin(NetworkMessage& message) {
+	if (ignoreIncomingAssets) {
+		return;
+	}
+
+	const LiveAssetKind kind = static_cast<LiveAssetKind>(message.read<uint8_t>());
+	const std::string filename = message.read<std::string>();
+	const uint32_t size = message.read<uint32_t>();
+
+	wxString error;
+	if (!beginLiveAssetReceive(assetReceiveState, pendingVersionId, kind, filename, size, error)) {
+		logMessage("Asset download failed: " + error);
+		close();
+		g_gui.CloseLiveEditors(this);
+	}
+}
+
+void LiveClient::parseAssetFileChunk(NetworkMessage& message) {
+	if (ignoreIncomingAssets) {
+		return;
+	}
+
+	const std::string chunk = message.read<std::string>();
+	assetBytesReceived += chunk.size();
+	if (assetBytesExpected > 0) {
+		const int percent = static_cast<int>((assetBytesReceived * 100) / assetBytesExpected);
+		if (percent >= assetProgressReported + 5) {
+			while (assetProgressReported + 5 <= percent) {
+				assetProgressReported += 5;
+			}
+			logMessage(wxString::Format("Downloading assets... %d%%", assetProgressReported));
+		}
+	}
+
+	wxString error;
+	if (!appendLiveAssetChunk(assetReceiveState, chunk, error)) {
+		logMessage("Asset download failed: " + error);
+		close();
+		g_gui.CloseLiveEditors(this);
+	}
+}
+
+void LiveClient::parseAssetFileEnd(NetworkMessage& WXUNUSED(message)) {
+	if (ignoreIncomingAssets) {
+		return;
+	}
+
+	wxString error;
+	if (!finishLiveAssetReceive(assetReceiveState, error)) {
+		logMessage("Asset download failed: " + error);
+		close();
+		g_gui.CloseLiveEditors(this);
+	}
+}
+
+void LiveClient::parseAssetFilesDone(NetworkMessage& WXUNUSED(message)) {
+	if (ignoreIncomingAssets) {
+		return;
+	}
+
+	waitingForServerAssets = false;
+	if (assetBytesExpected > 0 && assetProgressReported < 100) {
+		assetProgressReported = 100;
+		logMessage("Downloading assets... 100%");
+	}
+	wxTheApp->CallAfter([this]() {
+		finishLiveVersionLoad();
+	});
+}
+
+void LiveClient::finishLiveVersionLoad() {
+	waitingForServerAssets = false;
+	logMessage("Loading server client version...");
 
 	if (!g_gui.CloseAllEditors()) {
+		logMessage("Could not close open maps for the live session.");
 		close();
+		g_gui.CloseLiveEditors(this);
+		return;
+	}
+
+	if (!applyLiveAssetCacheToVersion(pendingVersionId)) {
+		logMessage("Failed to prepare downloaded assets.");
+		close();
+		g_gui.CloseLiveEditors(this);
 		return;
 	}
 
 	wxString error;
 	wxArrayString warnings;
-	if (!g_gui.LoadVersion(clientVersion, error, warnings)) {
+	if (!g_gui.LoadVersion(pendingVersionId, error, warnings, true, false)) {
 		logMessage("Failed to load server client version: " + error);
 		close();
 		g_gui.CloseLiveEditors(this);

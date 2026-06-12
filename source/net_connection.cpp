@@ -89,7 +89,17 @@ bool NetworkConnection::start() {
 		if (stopped) {
 			return false;
 		}
-		return true;
+		// run() returns when the io_context is stopped; a joinable thread with a
+		// stopped service means the network pump died and must be restarted.
+		if (service && !service->stopped()) {
+			return true;
+		}
+		thread.join();
+		workGuard.reset();
+		if (service) {
+			delete service;
+			service = nullptr;
+		}
 	}
 
 	stopped = false;

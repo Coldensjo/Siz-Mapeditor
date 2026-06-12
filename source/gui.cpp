@@ -610,7 +610,7 @@ void GUI::discoverDataDirectory(const wxString& existentFile) {
 	}
 }
 
-bool GUI::LoadVersion(ClientVersionID version, wxString& error, wxArrayString& warnings, bool force) {
+bool GUI::LoadVersion(ClientVersionID version, wxString& error, wxArrayString& warnings, bool force, bool promptForPaths) {
 	if (ClientVersion::get(version) == nullptr) {
 		error = "Unsupported client version! (8)";
 		return false;
@@ -632,6 +632,11 @@ bool GUI::LoadVersion(ClientVersionID version, wxString& error, wxArrayString& w
 
 		loaded_version = version;
 		if (!getLoadedVersion()->hasValidPaths()) {
+			if (!promptForPaths) {
+				error = "Couldn't load relevant asset files";
+				loaded_version = CLIENT_VERSION_NONE;
+				return false;
+			}
 			if (!getLoadedVersion()->loadValidPaths()) {
 				error = "Couldn't load relevant asset files";
 				loaded_version = CLIENT_VERSION_NONE;
@@ -865,29 +870,15 @@ bool GUI::ConnectToLiveServer() {
 		root->Show();
 	}
 
-	if (!IsVersionLoaded()) {
-		ClientVersionID defaultVersion = ClientVersionID(g_settings.getInteger(Config::DEFAULT_CLIENT_VERSION));
-		if (defaultVersion == CLIENT_VERSION_NONE) {
-			if (ClientVersion::getLatestVersion() == nullptr) {
-				PopupDialog("Error", "No client version is available. Check your data directory.", wxOK);
-				return false;
-			}
-			defaultVersion = ClientVersion::getLatestVersion()->getID();
-		}
-
-		wxString error;
-		wxArrayString warnings;
-		if (!LoadVersion(defaultVersion, error, warnings)) {
-			PopupDialog("Error", error, wxOK);
-			return false;
-		}
-		if (!warnings.empty()) {
-			ListDialog("Warnings", warnings);
-		}
-	}
-
 	LiveConnectWindow dialog(root);
 	if (dialog.ShowModal() != wxID_OK) {
+		return false;
+	}
+
+	// Resolve save prompts before opening the live session so the handshake is
+	// not blocked later by a modal dialog behind the live log tab.
+	if (!CloseAllEditors()) {
+		PopupDialog("Cannot Connect", "Save or close your open maps before joining a live session.", wxOK);
 		return false;
 	}
 

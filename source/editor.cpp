@@ -125,8 +125,11 @@ Editor::Editor(CopyBuffer& copybuffer, const FileName& fn, ClientVersionID force
 		if (g_gui.CloseAllEditors()) {
 			success = g_gui.LoadVersion(versionToLoad, error, warnings, forceReloadVersion);
 			if (!success) {
+				if (g_gui.IsHeadless()) {
+					throw std::runtime_error(nstr(error.empty() ? wxString("Couldn't load client version.") : error));
+				}
 				g_gui.PopupDialog("Error", error, wxOK);
-			} else {
+			} else if (!g_gui.IsHeadless()) {
 				g_gui.ListDialog("Warnings", warnings);
 			}
 		} else {
@@ -147,6 +150,10 @@ Editor::Editor(CopyBuffer& copybuffer, const FileName& fn, ClientVersionID force
 			}
 		}
 		*/
+	}
+
+	if (!success) {
+		throw std::runtime_error("Failed to load map.");
 	}
 }
 

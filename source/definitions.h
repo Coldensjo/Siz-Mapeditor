@@ -40,7 +40,7 @@
 
 // Live collaboration protocol version. Bump this whenever the live packet
 // format changes in an incompatible way.
-#define __LIVE_NET_VERSION__ 10
+#define __LIVE_NET_VERSION__ 11
 
 // #define __PRERELEASE__ 1
 

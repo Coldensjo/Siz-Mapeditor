@@ -95,6 +95,15 @@ void LiveSocket::logMessage(const wxString& message) {
 	std::cout << "[live] " << message.ToStdString() << std::endl;
 	std::cout.flush();
 
+	if (wxThread::IsMain()) {
+		if (log) {
+			log->Message(message);
+		} else {
+			pendingLogMessages.push_back(message);
+		}
+		return;
+	}
+
 	wxTheApp->CallAfter([this, message]() {
 		if (log) {
 			log->Message(message);

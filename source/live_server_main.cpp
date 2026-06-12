@@ -55,6 +55,7 @@ void printUsage() {
 	          << "  --y <coord>           Session center Y\n"
 	          << "  --z <floor>           Session center floor\n"
 	          << "  --radius <sqm>        Editable/viewable radius around center\n"
+	          << "  --assets <directory>  Folder containing Tibia.dat/.spr and items.otb/.xml\n"
 	          << "\nConsole commands: save, list, kick <name>, exit\n";
 }
 
@@ -126,11 +127,12 @@ void tickAutosave() {
 	}
 }
 
-bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxString& password, wxString& sessionName, LiveSessionBounds& sessionBounds) {
+bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxString& password, wxString& sessionName, LiveSessionBounds& sessionBounds, FileName& assetsPath) {
 	port = 31313;
 	password = wxEmptyString;
 	sessionName = wxEmptyString;
 	sessionBounds = LiveSessionBounds {};
+	assetsPath.Clear();
 
 	int boundsX = -1;
 	int boundsY = -1;
@@ -170,6 +172,8 @@ bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxStr
 			boundsZ = wxAtoi(argv[++i]);
 		} else if (arg == wxT("--radius") && i + 1 < argc) {
 			boundsRadius = wxAtoi(argv[++i]);
+		} else if (arg == wxT("--assets") && i + 1 < argc) {
+			assetsPath = FileName(argv[++i]);
 		} else {
 			std::cerr << "Unknown argument: " << arg.ToStdString() << std::endl;
 			return false;
@@ -199,6 +203,62 @@ bool parseArgs(int argc, wxChar** argv, FileName& mapPath, uint16_t& port, wxStr
 		sessionBounds.radius = static_cast<uint32_t>(boundsRadius);
 	}
 	return true;
+}
+
+bool configureAssetsForMap(const FileName& mapPath, const FileName& assetsPath) {
+	MapVersion version;
+	if (!IOMapOTBM::getVersionInfo(mapPath, version)) {
+		std::cerr << "Could not read client version from map file." << std::endl;
+		return false;
+	}
+
+	ClientVersion* clientVersion = ClientVersion::get(version.client);
+	if (clientVersion == nullptr) {
+		std::cerr << "Unsupported map client version." << std::endl;
+		return false;
+	}
+
+	wxArrayString searchDirs;
+	if (assetsPath.DirExists()) {
+		searchDirs.Add(assetsPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
+	}
+	searchDirs.Add(g_gui.GetExecDirectory());
+
+	wxString workingDirectory;
+	workingDirectory = wxGetCwd();
+	if (!workingDirectory.empty()) {
+		workingDirectory = wxGetCwd();
+		if (!workingDirectory.EndsWith(FileName::GetPathSeparator())) {
+			workingDirectory << FileName::GetPathSeparator();
+		}
+		searchDirs.Add(workingDirectory);
+	}
+
+	for (size_t i = 0; i < searchDirs.size(); ++i) {
+		const wxString candidate = searchDirs[i];
+		bool duplicate = false;
+		for (size_t j = 0; j < i; ++j) {
+			if (searchDirs[j] == candidate) {
+				duplicate = true;
+				break;
+			}
+		}
+		if (duplicate) {
+			continue;
+		}
+
+		if (clientVersion->tryConfigureFromDirectory(FileName(candidate))) {
+			std::cout << "[live] Using assets from " << candidate.ToStdString() << std::endl;
+			ClientVersion::saveVersions();
+			return true;
+		}
+	}
+
+	std::cerr << "Could not locate Tibia.dat/Tibia.spr for map client version "
+	          << clientVersion->getName() << "." << std::endl;
+	std::cerr << "Place the asset files next to MapServer_x64.exe or pass --assets <directory>."
+	          << std::endl;
+	return false;
 }
 
 void processCommand(const std::string& line) {
@@ -282,7 +342,12 @@ public:
 		wxString password;
 		wxString sessionName;
 		LiveSessionBounds sessionBounds;
-		if (!parseArgs(argc, argv, mapPath, port, password, sessionName, sessionBounds)) {
+		FileName assetsPath;
+		if (!parseArgs(argc, argv, mapPath, port, password, sessionName, sessionBounds, assetsPath)) {
+			return false;
+		}
+
+		if (!configureAssetsForMap(mapPath, assetsPath)) {
 			return false;
 		}
 

@@ -20,6 +20,10 @@
 
 #include "live_socket.h"
 #include "net_connection.h"
+#include "live_assets.h"
+
+#include <functional>
+#include <fstream>
 
 class LiveServer;
 class LivePeer : public LiveSocket {
@@ -54,9 +58,13 @@ public:
 	void receiveHeader();
 	void receive(uint32_t packetSize);
 	void send(NetworkMessage& message);
+	void send(NetworkMessage& message, std::function<void()> onSent);
 
 	//
 	void updateCursor(const Position& position) { }
+
+	void startAssetTransfer();
+	void sendNextAssetChunk();
 
 protected:
 	void parseLoginPacket(NetworkMessage message);
@@ -85,6 +93,11 @@ protected:
 	uint32_t clientId;
 
 	bool connected;
+
+	std::vector<LiveAssetFile> assetFiles;
+	size_t assetFileIndex;
+	std::ifstream assetStream;
+	uint32_t assetBytesRemaining;
 
 	friend class LiveLogTab;
 	friend class LiveServer;

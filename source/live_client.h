@@ -20,6 +20,7 @@
 
 #include "live_socket.h"
 #include "net_connection.h"
+#include "live_assets.h"
 
 #include <set>
 #include <functional>
@@ -78,6 +79,11 @@ protected:
 	void parseKick(NetworkMessage& message);
 	void parseClientAccepted(NetworkMessage& message);
 	void parseChangeClientVersion(NetworkMessage& message);
+	void parseAssetFileBegin(NetworkMessage& message);
+	void parseAssetFileChunk(NetworkMessage& message);
+	void parseAssetFileEnd(NetworkMessage& message);
+	void parseAssetFilesDone(NetworkMessage& message);
+	void finishLiveVersionLoad();
 	void parseNode(NetworkMessage& message);
 	void parseCursorUpdate(NetworkMessage& message);
 	void parseClientList(NetworkMessage& message);
@@ -100,6 +106,15 @@ protected:
 
 	wxColor ownClientColor;
 	bool stopped;
+
+	ClientVersionID pendingVersionId;
+	std::vector<LiveAssetFile> pendingAssetManifest;
+	LiveAssetReceiveState assetReceiveState;
+	bool ignoreIncomingAssets;
+	bool waitingForServerAssets;
+	uint64_t assetBytesExpected;
+	uint64_t assetBytesReceived;
+	int assetProgressReported;
 };
 
 #endif

@@ -322,6 +322,7 @@
     <ClCompile Include="..\..\source\live_peer.cpp" />
     <ClCompile Include="..\..\source\live_server.cpp" />
     <ClCompile Include="..\..\source\live_socket.cpp" />
+    <ClCompile Include="..\..\source\live_assets.cpp" />
     <ClCompile Include="..\..\source\live_tab.cpp" />
     <ClCompile Include="..\..\source\net_connection.cpp" />
     <ClInclude Include="..\..\source\live_action.h" />

@@ -25,6 +25,7 @@
 #include "client_version.h"
 #include "otml.h"
 #include <wx/dir.h>
+#include <iostream>
 
 // Static methods to load/save
 
@@ -551,7 +552,75 @@ bool ClientVersion::hasValidPaths() {
 	return false;
 }
 
+bool ClientVersion::tryConfigureFromDirectory(const FileName& dir) {
+	if (!dir.DirExists()) {
+		return false;
+	}
+
+	FileName assetDir = dir.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+	client_path.Assign(assetDir);
+	if (!hasValidPaths()) {
+		client_path.Clear();
+		return false;
+	}
+
+	const FileName itemsOtb(assetDir.GetFullPath(), "items.otb");
+	const FileName itemsXml(assetDir.GetFullPath(), "items.xml");
+	if (itemsOtb.FileExists() && itemsXml.FileExists()) {
+		setItemsPath(assetDir);
+	}
+
+	return true;
+}
+
 bool ClientVersion::loadValidPaths() {
+	if (hasValidPaths()) {
+		return true;
+	}
+
+	wxArrayString searchDirs;
+	if (!client_path.GetFullPath().empty()) {
+		searchDirs.Add(client_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
+	}
+	searchDirs.Add(g_gui.GetExecDirectory());
+
+	wxString workingDirectory;
+	workingDirectory = wxGetCwd();
+	if (!workingDirectory.empty()) {
+		workingDirectory = wxGetCwd();
+		if (!workingDirectory.EndsWith(FileName::GetPathSeparator())) {
+			workingDirectory << FileName::GetPathSeparator();
+		}
+		searchDirs.Add(workingDirectory);
+	}
+
+	for (size_t i = 0; i < searchDirs.size(); ++i) {
+		const wxString candidate = searchDirs[i];
+		bool duplicate = false;
+		for (size_t j = 0; j < i; ++j) {
+			if (searchDirs[j] == candidate) {
+				duplicate = true;
+				break;
+			}
+		}
+		if (duplicate) {
+			continue;
+		}
+
+		if (tryConfigureFromDirectory(FileName(candidate))) {
+			ClientVersion::saveVersions();
+			return true;
+		}
+	}
+
+	if (g_gui.IsHeadless()) {
+		std::cerr << "Could not locate metadata and/or sprite files for client version "
+		          << name << "." << std::endl;
+		std::cerr << "Place Tibia.dat and Tibia.spr next to MapServer_x64.exe, or pass --assets <directory>."
+		          << std::endl;
+		return false;
+	}
+
 	while (!hasValidPaths()) {
 		wxString message = "Could not locate metadata and/or sprite files, please navigate to your client assets %s installation folder.\n";
 		message << "Attempted metadata file: %s\n";
@@ -560,7 +629,8 @@ bool ClientVersion::loadValidPaths() {
 		g_gui.PopupDialog("Error", wxString::Format(message, name, metadata_path.GetFullPath(), sprites_path.GetFullPath()), wxOK);
 
 		wxString dirHelpText("Select assets directory.");
-		wxDirDialog file_dlg(nullptr, dirHelpText, "", wxDD_DIR_MUST_EXIST);
+		wxWindow* parent = g_gui.root ? static_cast<wxWindow*>(g_gui.root) : nullptr;
+		wxDirDialog file_dlg(parent, dirHelpText, "", wxDD_DIR_MUST_EXIST);
 		int ok = file_dlg.ShowModal();
 		if (ok == wxID_CANCEL) {
 			return false;

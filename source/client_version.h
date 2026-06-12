@@ -209,6 +209,7 @@ public:
 
 	bool hasValidPaths();
 	bool loadValidPaths();
+	bool tryConfigureFromDirectory(const FileName& dir);
 	void setClientPath(const FileName& dir);
 	void setItemsPath(const FileName& dir);
 	void clearItemsPath();

@@ -116,7 +116,9 @@ void LiveServer::acceptClient() {
 
 	acceptor->async_accept(*newSocket, [this, newSocket](const net_error_code& error) -> void {
 		if (error) {
-			//
+			if (!stopped && error != asio::error::operation_aborted) {
+				liveServerLog(log, "Accept failed: " + wxString(error.message().c_str(), wxConvUTF8));
+			}
 		} else {
 			net_error_code endpointError;
 			const std::string host = newSocket->remote_endpoint(endpointError).address().to_string();

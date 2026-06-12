@@ -21,6 +21,7 @@
 #include "live_server.h"
 #include "live_tab.h"
 #include "live_action.h"
+#include "live_assets.h"
 #include "net_connection.h"
 
 #include "editor.h"
@@ -41,7 +42,8 @@ static void livePeerLog(LiveLogTab* log, const wxString& message) {
 
 LivePeer::LivePeer(LiveServer* server, asio::ip::tcp::socket socket) :
 	LiveSocket(),
-	readMessage(), server(server), socket(std::move(socket)), color(), id(0), clientId(0), connected(false) {
+	readMessage(), server(server), socket(std::move(socket)), color(), id(0), clientId(0), connected(false),
+	assetFiles(), assetFileIndex(0), assetStream(), assetBytesRemaining(0) {
 	ASSERT(server != nullptr);
 	mapVersion = server->getEditor()->getMap().getVersion();
 }
@@ -135,18 +137,24 @@ void LivePeer::receive(uint32_t packetSize) {
 }
 
 void LivePeer::send(NetworkMessage& message) {
+	send(message, nullptr);
+}
+
+void LivePeer::send(NetworkMessage& message, std::function<void()> onSent) {
 	NetworkMessage outbound;
 	outbound.buffer = message.buffer;
 	outbound.position = message.position;
 	outbound.size = message.size;
 
-	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound)]() mutable {
+	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound), onSent = std::move(onSent)]() mutable {
 		memcpy(&outbound.buffer[0], &outbound.size, 4);
 		asio::async_write(socket,
 			asio::buffer(outbound.buffer, outbound.size + 4),
-			[this](const net_error_code& error, size_t bytesTransferred) -> void {
+			[this, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
 				if (error) {
 					livePeerLog(log, wxString() + getHostName() + ": " + error.message());
+				} else if (onSent) {
+					onSent();
 				}
 			});
 	});
@@ -229,7 +237,7 @@ void LivePeer::parseHello(NetworkMessage& message) {
 		return;
 	}
 
-	uint32_t clientVersion = message.read<uint32_t>();
+	(void)message.read<uint32_t>(); // client-reported version; server assets are authoritative
 	std::string nickname = message.read<std::string>();
 	std::string password = message.read<std::string>();
 
@@ -248,13 +256,97 @@ void LivePeer::parseHello(NetworkMessage& message) {
 	livePeerLog(log, name + " (" + getHostName() + ") connected.");
 
 	NetworkMessage outMessage;
-	if (static_cast<ClientVersionID>(clientVersion) != g_gui.GetCurrentVersionID()) {
-		outMessage.write<uint8_t>(PACKET_CHANGE_CLIENT_VERSION);
-		outMessage.write<uint32_t>(g_gui.GetCurrentVersionID());
-	} else {
-		outMessage.write<uint8_t>(PACKET_ACCEPTED_CLIENT);
+	outMessage.write<uint8_t>(PACKET_CHANGE_CLIENT_VERSION);
+	outMessage.write<uint32_t>(g_gui.GetCurrentVersionID());
+
+	wxString assetError;
+	if (!collectServerAssetFiles(assetFiles, assetError)) {
+		livePeerLog(log, "Asset sync failed: " + assetError);
+
+		NetworkMessage kickMessage;
+		kickMessage.write<uint8_t>(PACKET_KICK);
+		kickMessage.write<std::string>(nstr(assetError));
+		send(kickMessage);
+		close();
+		return;
 	}
-	send(outMessage);
+
+	outMessage.write<uint32_t>(static_cast<uint32_t>(assetFiles.size()));
+	for (const LiveAssetFile& file : assetFiles) {
+		outMessage.write<uint8_t>(file.kind);
+		outMessage.write<std::string>(file.filename);
+		outMessage.write<uint32_t>(file.size);
+	}
+
+	send(outMessage, [this]() {
+		startAssetTransfer();
+	});
+}
+
+void LivePeer::startAssetTransfer() {
+	assetFileIndex = 0;
+	sendNextAssetChunk();
+}
+
+void LivePeer::sendNextAssetChunk() {
+	if (assetFileIndex >= assetFiles.size()) {
+		NetworkMessage doneMessage;
+		doneMessage.write<uint8_t>(PACKET_ASSET_FILES_DONE);
+		send(doneMessage);
+		return;
+	}
+
+	if (!assetStream.is_open()) {
+		const LiveAssetFile& file = assetFiles[assetFileIndex];
+		assetStream.open(nstr(file.sourcePath.GetFullPath()), std::ios::binary);
+		if (!assetStream.is_open()) {
+			livePeerLog(log, "Failed to open asset file: " + file.sourcePath.GetFullPath());
+			close();
+			return;
+		}
+
+		assetBytesRemaining = file.size;
+
+		NetworkMessage beginMessage;
+		beginMessage.write<uint8_t>(PACKET_ASSET_FILE_BEGIN);
+		beginMessage.write<uint8_t>(file.kind);
+		beginMessage.write<std::string>(file.filename);
+		beginMessage.write<uint32_t>(file.size);
+		send(beginMessage);
+	}
+
+	std::vector<char> buffer(LIVE_ASSET_CHUNK_SIZE);
+	const size_t toRead = std::min<size_t>(LIVE_ASSET_CHUNK_SIZE, assetBytesRemaining);
+	assetStream.read(buffer.data(), static_cast<std::streamsize>(toRead));
+	const std::streamsize bytesRead = assetStream.gcount();
+	if (bytesRead <= 0) {
+		livePeerLog(log, "Failed while reading asset file for transfer.");
+		close();
+		return;
+	}
+
+	std::string chunk(buffer.data(), static_cast<size_t>(bytesRead));
+	assetBytesRemaining -= static_cast<uint32_t>(bytesRead);
+
+	NetworkMessage chunkMessage;
+	chunkMessage.write<uint8_t>(PACKET_ASSET_FILE_CHUNK);
+	chunkMessage.write<std::string>(chunk);
+	send(chunkMessage, [this]() {
+		if (assetBytesRemaining == 0) {
+			if (assetStream.is_open()) {
+				assetStream.close();
+			}
+
+			NetworkMessage endMessage;
+			endMessage.write<uint8_t>(PACKET_ASSET_FILE_END);
+			send(endMessage, [this]() {
+				++assetFileIndex;
+				sendNextAssetChunk();
+			});
+		} else {
+			sendNextAssetChunk();
+		}
+	});
 }
 
 void LivePeer::parseReady(NetworkMessage& message) {
