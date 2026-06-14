@@ -408,6 +408,11 @@ void MapDrawer::DrawMap() {
 		glEnable(GL_TEXTURE_2D);
 	}
 
+	LiveClient* live_client = editor.live_client;
+	if (live_client && live_client->consumeViewportRefresh()) {
+		live_client->invalidateViewport(start_x, start_y, end_x, end_y);
+	}
+
 	for (int map_z = start_z; map_z >= superend_z; map_z--) {
 		if (map_z == end_z && start_z != end_z && options.show_shade) {
 			// Draw shade
@@ -434,7 +439,6 @@ void MapDrawer::DrawMap() {
 			int nd_end_x = (end_x & ~3) + 4;
 			int nd_end_y = (end_y & ~3) + 4;
 
-			LiveClient* live_client = editor.live_client;
 			const bool underground = map_z > GROUND_LAYER;
 			const LiveSessionBounds* session_bounds = nullptr;
 			if (editor.IsLive() && editor.GetLive().getSessionBounds().enabled) {

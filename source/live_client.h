@@ -22,8 +22,10 @@
 #include "net_connection.h"
 #include "live_assets.h"
 
-#include <set>
+#include <chrono>
 #include <functional>
+#include <map>
+#include <set>
 
 class DirtyList;
 class MapTab;
@@ -66,6 +68,10 @@ public:
 
 	// Flags a node as queried and stores it, need to call SendNodeRequest to send it to server
 	void queryNode(int32_t ndx, int32_t ndy, bool underground);
+	void tickNodeRequests();
+	void requestViewportRefresh();
+	bool consumeViewportRefresh();
+	void invalidateViewport(int32_t start_x, int32_t start_y, int32_t end_x, int32_t end_y);
 
 	Editor* getEditor() const {
 		return editor;
@@ -97,6 +103,8 @@ protected:
 	NetworkMessage readMessage;
 
 	std::set<uint32_t> queryNodeList;
+	std::map<uint32_t, std::chrono::steady_clock::time_point> pendingNodeRequests;
+	bool viewportRefreshPending;
 	wxString currentOperation;
 
 	std::shared_ptr<asio::ip::tcp::resolver> resolver;

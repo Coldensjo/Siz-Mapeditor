@@ -157,13 +157,15 @@ bool QTreeNode::isRequested(bool underground) {
 	}
 }
 
-void QTreeNode::clearVisible(uint32_t u) {
+void QTreeNode::clearVisible(uint32_t client) {
+	const uint32_t overgroundMask = static_cast<uint32_t>(1) << client;
+	const uint32_t undergroundMask = overgroundMask << MAP_LAYERS;
 	if (isLeaf) {
-		visible &= u;
+		visible &= ~(overgroundMask | undergroundMask);
 	} else {
 		for (int i = 0; i < MAP_LAYERS; ++i) {
 			if (child[i]) {
-				child[i]->clearVisible(u);
+				child[i]->clearVisible(client);
 			}
 		}
 	}

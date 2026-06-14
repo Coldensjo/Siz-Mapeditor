@@ -148,7 +148,7 @@ void LiveServer::removeClient(uint32_t id) {
 	const uint32_t clientId = it->second->getClientId();
 	if (clientId != 0) {
 		clientIds &= ~clientId;
-		editor->getMap().clearVisible(clientIds);
+		editor->getMap().clearVisible(clientId);
 		cursors.erase(clientId);
 	}
 

@@ -130,8 +130,8 @@ public:
 		return swapTile(pos.x, pos.y, pos.z, newtile);
 	}
 
-	// Clears the visiblity according to the mask passed
-	void clearVisible(uint32_t mask);
+	// Clears per-client chunk visibility for the disconnected client id (a power-of-two bit flag).
+	void clearVisible(uint32_t client);
 
 	uint64_t getTileCount() const {
 		return tilecount;

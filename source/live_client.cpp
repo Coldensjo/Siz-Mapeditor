@@ -24,13 +24,15 @@
 #include "editor.h"
 #include "gui.h"
 #include "map_tab.h"
+#include "map_region.h"
 #include "settings.h"
 
 #include <wx/event.h>
 
 LiveClient::LiveClient() :
 	LiveSocket(),
-	readMessage(), queryNodeList(), currentOperation(),
+	readMessage(), queryNodeList(), pendingNodeRequests(), viewportRefreshPending(false),
+	currentOperation(),
 	resolver(nullptr), socket(nullptr), editor(nullptr), stopped(false),
 	ownClientColor(0, 166, 0, 200), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
 	assetReceiveState(), ignoreIncomingAssets(false), waitingForServerAssets(false),
@@ -299,6 +301,8 @@ void LiveClient::sendHello() {
 }
 
 void LiveClient::sendNodeRequests() {
+	tickNodeRequests();
+
 	if (queryNodeList.empty()) {
 		return;
 	}
@@ -385,6 +389,79 @@ void LiveClient::queryNode(int32_t ndx, int32_t ndy, bool underground) {
 	nd |= ((ndy >> 2) << 4);
 	nd |= (underground ? 1 : 0);
 	queryNodeList.insert(nd);
+	pendingNodeRequests[nd] = std::chrono::steady_clock::now();
+}
+
+void LiveClient::tickNodeRequests() {
+	if (!editor) {
+		return;
+	}
+
+	const auto now = std::chrono::steady_clock::now();
+	constexpr auto retryAfter = std::chrono::seconds(5);
+
+	for (auto it = pendingNodeRequests.begin(); it != pendingNodeRequests.end();) {
+		if (now - it->second < retryAfter) {
+			++it;
+			continue;
+		}
+
+		const uint32_t nd = it->first;
+		const bool underground = nd & 1;
+		const int32_t ndy = (nd >> 4) & 0x3FFF;
+		const int32_t ndx = nd >> 18;
+
+		QTreeNode* node = editor->getMap().getLeaf(ndx * 4, ndy * 4);
+		if (node && node->isVisible(underground)) {
+			it = pendingNodeRequests.erase(it);
+			continue;
+		}
+
+		if (node) {
+			node->setRequested(underground, false);
+		}
+
+		queryNodeList.insert(nd);
+		it->second = now;
+		++it;
+	}
+}
+
+void LiveClient::requestViewportRefresh() {
+	viewportRefreshPending = true;
+}
+
+bool LiveClient::consumeViewportRefresh() {
+	if (!viewportRefreshPending) {
+		return false;
+	}
+	viewportRefreshPending = false;
+	return true;
+}
+
+void LiveClient::invalidateViewport(int32_t start_x, int32_t start_y, int32_t end_x, int32_t end_y) {
+	if (!editor) {
+		return;
+	}
+
+	const int nd_start_x = start_x & ~3;
+	const int nd_start_y = start_y & ~3;
+	const int nd_end_x = (end_x & ~3) + 4;
+	const int nd_end_y = (end_y & ~3) + 4;
+
+	for (int nd_map_x = nd_start_x; nd_map_x <= nd_end_x; nd_map_x += 4) {
+		for (int nd_map_y = nd_start_y; nd_map_y <= nd_end_y; nd_map_y += 4) {
+			QTreeNode* node = editor->getMap().getLeaf(nd_map_x, nd_map_y);
+			if (node) {
+				node->setVisible(false, false);
+				node->setVisible(true, false);
+				node->setRequested(false, false);
+				node->setRequested(true, false);
+			}
+			queryNode(nd_map_x, nd_map_y, false);
+			queryNode(nd_map_x, nd_map_y, true);
+		}
+	}
 }
 
 void LiveClient::parsePacket(NetworkMessage message) {
@@ -649,6 +726,7 @@ void LiveClient::finishLiveVersionLoad() {
 
 void LiveClient::parseNode(NetworkMessage& message) {
 	uint32_t ind = message.read<uint32_t>();
+	pendingNodeRequests.erase(ind);
 
 	// Extract node position
 	int32_t ndx = ind >> 18;
@@ -678,6 +756,7 @@ void LiveClient::parseCursorUpdate(NetworkMessage& message) {
 
 void LiveClient::parseClientList(NetworkMessage& message) {
 	readParticipantList(message);
+	requestViewportRefresh();
 	g_gui.RefreshView();
 }
 
