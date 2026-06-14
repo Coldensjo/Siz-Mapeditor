@@ -491,6 +491,7 @@ void LivePeer::parseCursorUpdate(NetworkMessage& message) {
 	server->broadcastCursor(cursor);
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.UpdateMinimap();
 	}
 }
 

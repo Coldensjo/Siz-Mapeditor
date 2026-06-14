@@ -220,6 +220,7 @@ void LiveServer::broadcastClientList() {
 
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.UpdateMinimap();
 	}
 }
 

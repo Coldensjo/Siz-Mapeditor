@@ -772,6 +772,7 @@ void LiveClient::parseCursorUpdate(NetworkMessage& message) {
 	}
 
 	g_gui.RefreshView();
+	g_gui.UpdateMinimap();
 }
 
 void LiveClient::parsePing(NetworkMessage& message) {
@@ -783,6 +784,7 @@ void LiveClient::parseClientList(NetworkMessage& message) {
 	readParticipantList(message);
 	requestViewportRefresh();
 	g_gui.RefreshView();
+	g_gui.UpdateMinimap();
 }
 
 void LiveClient::parseCommentList(NetworkMessage& message) {

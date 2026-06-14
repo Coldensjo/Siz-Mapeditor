@@ -22,10 +22,106 @@
 #include "map.h"
 
 #include "gui.h"
+#include "live_socket.h"
 #include "map_display.h"
 #include "minimap_window.h"
 #include <algorithm>
 #include <wx/rawbmp.h>
+
+namespace {
+
+void DrawLiveUserMarkers(wxDC& dc, Editor& editor, int start_x, int start_y, int floor, int window_width, int window_height) {
+	if (!editor.IsLive()) {
+		return;
+	}
+
+	LiveSocket& live = editor.GetLive();
+	const std::vector<LiveCursor> cursorList = live.getCursorList();
+	if (cursorList.empty()) {
+		return;
+	}
+
+	const std::vector<LiveParticipant>& participants = live.getParticipantList();
+	const uint32_t ownClientId = live.getOwnClientId();
+
+	wxFont label_font(*wxSWISS_FONT);
+	label_font.SetPointSize(8);
+	label_font.SetWeight(wxFONTWEIGHT_BOLD);
+	dc.SetFont(label_font);
+
+	for (const LiveCursor& cursor : cursorList) {
+		if (cursor.id == ownClientId) {
+			continue;
+		}
+		if (cursor.pos.z != floor) {
+			continue;
+		}
+
+		const int screen_x = cursor.pos.x - start_x;
+		const int screen_y = cursor.pos.y - start_y;
+		if (screen_x < 0 || screen_y < 0 || screen_x >= window_width || screen_y >= window_height) {
+			continue;
+		}
+
+		wxColor color = cursor.color;
+		wxString user_name;
+		for (const LiveParticipant& participant : participants) {
+			if (participant.id == cursor.id) {
+				color = participant.color;
+				user_name = participant.name;
+				break;
+			}
+		}
+
+		constexpr int marker_radius = 4;
+
+		// Dark halo + white ring + filled marker for contrast on any terrain.
+		dc.SetPen(wxPen(*wxBLACK, 2));
+		dc.SetBrush(*wxTRANSPARENT_BRUSH);
+		dc.DrawCircle(screen_x, screen_y, marker_radius + 1);
+
+		dc.SetPen(wxPen(*wxWHITE, 2));
+		dc.DrawCircle(screen_x, screen_y, marker_radius);
+
+		dc.SetPen(*wxTRANSPARENT_PEN);
+		dc.SetBrush(wxBrush(color));
+		dc.DrawCircle(screen_x, screen_y, marker_radius - 1);
+
+		if (user_name.empty()) {
+			continue;
+		}
+
+		const wxSize text_size = dc.GetTextExtent(user_name);
+		const int pad_x = 3;
+		const int pad_y = 1;
+
+		int label_x = screen_x + marker_radius + 3;
+		int label_y = screen_y - text_size.y / 2;
+
+		if (label_x + text_size.x + pad_x * 2 > window_width) {
+			label_x = screen_x - marker_radius - 3 - text_size.x - pad_x * 2;
+		}
+		if (label_y < 0) {
+			label_y = screen_y + marker_radius + 2;
+		}
+		if (label_y + text_size.y + pad_y * 2 > window_height) {
+			label_y = screen_y - marker_radius - text_size.y - 2;
+		}
+
+		label_x = std::max(0, label_x);
+		label_y = std::max(0, label_y);
+
+		const wxRect label_bg(label_x, label_y, text_size.x + pad_x * 2, text_size.y + pad_y * 2);
+		dc.SetPen(wxPen(color, 1));
+		dc.SetBrush(wxBrush(wxColor(16, 16, 16)));
+		dc.DrawRectangle(label_bg);
+
+		dc.SetTextForeground(*wxWHITE);
+		dc.DrawText(user_name, label_x + pad_x, label_y + pad_y);
+	}
+}
+
+} // namespace
 
 BEGIN_EVENT_TABLE(MinimapWindow, wxPanel)
 EVT_LEFT_DOWN(MinimapWindow::OnMouseClick)
@@ -233,6 +329,8 @@ void MinimapWindow::OnPaint(wxPaintEvent& event) {
 		if (minimap_bitmap.IsOk()) {
 			pdc.DrawBitmap(minimap_bitmap, 0, 0, false);
 		}
+
+		DrawLiveUserMarkers(pdc, editor, start_x, start_y, floor, window_width, window_height);
 
 		if (g_settings.getInteger(Config::MINIMAP_VIEW_BOX)) {
 			pdc.SetPen(*wxWHITE_PEN);
