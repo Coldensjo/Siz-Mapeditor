@@ -235,7 +235,12 @@ void LivePeer::parseHello(NetworkMessage& message) {
 	if (netVersion != __LIVE_NET_VERSION__) {
 		NetworkMessage outMessage;
 		outMessage.write<uint8_t>(PACKET_KICK);
-		outMessage.write<std::string>("Wrong protocol version.");
+		if (netVersion < __LIVE_NET_VERSION__) {
+			livePeerLog(log, "Client tried to connect with an outdated live protocol version, connection refused.");
+			outMessage.write<std::string>("Your client is outdated. Please update to the latest version.");
+		} else {
+			outMessage.write<std::string>("Wrong protocol version.");
+		}
 
 		send(outMessage);
 		close();
