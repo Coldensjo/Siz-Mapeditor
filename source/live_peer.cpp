@@ -196,6 +196,9 @@ void LivePeer::parseEditorPacket(NetworkMessage message) {
 			case PACKET_CLIENT_UPDATE_CURSOR:
 				parseCursorUpdate(message);
 				break;
+			case PACKET_CLIENT_PING:
+				parseClientPing(message);
+				break;
 			case PACKET_COMMENT_ADD:
 				parseCommentAdd(message);
 				break;
@@ -484,6 +487,23 @@ void LivePeer::parseCursorUpdate(NetworkMessage& message) {
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
 	}
+}
+
+void LivePeer::parseClientPing(NetworkMessage& message) {
+	const uint16_t x = message.read<uint16_t>();
+	const uint16_t y = message.read<uint16_t>();
+	const uint8_t z = message.read<uint8_t>();
+
+	const LiveSessionBounds& bounds = server->getSessionBounds();
+	if (bounds.enabled && !bounds.contains(x, y)) {
+		return;
+	}
+
+	LivePing ping;
+	ping.id = clientId;
+	ping.color = color;
+	ping.pos = Position(x, y, z);
+	server->broadcastPing(ping);
 }
 
 void LivePeer::parseCommentAdd(NetworkMessage& message) {

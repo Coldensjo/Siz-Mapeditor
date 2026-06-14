@@ -30,6 +30,7 @@
 #include "settings.h"
 
 #include <iostream>
+#include <algorithm>
 
 LiveSocket::LiveSocket() :
 	cursors(), participants(), ownClientId(0), mapReader(nullptr, 0), mapWriter(),
@@ -475,6 +476,55 @@ void LiveSocket::writeCursor(NetworkMessage& message, const LiveCursor& cursor) 
 	message.write<uint8_t>(cursor.color.Blue());
 	message.write<uint8_t>(cursor.color.Alpha());
 	message.write<Position>(cursor.pos);
+}
+
+namespace {
+constexpr std::chrono::milliseconds LIVE_PING_DURATION{4000};
+}
+
+void LiveSocket::addPing(const LivePing& ping) {
+	ActiveLivePing active;
+	active.ping = ping;
+	active.startTime = std::chrono::steady_clock::now();
+	activePings.push_back(active);
+}
+
+void LiveSocket::pruneExpiredPings() {
+	const auto now = std::chrono::steady_clock::now();
+	activePings.erase(
+		std::remove_if(activePings.begin(), activePings.end(), [&](const ActiveLivePing& active) {
+			return now - active.startTime >= LIVE_PING_DURATION;
+		}),
+		activePings.end()
+	);
+}
+
+bool LiveSocket::hasActivePings() {
+	pruneExpiredPings();
+	return !activePings.empty();
+}
+
+LivePing LiveSocket::readPing(NetworkMessage& message) {
+	LivePing ping;
+	ping.id = message.read<uint32_t>();
+
+	uint8_t r = message.read<uint8_t>();
+	uint8_t g = message.read<uint8_t>();
+	uint8_t b = message.read<uint8_t>();
+	uint8_t a = message.read<uint8_t>();
+	ping.color = wxColor(r, g, b, a);
+
+	ping.pos = message.read<Position>();
+	return ping;
+}
+
+void LiveSocket::writePing(NetworkMessage& message, const LivePing& ping) {
+	message.write<uint32_t>(ping.id);
+	message.write<uint8_t>(ping.color.Red());
+	message.write<uint8_t>(ping.color.Green());
+	message.write<uint8_t>(ping.color.Blue());
+	message.write<uint8_t>(ping.color.Alpha());
+	message.write<Position>(ping.pos);
 }
 
 wxColor LiveSocket::colorForClientId(uint32_t clientId) {

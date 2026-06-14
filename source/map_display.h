@@ -75,6 +75,7 @@ public:
 	void OnDelete(wxCommandEvent& event);
 	void OnAddComment(wxCommandEvent& event);
 	void OnRemoveComment(wxCommandEvent& event);
+	void OnPingHere(wxCommandEvent& event);
 	void OnCreateGenerateScript(wxCommandEvent& event);
 	void OnCreateRemoveScript(wxCommandEvent& event);
 	void OnCreateCreateScript(wxCommandEvent& event);

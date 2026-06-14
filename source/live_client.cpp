@@ -378,6 +378,15 @@ void LiveClient::sendCommentRemove(uint32_t commentId) {
 	send(message);
 }
 
+void LiveClient::sendPing(const Position& pos) {
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_CLIENT_PING);
+	message.write<uint16_t>(static_cast<uint16_t>(pos.x));
+	message.write<uint16_t>(static_cast<uint16_t>(pos.y));
+	message.write<uint8_t>(static_cast<uint8_t>(pos.z));
+	send(message);
+}
+
 void LiveClient::sendReady() {
 	NetworkMessage message;
 	message.write<uint8_t>(PACKET_READY_CLIENT);
@@ -499,6 +508,9 @@ void LiveClient::parsePacket(NetworkMessage message) {
 				break;
 			case PACKET_CURSOR_UPDATE:
 				parseCursorUpdate(message);
+				break;
+			case PACKET_PING:
+				parsePing(message);
 				break;
 			case PACKET_START_OPERATION:
 				parseStartOperation(message);
@@ -759,6 +771,11 @@ void LiveClient::parseCursorUpdate(NetworkMessage& message) {
 		cursors[cursor.id] = cursor;
 	}
 
+	g_gui.RefreshView();
+}
+
+void LiveClient::parsePing(NetworkMessage& message) {
+	addPing(readPing(message));
 	g_gui.RefreshView();
 }
 

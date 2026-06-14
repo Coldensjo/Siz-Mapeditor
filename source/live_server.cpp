@@ -322,6 +322,42 @@ void LiveServer::broadcastCursor(const LiveCursor& cursor) {
 	}
 }
 
+void LiveServer::broadcastPing(const LivePing& ping) {
+	addPing(ping);
+
+	if (clients.empty()) {
+		if (!g_gui.IsHeadless()) {
+			g_gui.RefreshView();
+		}
+		return;
+	}
+
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_PING);
+	writePing(message, ping);
+
+	for (auto& clientEntry : clients) {
+		clientEntry.second->send(message);
+	}
+
+	if (!g_gui.IsHeadless()) {
+		g_gui.RefreshView();
+	}
+}
+
+void LiveServer::sendPing(const Position& position) {
+	LivePing ping;
+	ping.id = 0;
+	ping.pos = position;
+	ping.color = wxColor(
+		g_settings.getInteger(Config::CURSOR_RED),
+		g_settings.getInteger(Config::CURSOR_GREEN),
+		g_settings.getInteger(Config::CURSOR_BLUE),
+		g_settings.getInteger(Config::CURSOR_ALPHA)
+	);
+	broadcastPing(ping);
+}
+
 void LiveServer::sendCommentList(LivePeer* peer) {
 	if (!peer) {
 		return;

@@ -343,6 +343,7 @@ void MapDrawer::Draw() {
 		DrawTooltips();
 	}
 	DrawLiveCursors();
+	DrawLivePings();
 	DrawLiveParticipants();
 	DrawMapComments();
 
@@ -1031,6 +1032,132 @@ void MapDrawer::DrawLiveCursors() {
 		PushScreenSpaceGL(screensize_x, screensize_y);
 		for (const CursorLabel& label : cursorLabels) {
 			DrawScreenTextLabel(label.screenRight, label.screenTop, label.name);
+		}
+		PopScreenSpaceGL();
+	}
+
+	glLineWidth(1.0f);
+	if (textureWasEnabled) {
+		glEnable(GL_TEXTURE_2D);
+	}
+}
+
+namespace {
+void drawPingCircle(float centerX, float centerY, float radius) {
+	constexpr int segments = 32;
+	glBegin(GL_LINE_LOOP);
+	for (int i = 0; i < segments; ++i) {
+		const float angle = 6.2831853f * static_cast<float>(i) / static_cast<float>(segments);
+		glVertex2f(centerX + radius * std::cos(angle), centerY + radius * std::sin(angle));
+	}
+	glEnd();
+}
+
+void drawPingDot(float centerX, float centerY, float radius) {
+	constexpr int segments = 16;
+	glBegin(GL_TRIANGLE_FAN);
+	glVertex2f(centerX, centerY);
+	for (int i = 0; i <= segments; ++i) {
+		const float angle = 6.2831853f * static_cast<float>(i) / static_cast<float>(segments);
+		glVertex2f(centerX + radius * std::cos(angle), centerY + radius * std::sin(angle));
+	}
+	glEnd();
+}
+}
+
+void MapDrawer::DrawLivePings() {
+	if (!editor.IsLive()) {
+		return;
+	}
+
+	LiveSocket& live = editor.GetLive();
+	if (!live.hasActivePings()) {
+		return;
+	}
+
+	const std::vector<LiveParticipant>& participants = live.getParticipantList();
+	const auto now = std::chrono::steady_clock::now();
+	const GLboolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+	if (textureWasEnabled) {
+		glDisable(GL_TEXTURE_2D);
+	}
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	struct PingLabel {
+		float screenX;
+		float screenY;
+		wxString name;
+		uint8_t alpha;
+	};
+	std::vector<PingLabel> pingLabels;
+
+	for (const ActiveLivePing& active : live.getActivePings()) {
+		const LivePing& ping = active.ping;
+		if (ping.pos.z != floor) {
+			continue;
+		}
+
+		const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - active.startTime);
+		if (elapsed.count() >= 4000) {
+			continue;
+		}
+
+		wxColor color = ping.color;
+		wxString userName;
+		for (const LiveParticipant& participant : participants) {
+			if (participant.id == ping.id) {
+				color = participant.color;
+				userName = participant.name;
+				break;
+			}
+		}
+
+		const int offset = getFloorAdjustment(ping.pos.z);
+		const float tileLeft = float(ping.pos.x * TileSize - view_scroll_x - offset);
+		const float tileTop = float(ping.pos.y * TileSize - view_scroll_y - offset);
+		const float centerX = tileLeft + TileSize * 0.5f;
+		const float centerY = tileTop + TileSize * 0.5f;
+
+		for (int ring = 0; ring < 3; ++ring) {
+			const int ringStartMs = ring * 400;
+			const int ringElapsedMs = static_cast<int>(elapsed.count()) - ringStartMs;
+			if (ringElapsedMs < 0 || ringElapsedMs > 1200) {
+				continue;
+			}
+
+			const float progress = static_cast<float>(ringElapsedMs) / 1200.0f;
+			const float radius = 8.0f + progress * 52.0f;
+			const uint8_t alpha = static_cast<uint8_t>(220.0f * (1.0f - progress));
+			glLineWidth(2.5f - ring * 0.5f);
+			glColor4ub(color.Red(), color.Green(), color.Blue(), alpha);
+			drawPingCircle(centerX, centerY, radius);
+		}
+
+		if (elapsed.count() < 2000) {
+			const float dotRadius = 6.0f;
+			const uint8_t dotAlpha = static_cast<uint8_t>(255.0f * (1.0f - elapsed.count() / 2000.0f));
+			glColor4ub(color.Red(), color.Green(), color.Blue(), dotAlpha);
+			drawPingDot(centerX, centerY, dotRadius);
+		}
+
+		if (!userName.empty() && elapsed.count() < 2500) {
+			const uint8_t labelAlpha = static_cast<uint8_t>(255.0f * (1.0f - elapsed.count() / 2500.0f));
+			pingLabels.push_back({
+				(centerX + 10.0f) / zoom,
+				(centerY - 8.0f) / zoom,
+				userName,
+				labelAlpha
+			});
+		}
+	}
+
+	if (!pingLabels.empty()) {
+		PushScreenSpaceGL(screensize_x, screensize_y);
+		for (const PingLabel& label : pingLabels) {
+			glColor4ub(255, 255, 255, label.alpha);
+			DrawScreenTextLabel(label.screenX, label.screenY, label.name);
 		}
 		PopScreenSpaceGL();
 	}

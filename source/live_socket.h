@@ -28,6 +28,8 @@
 
 #include <memory>
 #include <unordered_map>
+#include <chrono>
+#include <vector>
 
 class Editor;
 class LiveLogTab;
@@ -40,6 +42,17 @@ struct LiveCursor {
 	uint32_t id;
 	wxColor color;
 	Position pos;
+};
+
+struct LivePing {
+	uint32_t id;
+	wxColor color;
+	Position pos;
+};
+
+struct ActiveLivePing {
+	LivePing ping;
+	std::chrono::steady_clock::time_point startTime;
 };
 
 struct LiveParticipant {
@@ -91,6 +104,12 @@ public:
 	//
 	virtual 	void updateCursor(const Position& position) = 0;
 
+	void addPing(const LivePing& ping);
+	bool hasActivePings();
+	const std::vector<ActiveLivePing>& getActivePings() const {
+		return activePings;
+	}
+
 	void writeSessionBounds(NetworkMessage& message) const;
 	void readSessionBounds(NetworkMessage& message);
 	void writeMapComment(NetworkMessage& message, const MapComment& comment) const;
@@ -112,13 +131,18 @@ protected:
 
 	LiveCursor readCursor(NetworkMessage& message);
 	void writeCursor(NetworkMessage& message, const LiveCursor& cursor);
+	LivePing readPing(NetworkMessage& message);
+	void writePing(NetworkMessage& message, const LivePing& ping);
 	void writeParticipantList(NetworkMessage& message) const;
 	void readParticipantList(NetworkMessage& message);
 
 	static wxColor colorForClientId(uint32_t clientId);
 
+	void pruneExpiredPings();
+
 	//
 	std::unordered_map<uint32_t, LiveCursor> cursors;
+	std::vector<ActiveLivePing> activePings;
 	std::vector<LiveParticipant> participants;
 	uint32_t ownClientId;
 

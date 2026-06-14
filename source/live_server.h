@@ -71,6 +71,8 @@ public:
 	//
 	void broadcastNodes(DirtyList& dirtyList);
 	void broadcastCursor(const LiveCursor& cursor);
+	void broadcastPing(const LivePing& ping);
+	void sendPing(const Position& position);
 	void broadcastComment(const MapComment& comment);
 	void broadcastCommentRemoved(uint32_t commentId);
 	void sendCommentList(LivePeer* peer);

@@ -96,6 +96,7 @@ EVT_MENU(MAP_POPUP_MENU_PASTE, MapCanvas::OnPaste)
 EVT_MENU(MAP_POPUP_MENU_DELETE, MapCanvas::OnDelete)
 EVT_MENU(MAP_POPUP_MENU_ADD_COMMENT, MapCanvas::OnAddComment)
 EVT_MENU(MAP_POPUP_MENU_REMOVE_COMMENT, MapCanvas::OnRemoveComment)
+EVT_MENU(MAP_POPUP_MENU_PING_HERE, MapCanvas::OnPingHere)
 //----
 EVT_MENU(MAP_POPUP_MENU_COPY_SERVER_ID, MapCanvas::OnCopyServerId)
 EVT_MENU(MAP_POPUP_MENU_COPY_CLIENT_ID, MapCanvas::OnCopyClientId)
@@ -276,7 +277,7 @@ void MapCanvas::OnPaint(wxPaintEvent& event) {
 
 		options.dragging = boundbox_selection;
 
-		if (options.show_preview) {
+		if (options.show_preview || (editor.IsLive() && editor.GetLive().hasActivePings())) {
 			animation_timer->Start();
 		} else {
 			animation_timer->Stop();
@@ -718,6 +719,15 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 
 	int mouse_map_x, mouse_map_y;
 	ScreenToMap(event.GetX(), event.GetY(), &mouse_map_x, &mouse_map_y);
+
+	if (editor.IsLive() && event.ControlDown() && event.ShiftDown()) {
+		if (liveEditAllowed(editor, mouse_map_x, mouse_map_y)) {
+			editor.sendLivePing(Position(mouse_map_x, mouse_map_y, floor));
+			g_gui.SetStatusText(wxString::Format("Ping sent at %d, %d, %d", mouse_map_x, mouse_map_y, floor));
+			g_gui.RefreshView();
+		}
+		return;
+	}
 
 	if (!g_gui.GetCurrentBrush() && !g_gui.IsSelectionMode()) {
 		if (editor.showMapCommentsAt(Position(mouse_map_x, mouse_map_y, floor))) {
@@ -1912,6 +1922,21 @@ void MapCanvas::OnKeyDown(wxKeyEvent& event) {
 			event.Skip();
 			break;
 		}
+		case 'p':
+		case 'P': {
+			if (event.ControlDown() && event.ShiftDown() && editor.IsLive()) {
+				int mouse_map_x, mouse_map_y;
+				MouseToMap(&mouse_map_x, &mouse_map_y);
+				if (liveEditAllowed(editor, mouse_map_x, mouse_map_y)) {
+					editor.sendLivePing(Position(mouse_map_x, mouse_map_y, floor));
+					g_gui.SetStatusText(wxString::Format("Ping sent at %d, %d, %d", mouse_map_x, mouse_map_y, floor));
+					g_gui.RefreshView();
+				}
+				break;
+			}
+			event.Skip();
+			break;
+		}
 		default: {
 			event.Skip();
 			break;
@@ -1963,6 +1988,23 @@ void MapCanvas::OnRemoveComment(wxCommandEvent& WXUNUSED(event)) {
 		return;
 	}
 	editor.removeMapCommentAt(Position(last_click_map_x, last_click_map_y, last_click_map_z));
+	g_gui.RefreshView();
+}
+
+void MapCanvas::OnPingHere(wxCommandEvent& WXUNUSED(event)) {
+	if (!editor.IsLive()) {
+		return;
+	}
+	if (!liveEditAllowed(editor, last_click_map_x, last_click_map_y)) {
+		return;
+	}
+	editor.sendLivePing(Position(last_click_map_x, last_click_map_y, last_click_map_z));
+	g_gui.SetStatusText(wxString::Format(
+		"Ping sent at %d, %d, %d",
+		last_click_map_x,
+		last_click_map_y,
+		last_click_map_z
+	));
 	g_gui.RefreshView();
 }
 
@@ -2550,6 +2592,11 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 	addCommentItem->Enable(allowCommentEdit);
 	wxMenuItem* removeCommentItem = Append(MAP_POPUP_MENU_REMOVE_COMMENT, "Remove Comment...", "Remove a comment from this tile");
 	removeCommentItem->Enable(allowCommentEdit && !tileComments.empty());
+
+	if (editor.IsLive()) {
+		wxMenuItem* pingItem = Append(MAP_POPUP_MENU_PING_HERE, "Ping &Here\tCTRL+SHIFT+P", "Draw attention to this tile for other mappers");
+		pingItem->Enable(allowCommentEdit);
+	}
 
 	AppendSeparator();
 

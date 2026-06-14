@@ -94,6 +94,7 @@ public: // Functions
 	// Map handling
 	bool saveMap(FileName filename, bool showdialog); // returns false on failure
 	void addMapComment(const Position& pos, const std::string& text);
+	void sendLivePing(const Position& pos);
 	bool removeMapComment(uint32_t commentId);
 	bool removeMapCommentAt(const Position& pos);
 	bool showMapCommentsAt(const Position& pos);

@@ -573,6 +573,18 @@ void Editor::addMapComment(const Position& pos, const std::string& text) {
 	}
 }
 
+void Editor::sendLivePing(const Position& pos) {
+	if (!IsLive()) {
+		return;
+	}
+
+	if (IsLiveClient()) {
+		live_client->sendPing(pos);
+	} else if (IsLiveServer()) {
+		live_server->sendPing(pos);
+	}
+}
+
 bool Editor::promptAddMapComment(const Position& pos) {
 	wxTextEntryDialog dlg(g_gui.root, "Leave a note for other mappers:", "Add Map Comment");
 	if (dlg.ShowModal() != wxID_OK) {

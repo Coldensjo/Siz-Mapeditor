@@ -66,6 +66,7 @@ public:
 	void sendReady();
 	void sendCommentAdd(const Position& pos, const std::string& text);
 	void sendCommentRemove(uint32_t commentId);
+	void sendPing(const Position& pos);
 
 	// Flags a node as queried and stores it, need to call SendNodeRequest to send it to server
 	void queryNode(int32_t ndx, int32_t ndy, bool underground);
@@ -93,6 +94,7 @@ protected:
 	void finishLiveVersionLoad();
 	void parseNode(NetworkMessage& message);
 	void parseCursorUpdate(NetworkMessage& message);
+	void parsePing(NetworkMessage& message);
 	void parseClientList(NetworkMessage& message);
 	void parseCommentList(NetworkMessage& message);
 	void parseComment(NetworkMessage& message);

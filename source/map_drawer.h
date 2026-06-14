@@ -144,6 +144,7 @@ public:
 	void DrawMouseCrosshair();
 	void DrawTooltips();
 	void DrawLiveCursors();
+	void DrawLivePings();
 	void DrawLiveParticipants();
 	bool HitTestLiveParticipant(int screenX, int screenY, uint32_t& participantId);
 	// Returns true if the hovered participant changed (caller should refresh).
