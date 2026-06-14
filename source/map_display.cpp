@@ -2544,10 +2544,12 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 	}
 
 	const std::vector<const MapComment*> tileComments = editor.map.getComments().atPosition(cursorTile.x, cursorTile.y, cursorTile.z);
+	const bool allowCommentEdit = liveEditAllowed(editor, cursorTile.x, cursorTile.y);
 
-	Append(MAP_POPUP_MENU_ADD_COMMENT, "Add &Comment...", "Leave a note for other mappers on this tile");
+	wxMenuItem* addCommentItem = Append(MAP_POPUP_MENU_ADD_COMMENT, "Add &Comment...", "Leave a note for other mappers on this tile");
+	addCommentItem->Enable(allowCommentEdit);
 	wxMenuItem* removeCommentItem = Append(MAP_POPUP_MENU_REMOVE_COMMENT, "Remove Comment...", "Remove a comment from this tile");
-	removeCommentItem->Enable(!tileComments.empty());
+	removeCommentItem->Enable(allowCommentEdit && !tileComments.empty());
 
 	AppendSeparator();
 

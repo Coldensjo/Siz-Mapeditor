@@ -32,6 +32,7 @@
 LiveClient::LiveClient() :
 	LiveSocket(),
 	readMessage(), queryNodeList(), pendingNodeRequests(), viewportRefreshPending(false),
+	hasPendingCommentList(false), pendingCommentList(),
 	currentOperation(),
 	resolver(nullptr), socket(nullptr), editor(nullptr), stopped(false),
 	ownClientColor(0, 166, 0, 200), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
@@ -566,6 +567,13 @@ void LiveClient::parseHello(NetworkMessage& message) {
 		));
 	}
 
+	if (hasPendingCommentList) {
+		editor->getMap().getComments().setAll(std::move(pendingCommentList), 1);
+		pendingCommentList.clear();
+		hasPendingCommentList = false;
+		g_gui.RefreshView();
+	}
+
 	logMessage("Connected to live map.");
 	g_gui.UpdateMenubar();
 }
@@ -761,16 +769,19 @@ void LiveClient::parseClientList(NetworkMessage& message) {
 }
 
 void LiveClient::parseCommentList(NetworkMessage& message) {
-	if (!editor) {
-		return;
-	}
-
 	const uint32_t count = message.read<uint32_t>();
 	std::vector<MapComment> loaded;
 	loaded.reserve(count);
 	for (uint32_t i = 0; i < count; ++i) {
 		loaded.push_back(readMapComment(message));
 	}
+
+	if (!editor) {
+		pendingCommentList = std::move(loaded);
+		hasPendingCommentList = true;
+		return;
+	}
+
 	editor->getMap().getComments().setAll(std::move(loaded), 1);
 	g_gui.RefreshView();
 }

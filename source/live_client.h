@@ -26,6 +26,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <vector>
 
 class DirtyList;
 class MapTab;
@@ -105,6 +106,8 @@ protected:
 	std::set<uint32_t> queryNodeList;
 	std::map<uint32_t, std::chrono::steady_clock::time_point> pendingNodeRequests;
 	bool viewportRefreshPending;
+	bool hasPendingCommentList;
+	std::vector<MapComment> pendingCommentList;
 	wxString currentOperation;
 
 	std::shared_ptr<asio::ip::tcp::resolver> resolver;

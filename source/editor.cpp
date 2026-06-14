@@ -590,7 +590,13 @@ bool Editor::promptAddMapComment(const Position& pos) {
 
 bool Editor::removeMapComment(uint32_t commentId) {
 	if (IsLiveClient()) {
+		if (!map.comments.removeById(commentId)) {
+			return false;
+		}
 		live_client->sendCommentRemove(commentId);
+		if (!g_gui.IsHeadless()) {
+			g_gui.RefreshView();
+		}
 		return true;
 	}
 
