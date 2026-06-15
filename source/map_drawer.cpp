@@ -63,6 +63,104 @@ constexpr float TOOLTIP_ICON_OFFSET_Y = -4.0f;
 constexpr float TOOLTIP_ICON_BG_PAD = 2.0f;
 constexpr float TOOLTIP_ICON_OUTLINE = 1.0f;
 
+bool isRampWarningItemId(uint32_t id) {
+	switch (id) {
+		case 1388:
+		case 1390:
+		case 1392:
+		case 1394:
+		case 1398:
+		case 1400:
+		case 1402:
+		case 1404:
+		case 1553:
+		case 1555:
+		case 1557:
+		case 1559:
+			return true;
+		default:
+			return false;
+	}
+}
+
+bool isNonWalkableItem(const Item* item) {
+	if (!item) {
+		return false;
+	}
+	// Walls and anything that blocks movement/pathfinding count as non-walkable.
+	// Note: we intentionally do NOT skip borders here. Decorative (walkable)
+	// borders carry no blocking flags so they are excluded naturally, while
+	// blocking borders (mountain/rock edges, stone, lava) must still be caught.
+	if (item->isWall()) {
+		return true;
+	}
+	return item->hasProperty(BLOCKSOLID) || item->hasProperty(BLOCKPATHFIND);
+}
+
+int getItemStackSize(const Tile* tile) {
+	int size = 0;
+	if (tile->hasGround()) {
+		++size;
+	}
+	size += static_cast<int>(tile->items.size());
+	return size;
+}
+
+bool tileHasInvalidRamp(const Tile* tile, const BaseMap& map) {
+	if (!tile) {
+		return false;
+	}
+
+	const int stackSize = getItemStackSize(tile);
+	for (int i = 0; i < stackSize; ++i) {
+		Item* ramp = tile->getItemAt(i);
+		if (!ramp || !isRampWarningItemId(ramp->getID())) {
+			continue;
+		}
+
+		if (tile->hasGround() && tile->ground != ramp && isNonWalkableItem(tile->ground)) {
+			return true;
+		}
+
+		for (int j = 0; j < stackSize; ++j) {
+			if (j == i) {
+				continue;
+			}
+
+			Item* other = tile->getItemAt(j);
+			if (other == tile->ground) {
+				continue;
+			}
+
+			if (isNonWalkableItem(other)) {
+				return true;
+			}
+		}
+
+		if (!tile->hasGround()) {
+			const Position pos = tile->getPosition();
+			if (pos.z == 0) {
+				return true;
+			}
+
+			Position belowPos = pos;
+			--belowPos.z;
+			const Tile* belowTile = map.getTile(belowPos);
+			if (!belowTile || !belowTile->hasGround() || belowTile->ground->isBlocking()) {
+				return true;
+			}
+
+			for (const Item* belowItem : belowTile->items) {
+				if (isNonWalkableItem(belowItem)) {
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 void getTooltipIconDrawPosition(uint32_t spriteId, float slotCenterX, float slotCenterY, float& anchorX, float& anchorY) {
 	GameSprite* spr = g_items[spriteId].sprite;
 	if (spr == nullptr) {
@@ -286,6 +384,7 @@ MapDrawer::MapDrawer(MapCanvas* canvas) : canvas(canvas), editor(canvas->editor)
 	light_drawer = std::make_shared<LightDrawer>();
 	tooltips.reserve(32);
 	tooltip_markers.reserve(64);
+	ramp_warning_markers.reserve(32);
 }
 
 MapDrawer::~MapDrawer() {
@@ -350,6 +449,7 @@ void MapDrawer::SetupGL() {
 void MapDrawer::Release() {
 	tooltips.clear();
 	tooltip_markers.clear();
+	ramp_warning_markers.clear();
 
 	if (light_drawer) {
 		light_drawer->clear();
@@ -371,6 +471,7 @@ void MapDrawer::Draw() {
 	}
 	DrawDraggingShadow();
 	DrawHigherFloors();
+	DrawRampWarningIcons();
 	if (options.dragging) {
 		DrawSelectionBox();
 	}
@@ -1649,6 +1750,17 @@ void MapDrawer::DrawTooltipIcons() {
 	}
 }
 
+void MapDrawer::DrawRampWarningIcons() {
+	if (ramp_warning_markers.empty()) {
+		return;
+	}
+
+	glEnable(GL_TEXTURE_2D);
+	for (const MapRampWarningMarker& marker : ramp_warning_markers) {
+		BlitSpriteType(marker.draw_x, marker.draw_y, SPRITE_WARNING_SIGN, 255, 255, 64, 220);
+	}
+}
+
 
 void MapDrawer::DrawBrush() {
 	if (!g_gui.IsDrawingMode()) {
@@ -2810,6 +2922,14 @@ void MapDrawer::DrawTile(TileLocation* location) {
 				} else {
 					BlitSpriteType(draw_x, draw_y, SPRITE_SPAWN, 255, 255, 255, 120);
 				}
+			}
+
+			// invalid ramp placement (warning sign drawn in DrawRampWarningIcons after the map)
+			if (!options.ingame && tileHasInvalidRamp(tile, editor.map)) {
+				ramp_warning_markers.push_back(MapRampWarningMarker {
+					draw_x,
+					draw_y - TileSize / 2,
+				});
 			}
 
 			// tooltip markers (icons drawn in DrawTooltipIcons after the map)

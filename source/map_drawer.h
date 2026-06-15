@@ -73,6 +73,10 @@ struct MapTooltipMarker {
 	bool has_unique = false;
 };
 
+struct MapRampWarningMarker {
+	int draw_x, draw_y;
+};
+
 // Storage during drawing, for option caching
 struct DrawingOptions {
 	DrawingOptions();
@@ -147,6 +151,7 @@ class MapDrawer {
 protected:
 	std::vector<MapTooltip> tooltips;
 	std::vector<MapTooltipMarker> tooltip_markers;
+	std::vector<MapRampWarningMarker> ramp_warning_markers;
 
 public:
 	MapDrawer(MapCanvas* canvas);
@@ -205,6 +210,7 @@ protected:
 	void DrawHookIndicator(int x, int y, const ItemType& type);
 	void WriteTooltip(Item* item, TileTooltipData& data, bool isHouseTile = false);
 	void DrawTooltipIcons();
+	void DrawRampWarningIcons();
 	void MakeTooltip(int screenx, int screeny, const std::string& text, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, bool truncateText = true);
 	void AddLight(TileLocation* location);
 
