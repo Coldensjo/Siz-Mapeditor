@@ -11,6 +11,8 @@
 #include "wall_brush.h"
 #include "items.h"
 #include "item.h"
+#include "gui.h"
+#include "graphics.h"
 
 namespace {
 
@@ -101,10 +103,49 @@ bool updateDoodadBrushXml(pugi::xml_node brushNode, const std::vector<BrushEditE
 }
 
 bool updateGroundBrushXml(pugi::xml_node brushNode, const std::vector<BrushEditEntry>& entries) {
+	auto borderNodeHasSpecific = [](pugi::xml_node borderNode) {
+		for (pugi::xml_node child = borderNode.first_child(); child; child = child.next_sibling()) {
+			if (as_lower_str(child.name()) == "specific") {
+				return true;
+			}
+		}
+		return false;
+	};
+
 	removeChildNodesByName(brushNode, "item");
+	for (pugi::xml_node child = brushNode.first_child(); child;) {
+		pugi::xml_node next = child.next_sibling();
+		const std::string& childName = as_lower_str(child.name());
+		if (childName == "optional") {
+			brushNode.remove_child(child);
+		} else if (childName == "border" && !borderNodeHasSpecific(child)) {
+			brushNode.remove_child(child);
+		}
+		child = next;
+	}
+
 	for (const BrushEditEntry& entry : entries) {
 		if (entry.kind == BRUSH_EDIT_ITEM) {
 			appendItemNode(brushNode, entry.item_id, entry.chance);
+		} else if (entry.kind == BRUSH_EDIT_GROUND_BORDER) {
+			pugi::xml_node borderNode = brushNode.append_child("border");
+			borderNode.append_attribute("align") = entry.border_outer ? "outer" : "inner";
+			if (entry.border_to == "none") {
+				borderNode.append_attribute("to") = "none";
+			} else if (entry.border_to != "all" && !entry.border_to.empty()) {
+				borderNode.append_attribute("to") = entry.border_to.c_str();
+			}
+			if (entry.border_super) {
+				borderNode.append_attribute("super") = true;
+			}
+			if (entry.border_id != 0) {
+				borderNode.append_attribute("id") = entry.border_id;
+			} else if (entry.ground_equivalent != 0) {
+				borderNode.append_attribute("ground_equivalent") = entry.ground_equivalent;
+			}
+		} else if (entry.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+			pugi::xml_node optionalNode = brushNode.append_child("optional");
+			optionalNode.append_attribute("id") = entry.border_id;
 		}
 	}
 	return true;
@@ -211,18 +252,25 @@ bool BrushApplyEditEntries(Brush* brush, const std::vector<BrushEditEntry>& entr
 	}
 
 	if (brush->isGround()) {
-		std::vector<std::pair<uint16_t, int>> items;
 		for (const BrushEditEntry& entry : entries) {
-			if (entry.kind != BRUSH_EDIT_ITEM) {
-				continue;
+			if (entry.kind == BRUSH_EDIT_ITEM) {
+				if (entry.item_id == 0 || entry.chance < 0) {
+					error = "Each item needs a valid ID and a non-negative chance.";
+					return false;
+				}
+			} else if (entry.kind == BRUSH_EDIT_GROUND_BORDER) {
+				if (entry.border_id == 0 && entry.ground_equivalent == 0) {
+					error = "Each border needs a border id or ground equivalent item.";
+					return false;
+				}
+			} else if (entry.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+				if (entry.border_id == 0) {
+					error = "Optional border needs a valid border id.";
+					return false;
+				}
 			}
-			if (entry.item_id == 0 || entry.chance < 0) {
-				error = "Each item needs a valid ID and a non-negative chance.";
-				return false;
-			}
-			items.push_back(std::make_pair(entry.item_id, entry.chance));
 		}
-		brush->asGround()->replaceItems(items);
+		brush->asGround()->replaceFromEditEntries(entries);
 		return true;
 	}
 
@@ -311,4 +359,51 @@ bool BrushSaveToXml(Brush* brush, wxString& error) {
 	}
 
 	return true;
+}
+
+std::vector<uint32_t> BrushGetAllBorderIds() {
+	return g_brushes.getAutoBorderIds();
+}
+
+void DrawAutoBorderPreview(wxDC& dc, const wxRect& rect, const AutoBorder* border) {
+	if (!border || rect.GetWidth() <= 0 || rect.GetHeight() <= 0) {
+		return;
+	}
+
+	const int tileSize = std::min(rect.GetWidth(), rect.GetHeight());
+	const int ox = rect.GetX() + (rect.GetWidth() - tileSize) / 2;
+	const int oy = rect.GetY() + (rect.GetHeight() - tileSize) / 2;
+
+	static const int drawOrder[] = {
+		NORTHWEST_DIAGONAL,
+		NORTHEAST_DIAGONAL,
+		SOUTHEAST_DIAGONAL,
+		SOUTHWEST_DIAGONAL,
+		NORTHWEST_CORNER,
+		NORTHEAST_CORNER,
+		SOUTHWEST_CORNER,
+		SOUTHEAST_CORNER,
+		NORTH_HORIZONTAL,
+		EAST_HORIZONTAL,
+		SOUTH_HORIZONTAL,
+		WEST_HORIZONTAL,
+	};
+
+	for (int edgeId : drawOrder) {
+		if (edgeId >= 13) {
+			continue;
+		}
+		const uint32_t itemId = border->tiles[edgeId];
+		if (itemId == 0) {
+			continue;
+		}
+		const ItemType& itemType = g_items[itemId];
+		if (itemType.id == 0) {
+			continue;
+		}
+		Sprite* sprite = g_gui.gfx.getSprite(itemType.clientID);
+		if (sprite) {
+			sprite->DrawTo(&dc, SPRITE_SIZE_32x32, ox, oy, tileSize, tileSize);
+		}
+	}
 }

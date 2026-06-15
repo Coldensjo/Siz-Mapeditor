@@ -1033,6 +1033,62 @@ void GroundBrush::replaceItems(const std::vector<std::pair<uint16_t, int>>& item
 	}
 }
 
+namespace {
+
+std::string brushIdToName(uint32_t brushId) {
+	for (const auto& brushEntry : g_brushes.getMap()) {
+		if (brushEntry.second->getID() == brushId) {
+			return brushEntry.first;
+		}
+	}
+	return "all";
+}
+
+uint16_t findGroundEquivalentFromBorder(const AutoBorder* autoBorder) {
+	if (!autoBorder) {
+		return 0;
+	}
+	for (uint32_t tileId : autoBorder->tiles) {
+		if (tileId == 0) {
+			continue;
+		}
+		const ItemType& it = g_items[tileId];
+		if (it.ground_equivalent != 0) {
+			return it.ground_equivalent;
+		}
+	}
+	return 0;
+}
+
+uint32_t parseBorderToBrushId(const std::string& toValue) {
+	if (toValue == "none") {
+		return 0;
+	}
+	if (toValue == "all" || toValue.empty()) {
+		return 0xFFFFFFFF;
+	}
+	Brush* brush = g_brushes.getBrush(toValue);
+	return brush ? brush->getID() : 0xFFFFFFFF;
+}
+
+} // namespace
+
+uint16_t BrushEditBorderPreviewId(uint32_t borderId) {
+	const AutoBorder* autoBorder = g_brushes.getAutoBorder(borderId);
+	if (!autoBorder) {
+		return 0;
+	}
+	for (uint32_t tileId : autoBorder->tiles) {
+		if (tileId != 0) {
+			const ItemType& itemType = g_items[tileId];
+			if (itemType.id != 0) {
+				return itemType.clientID;
+			}
+		}
+	}
+	return 0;
+}
+
 bool GroundBrush::extractEditEntries(std::vector<BrushEditEntry>& entries) const {
 	entries.clear();
 	int previousChance = 0;
@@ -1044,5 +1100,130 @@ bool GroundBrush::extractEditEntries(std::vector<BrushEditEntry>& entries) const
 		previousChance = block.chance;
 		entries.push_back(entry);
 	}
+
+	for (const BorderBlock* borderBlock : borders) {
+		if (!borderBlock->specific_cases.empty()) {
+			continue;
+		}
+
+		BrushEditEntry entry;
+		entry.kind = BRUSH_EDIT_GROUND_BORDER;
+		entry.border_outer = borderBlock->outer;
+		entry.border_super = borderBlock->super;
+		if (borderBlock->to == 0) {
+			entry.border_to = "none";
+		} else if (borderBlock->to == 0xFFFFFFFF) {
+			entry.border_to = "all";
+		} else {
+			entry.border_to = brushIdToName(borderBlock->to);
+		}
+
+		if (borderBlock->autoborder) {
+			entry.border_id = borderBlock->autoborder->id;
+			if (borderBlock->autoborder->id == 0 && borderBlock->autoborder->ground) {
+				entry.ground_equivalent = findGroundEquivalentFromBorder(borderBlock->autoborder);
+			}
+		}
+		entries.push_back(entry);
+	}
+
+	if (optional_border) {
+		BrushEditEntry entry;
+		entry.kind = BRUSH_EDIT_GROUND_OPTIONAL;
+		entry.border_id = optional_border->id;
+		entries.push_back(entry);
+	}
 	return true;
+}
+
+void GroundBrush::replaceFromEditEntries(const std::vector<BrushEditEntry>& entries) {
+	std::vector<std::pair<uint16_t, int>> items;
+	std::vector<BrushEditEntry> borderEntries;
+	const BrushEditEntry* optionalEntry = nullptr;
+
+	for (const BrushEditEntry& entry : entries) {
+		switch (entry.kind) {
+			case BRUSH_EDIT_ITEM:
+				items.push_back(std::make_pair(entry.item_id, entry.chance));
+				break;
+			case BRUSH_EDIT_GROUND_BORDER:
+				borderEntries.push_back(entry);
+				break;
+			case BRUSH_EDIT_GROUND_OPTIONAL:
+				optionalEntry = &entry;
+				break;
+			default:
+				break;
+		}
+	}
+
+	replaceItems(items);
+
+	std::vector<BorderBlock*> preservedBorders;
+	for (BorderBlock* borderBlock : borders) {
+		if (!borderBlock->specific_cases.empty()) {
+			preservedBorders.push_back(borderBlock);
+		} else {
+			if (borderBlock->autoborder && borderBlock->autoborder->ground && borderBlock->autoborder->id == 0) {
+				delete borderBlock->autoborder;
+			}
+			for (SpecificCaseBlock* specificCaseBlock : borderBlock->specific_cases) {
+				delete specificCaseBlock;
+			}
+			delete borderBlock;
+		}
+	}
+	borders.clear();
+	borders.insert(borders.end(), preservedBorders.begin(), preservedBorders.end());
+
+	has_zilch_outer_border = false;
+	has_zilch_inner_border = false;
+	has_outer_border = false;
+	has_inner_border = false;
+
+	auto applyBorderFlags = [this](const BorderBlock* borderBlock) {
+		if (borderBlock->outer) {
+			if (borderBlock->to == 0) {
+				has_zilch_outer_border = true;
+			} else {
+				has_outer_border = true;
+			}
+		} else if (borderBlock->to == 0) {
+			has_zilch_inner_border = true;
+		} else {
+			has_inner_border = true;
+		}
+	};
+
+	for (BorderBlock* borderBlock : borders) {
+		applyBorderFlags(borderBlock);
+	}
+
+	for (const BrushEditEntry& entry : borderEntries) {
+		BorderBlock* borderBlock = newd BorderBlock;
+		borderBlock->super = entry.border_super;
+		borderBlock->outer = entry.border_outer;
+		borderBlock->to = parseBorderToBrushId(entry.border_to);
+
+		if (entry.border_id != 0) {
+			borderBlock->autoborder = const_cast<AutoBorder*>(g_brushes.getAutoBorder(entry.border_id));
+		} else if (entry.ground_equivalent != 0) {
+			AutoBorder* autoBorder = newd AutoBorder(0);
+			autoBorder->ground = true;
+			borderBlock->autoborder = autoBorder;
+		} else {
+			borderBlock->autoborder = nullptr;
+		}
+
+		applyBorderFlags(borderBlock);
+		borders.push_back(borderBlock);
+	}
+
+	if (optional_border && optional_border->ground && optional_border->id == 0) {
+		delete optional_border;
+	}
+	optional_border = nullptr;
+	if (optionalEntry && optionalEntry->border_id != 0) {
+		optional_border = const_cast<AutoBorder*>(g_brushes.getAutoBorder(optionalEntry->border_id));
+	}
 }

@@ -79,6 +79,9 @@ public:
 		return brushes;
 	}
 
+	const AutoBorder* getAutoBorder(uint32_t id) const;
+	std::vector<uint32_t> getAutoBorderIds() const;
+
 protected:
 	typedef std::map<uint32_t, AutoBorder*> BorderMap;
 	BrushMap brushes;

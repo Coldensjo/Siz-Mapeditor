@@ -8,6 +8,7 @@
 #include "brush.h"
 #include "items.h"
 #include "find_item_window.h"
+#include "find_border_window.h"
 #include "gui.h"
 #include "materials.h"
 #include "dcbutton.h"
@@ -23,11 +24,19 @@ enum {
 	EDIT_BRUSH_TILE_Z,
 	EDIT_BRUSH_CHANCE,
 	EDIT_BRUSH_PICK_ITEM,
+	EDIT_BRUSH_PICK_BORDER,
 	EDIT_BRUSH_ADD_ITEM,
 	EDIT_BRUSH_ADD_COMPOSITE,
+	EDIT_BRUSH_ADD_BORDER,
+	EDIT_BRUSH_ADD_OPTIONAL,
 	EDIT_BRUSH_ADD_TILE,
 	EDIT_BRUSH_REMOVE_TILE,
 	EDIT_BRUSH_REMOVE_ENTRY,
+	EDIT_BRUSH_BORDER_ALIGN,
+	EDIT_BRUSH_BORDER_TO,
+	EDIT_BRUSH_BORDER_ID,
+	EDIT_BRUSH_BORDER_SUPER,
+	EDIT_BRUSH_GROUND_EQUIV,
 };
 
 void DrawItemSprite(wxDC& dc, int clientId, int x, int y, int width, int height) {
@@ -89,6 +98,9 @@ uint16_t GetEntryPreviewClientId(const BrushEditEntry& entry) {
 		const ItemType& it = g_items.getItemType(entry.item_id);
 		return it.id != 0 ? it.clientID : 0;
 	}
+	if (entry.kind == BRUSH_EDIT_GROUND_BORDER || entry.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+		return BrushEditBorderPreviewId(entry.border_id);
+	}
 	if (!entry.composite_tiles.empty()) {
 		return GetTilePreviewClientId(entry.composite_tiles.front());
 	}
@@ -112,6 +124,9 @@ void EditBrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const 
 	if (entry.kind == BRUSH_EDIT_ITEM) {
 		const ItemType& it = g_items.getItemType(entry.item_id);
 		DrawItemSprite(dc, it.id != 0 ? it.clientID : 0, rect.GetX() + 2, rect.GetY() + 2, 32, 32);
+	} else if (entry.kind == BRUSH_EDIT_GROUND_BORDER || entry.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+		const wxRect previewRect(rect.GetX() + 2, rect.GetY() + 2, 32, 32);
+		DrawAutoBorderPreview(dc, previewRect, g_brushes.getAutoBorder(entry.border_id));
 	} else {
 		DrawCompositePreview(dc, rect, entry.composite_tiles);
 	}
@@ -168,6 +183,8 @@ wxCoord EditCompositeTileListBox::OnMeasureItem(size_t WXUNUSED(n)) const {
 BEGIN_EVENT_TABLE(EditBrushWindow, wxDialog)
 EVT_BUTTON(EDIT_BRUSH_ADD_ITEM, EditBrushWindow::OnClickAddItem)
 EVT_BUTTON(EDIT_BRUSH_ADD_COMPOSITE, EditBrushWindow::OnClickAddComposite)
+EVT_BUTTON(EDIT_BRUSH_ADD_BORDER, EditBrushWindow::OnClickAddBorder)
+EVT_BUTTON(EDIT_BRUSH_ADD_OPTIONAL, EditBrushWindow::OnClickAddOptional)
 EVT_BUTTON(EDIT_BRUSH_ADD_TILE, EditBrushWindow::OnClickAddTile)
 EVT_BUTTON(EDIT_BRUSH_REMOVE_TILE, EditBrushWindow::OnClickRemoveTile)
 EVT_BUTTON(EDIT_BRUSH_REMOVE_ENTRY, EditBrushWindow::OnClickRemoveEntry)
@@ -180,7 +197,13 @@ EVT_SPINCTRL(EDIT_BRUSH_TILE_X, EditBrushWindow::OnTilePositionChanged)
 EVT_SPINCTRL(EDIT_BRUSH_TILE_Y, EditBrushWindow::OnTilePositionChanged)
 EVT_SPINCTRL(EDIT_BRUSH_TILE_Z, EditBrushWindow::OnTilePositionChanged)
 EVT_SPINCTRL(EDIT_BRUSH_CHANCE, EditBrushWindow::OnChanceChanged)
+EVT_SPINCTRL(EDIT_BRUSH_BORDER_ID, EditBrushWindow::OnBorderSpinChanged)
+EVT_SPINCTRL(EDIT_BRUSH_GROUND_EQUIV, EditBrushWindow::OnBorderSpinChanged)
 EVT_BUTTON(EDIT_BRUSH_PICK_ITEM, EditBrushWindow::OnClickPickItem)
+EVT_BUTTON(EDIT_BRUSH_PICK_BORDER, EditBrushWindow::OnClickPickBorder)
+EVT_CHOICE(EDIT_BRUSH_BORDER_ALIGN, EditBrushWindow::OnBorderFieldChanged)
+EVT_TEXT(EDIT_BRUSH_BORDER_TO, EditBrushWindow::OnBorderFieldChanged)
+EVT_CHECKBOX(EDIT_BRUSH_BORDER_SUPER, EditBrushWindow::OnBorderFieldChanged)
 END_EVENT_TABLE()
 
 void OpenBrushEditor(Brush* brush) {
@@ -212,11 +235,23 @@ EditBrushWindow::EditBrushWindow(wxWindow* parent, Brush* brush) :
 	tile_y_spin(nullptr),
 	tile_z_spin(nullptr),
 	tile_pos_label(nullptr),
+	border_align_choice(nullptr),
+	border_to_text(nullptr),
+	border_id_spin(nullptr),
+	border_super_check(nullptr),
+	ground_equivalent_spin(nullptr),
+	border_align_label(nullptr),
+	border_to_label(nullptr),
+	border_id_label(nullptr),
+	ground_equivalent_label(nullptr),
 	item_id_spin(nullptr),
 	chance_spin(nullptr),
 	pick_item_button(nullptr),
+	pick_border_button(nullptr),
 	item_name_label(nullptr),
 	add_composite_button(nullptr),
+	add_border_button(nullptr),
+	add_optional_button(nullptr),
 	add_tile_button(nullptr),
 	remove_tile_button(nullptr) {
 	wxString error;
@@ -262,6 +297,41 @@ EditBrushWindow::EditBrushWindow(wxWindow* parent, Brush* brush) :
 	editSizer->Add(tilePosSizer, wxSizerFlags(1).Expand());
 	editSizer->AddSpacer(0);
 
+	border_align_label = newd wxStaticText(this, wxID_ANY, "Align");
+	editSizer->Add(border_align_label, wxSizerFlags(1).CenterVertical());
+	border_align_choice = newd wxChoice(this, EDIT_BRUSH_BORDER_ALIGN);
+	border_align_choice->Append("outer");
+	border_align_choice->Append("inner");
+	editSizer->Add(border_align_choice, wxSizerFlags(1).Expand());
+	editSizer->AddSpacer(0);
+
+	border_to_label = newd wxStaticText(this, wxID_ANY, "To");
+	editSizer->Add(border_to_label, wxSizerFlags(1).CenterVertical());
+	border_to_text = newd wxTextCtrl(this, EDIT_BRUSH_BORDER_TO, "all");
+	editSizer->Add(border_to_text, wxSizerFlags(1).Expand());
+	editSizer->AddSpacer(0);
+
+	border_id_label = newd wxStaticText(this, wxID_ANY, "Border ID");
+	editSizer->Add(border_id_label, wxSizerFlags(1).CenterVertical());
+	wxSizer* borderIdSizer = newd wxBoxSizer(wxHORIZONTAL);
+	border_id_spin = newd wxSpinCtrl(this, EDIT_BRUSH_BORDER_ID, "0", wxDefaultPosition, wxSize(90, -1), wxSP_ARROW_KEYS, 0, 10000, 0);
+	borderIdSizer->Add(border_id_spin, wxSizerFlags(1).Expand());
+	pick_border_button = newd wxButton(this, EDIT_BRUSH_PICK_BORDER, "Pick...", wxDefaultPosition, wxSize(60, -1));
+	borderIdSizer->Add(pick_border_button, wxSizerFlags(0).Left().Border(wxLEFT, 5));
+	editSizer->Add(borderIdSizer, wxSizerFlags(1).Expand());
+	editSizer->AddSpacer(0);
+
+	ground_equivalent_label = newd wxStaticText(this, wxID_ANY, "Ground equiv.");
+	editSizer->Add(ground_equivalent_label, wxSizerFlags(1).CenterVertical());
+	ground_equivalent_spin = newd wxSpinCtrl(this, EDIT_BRUSH_GROUND_EQUIV, "0", wxDefaultPosition, wxSize(90, -1), wxSP_ARROW_KEYS, 0, 65535, 0);
+	editSizer->Add(ground_equivalent_spin, wxSizerFlags(1).Expand());
+	editSizer->AddSpacer(0);
+
+	border_super_check = newd wxCheckBox(this, EDIT_BRUSH_BORDER_SUPER, "Super border");
+	editSizer->AddSpacer(0);
+	editSizer->Add(border_super_check, wxSizerFlags(1).Expand());
+	editSizer->AddSpacer(0);
+
 	editSizer->Add(newd wxStaticText(this, wxID_ANY, "Item ID"), wxSizerFlags(1).CenterVertical());
 	wxSizer* itemIdSizer = newd wxBoxSizer(wxHORIZONTAL);
 	item_id_spin = newd wxSpinCtrl(this, EDIT_BRUSH_ITEM_ID, "0", wxDefaultPosition, wxSize(90, -1), wxSP_ARROW_KEYS, 1, 65535, 100);
@@ -283,6 +353,10 @@ EditBrushWindow::EditBrushWindow(wxWindow* parent, Brush* brush) :
 	buttonSizer->Add(newd wxButton(this, EDIT_BRUSH_ADD_ITEM, "Add Item"), wxSizerFlags(0).Border(wxALL, 5));
 	add_composite_button = newd wxButton(this, EDIT_BRUSH_ADD_COMPOSITE, "Add Composite");
 	buttonSizer->Add(add_composite_button, wxSizerFlags(0).Border(wxALL, 5));
+	add_border_button = newd wxButton(this, EDIT_BRUSH_ADD_BORDER, "Add Border");
+	buttonSizer->Add(add_border_button, wxSizerFlags(0).Border(wxALL, 5));
+	add_optional_button = newd wxButton(this, EDIT_BRUSH_ADD_OPTIONAL, "Add Optional");
+	buttonSizer->Add(add_optional_button, wxSizerFlags(0).Border(wxALL, 5));
 	buttonSizer->Add(newd wxButton(this, EDIT_BRUSH_REMOVE_ENTRY, "Remove Entry"), wxSizerFlags(0).Border(wxALL, 5));
 	buttonSizer->AddStretchSpacer();
 	buttonSizer->Add(newd wxButton(this, wxID_SAVE, "Save"), wxSizerFlags(0).Border(wxALL, 5));
@@ -292,6 +366,10 @@ EditBrushWindow::EditBrushWindow(wxWindow* parent, Brush* brush) :
 	if (!edit_brush->isDoodad()) {
 		add_composite_button->Hide();
 		composite_panel->Show(false);
+	}
+	if (!edit_brush->isGround()) {
+		add_border_button->Hide();
+		add_optional_button->Hide();
 	}
 
 	SetSizerAndFit(topsizer);
@@ -326,6 +404,16 @@ std::vector<std::pair<Position, uint16_t>>* EditBrushWindow::GetSelectedComposit
 wxString EditBrushWindow::FormatEntryLabel(const BrushEditEntry& entry) const {
 	if (entry.kind == BRUSH_EDIT_COMPOSITE) {
 		return wxString::Format("Composite  |  chance %d  |  %zu tile(s)", entry.chance, entry.composite_tiles.size());
+	}
+	if (entry.kind == BRUSH_EDIT_GROUND_BORDER) {
+		return wxString::Format("Border  |  %s  |  to: %s  |  id: %u%s",
+			entry.border_outer ? "outer" : "inner",
+			wxstr(entry.border_to),
+			entry.border_id,
+			entry.border_super ? "  |  super" : "");
+	}
+	if (entry.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+		return wxString::Format("Optional border  |  id: %u", entry.border_id);
 	}
 
 	const ItemType& it = g_items.getItemType(entry.item_id);
@@ -397,9 +485,24 @@ void EditBrushWindow::UpdatePreviewSprite(const BrushEditEntry* entry, const std
 
 void EditBrushWindow::UpdateEditFields() {
 	const BrushEditEntry* entry = GetSelectedEntry();
+	const bool showBorderFields = entry && entry->kind == BRUSH_EDIT_GROUND_BORDER;
+	const bool showOptionalFields = entry && entry->kind == BRUSH_EDIT_GROUND_OPTIONAL;
+
+	border_align_label->Enable(showBorderFields);
+	border_align_choice->Enable(showBorderFields);
+	border_to_label->Enable(showBorderFields);
+	border_to_text->Enable(showBorderFields);
+	border_id_label->Enable(showBorderFields || showOptionalFields);
+	border_id_spin->Enable(showBorderFields || showOptionalFields);
+	pick_border_button->Enable(showBorderFields || showOptionalFields);
+	border_super_check->Enable(showBorderFields);
+	ground_equivalent_label->Enable(showBorderFields);
+	ground_equivalent_spin->Enable(showBorderFields);
+
 	if (!entry) {
 		item_id_spin->Disable();
 		pick_item_button->Disable();
+		pick_border_button->Disable();
 		chance_spin->Disable();
 		tile_x_spin->Disable();
 		tile_y_spin->Disable();
@@ -411,16 +514,48 @@ void EditBrushWindow::UpdateEditFields() {
 		return;
 	}
 
-	chance_spin->Enable();
-	chance_spin->SetValue(entry->chance);
+	const bool showItemFields = entry->kind == BRUSH_EDIT_ITEM;
+	const bool showChance = entry->kind == BRUSH_EDIT_ITEM || entry->kind == BRUSH_EDIT_COMPOSITE;
+	chance_spin->Enable(showChance);
+	if (showChance) {
+		chance_spin->SetValue(entry->chance);
+	}
 
 	std::vector<std::pair<Position, uint16_t>>* tiles = GetSelectedCompositeTiles();
 	const long tileIndex = composite_tile_list ? composite_tile_list->GetSelection() : wxNOT_FOUND;
 	const bool editingCompositeTile = entry->kind == BRUSH_EDIT_COMPOSITE && tiles && tileIndex != wxNOT_FOUND && static_cast<size_t>(tileIndex) < tiles->size();
 
-	if (entry->kind == BRUSH_EDIT_ITEM) {
+	if (showBorderFields) {
+		border_align_choice->SetSelection(entry->border_outer ? 0 : 1);
+		border_to_text->ChangeValue(wxstr(entry->border_to));
+		border_id_spin->SetValue(entry->border_id);
+		border_super_check->SetValue(entry->border_super);
+		ground_equivalent_spin->SetValue(entry->ground_equivalent);
+		item_id_spin->Disable();
+		pick_item_button->Disable();
+		pick_border_button->Enable();
+		tile_x_spin->Disable();
+		tile_y_spin->Disable();
+		tile_z_spin->Disable();
+		tile_pos_label->Disable();
+		item_name_label->SetLabel(wxString::Format("Editing %s border to '%s' (border id %u).",
+			entry->border_outer ? "outer" : "inner", wxstr(entry->border_to), entry->border_id));
+		UpdatePreviewSprite(entry);
+	} else if (showOptionalFields) {
+		border_id_spin->SetValue(entry->border_id);
+		item_id_spin->Disable();
+		pick_item_button->Disable();
+		pick_border_button->Enable();
+		tile_x_spin->Disable();
+		tile_y_spin->Disable();
+		tile_z_spin->Disable();
+		tile_pos_label->Disable();
+		item_name_label->SetLabel(wxString::Format("Editing optional border id %u.", entry->border_id));
+		UpdatePreviewSprite(entry);
+	} else if (showItemFields) {
 		item_id_spin->Enable();
 		pick_item_button->Enable();
+		pick_border_button->Disable();
 		item_id_spin->SetValue(entry->item_id);
 		tile_x_spin->Disable();
 		tile_y_spin->Disable();
@@ -433,6 +568,7 @@ void EditBrushWindow::UpdateEditFields() {
 		auto& tile = tiles->at(tileIndex);
 		item_id_spin->Enable();
 		pick_item_button->Enable();
+		pick_border_button->Disable();
 		item_id_spin->SetValue(tile.second);
 		tile_x_spin->Enable();
 		tile_y_spin->Enable();
@@ -449,6 +585,7 @@ void EditBrushWindow::UpdateEditFields() {
 	} else {
 		item_id_spin->Disable();
 		pick_item_button->Disable();
+		pick_border_button->Disable();
 		tile_x_spin->Disable();
 		tile_y_spin->Disable();
 		tile_z_spin->Disable();
@@ -458,6 +595,36 @@ void EditBrushWindow::UpdateEditFields() {
 	}
 
 	UpdateCompositePanelVisibility();
+}
+
+void EditBrushWindow::ApplyBorderFieldsFromControls() {
+	BrushEditEntry* entry = GetSelectedEntry();
+	if (!entry) {
+		return;
+	}
+
+	if (entry->kind == BRUSH_EDIT_GROUND_BORDER) {
+		entry->border_outer = border_align_choice->GetSelection() == 0;
+		entry->border_to = border_to_text->GetValue().ToStdString();
+		if (entry->border_to.empty()) {
+			entry->border_to = "all";
+		}
+		entry->border_id = border_id_spin->GetValue();
+		entry->border_super = border_super_check->GetValue();
+		entry->ground_equivalent = static_cast<uint16_t>(ground_equivalent_spin->GetValue());
+		RefreshList();
+	} else if (entry->kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+		entry->border_id = border_id_spin->GetValue();
+		RefreshList();
+	}
+}
+
+void EditBrushWindow::OnBorderFieldChanged(wxCommandEvent& WXUNUSED(event)) {
+	ApplyBorderFieldsFromControls();
+}
+
+void EditBrushWindow::OnBorderSpinChanged(wxSpinEvent& WXUNUSED(event)) {
+	ApplyBorderFieldsFromControls();
 }
 
 void EditBrushWindow::SetSelectedItemId(uint16_t itemId) {
@@ -562,6 +729,24 @@ void EditBrushWindow::OnClickPickItem(wxCommandEvent& WXUNUSED(event)) {
 	dialog.Destroy();
 }
 
+void EditBrushWindow::OnClickPickBorder(wxCommandEvent& WXUNUSED(event)) {
+	BrushEditEntry* entry = GetSelectedEntry();
+	if (!entry) {
+		return;
+	}
+	if (entry->kind != BRUSH_EDIT_GROUND_BORDER && entry->kind != BRUSH_EDIT_GROUND_OPTIONAL) {
+		return;
+	}
+
+	FindBorderDialog dialog(this, entry->border_id);
+	if (dialog.ShowModal() == wxID_OK) {
+		border_id_spin->SetValue(static_cast<int>(dialog.getResultId()));
+		ApplyBorderFieldsFromControls();
+		UpdateEditFields();
+	}
+	dialog.Destroy();
+}
+
 void EditBrushWindow::OnChanceChanged(wxSpinEvent& WXUNUSED(event)) {
 	BrushEditEntry* entry = GetSelectedEntry();
 	if (!entry) {
@@ -642,6 +827,41 @@ void EditBrushWindow::OnClickAddComposite(wxCommandEvent& WXUNUSED(event)) {
 		composite_tile_list->SetSelection(0);
 	}
 	UpdateEditFields();
+}
+
+void EditBrushWindow::OnClickAddBorder(wxCommandEvent& WXUNUSED(event)) {
+	if (!edit_brush->isGround()) {
+		return;
+	}
+
+	BrushEditEntry entry;
+	entry.kind = BRUSH_EDIT_GROUND_BORDER;
+	entry.border_outer = true;
+	entry.border_to = "none";
+	entry.border_id = 7;
+	entries.push_back(entry);
+	RefreshList();
+	entry_list->SetSelection(entry_list->GetItemCount() - 1);
+}
+
+void EditBrushWindow::OnClickAddOptional(wxCommandEvent& WXUNUSED(event)) {
+	if (!edit_brush->isGround()) {
+		return;
+	}
+
+	for (const BrushEditEntry& existing : entries) {
+		if (existing.kind == BRUSH_EDIT_GROUND_OPTIONAL) {
+			g_gui.PopupDialog("Optional border exists", "This brush already has an optional border entry. Edit or remove it first.", wxOK);
+			return;
+		}
+	}
+
+	BrushEditEntry entry;
+	entry.kind = BRUSH_EDIT_GROUND_OPTIONAL;
+	entry.border_id = 7;
+	entries.push_back(entry);
+	RefreshList();
+	entry_list->SetSelection(entry_list->GetItemCount() - 1);
 }
 
 void EditBrushWindow::OnClickAddTile(wxCommandEvent& WXUNUSED(event)) {

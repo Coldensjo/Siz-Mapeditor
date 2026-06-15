@@ -74,6 +74,7 @@ public:
 	}
 
 	void replaceItems(const std::vector<std::pair<uint16_t, int>>& items);
+	void replaceFromEditEntries(const std::vector<BrushEditEntry>& entries);
 	bool extractEditEntries(std::vector<BrushEditEntry>& entries) const;
 
 protected: // Members

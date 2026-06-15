@@ -139,6 +139,7 @@
     <ClCompile Include="..\..\source\artprovider.cpp" />
     <ClCompile Include="..\..\source\brush_tables.cpp" />
     <ClCompile Include="..\..\source\container_properties_window.cpp" />
+    <ClCompile Include="..\..\source\find_border_window.cpp" />
     <ClCompile Include="..\..\source\find_item_window.cpp" />
     <ClCompile Include="..\..\source\light_drawer.cpp" />
     <ClCompile Include="..\..\source\replace_items_window.cpp" />
@@ -321,6 +322,7 @@
     <ClInclude Include="..\..\source\json\json_spirit_writer.h" />
     <ClInclude Include="..\..\source\json\json_spirit_writer_template.h" />
     <ClInclude Include="..\..\source\main.h" />
+    <ClInclude Include="..\..\source\find_border_window.h" />
     <ClInclude Include="..\..\source\find_item_window.h" />
     <ClInclude Include="..\..\source\welcome_dialog.h" />
     <ClCompile Include="..\..\source\live_action.cpp" />

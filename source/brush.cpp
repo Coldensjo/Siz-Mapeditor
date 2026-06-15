@@ -206,6 +206,24 @@ Brush* Brushes::getBrush(const std::string& name) const {
 	return nullptr;
 }
 
+const AutoBorder* Brushes::getAutoBorder(uint32_t id) const {
+	auto it = borders.find(id);
+	if (it != borders.end()) {
+		return it->second;
+	}
+	return nullptr;
+}
+
+std::vector<uint32_t> Brushes::getAutoBorderIds() const {
+	std::vector<uint32_t> ids;
+	ids.reserve(borders.size());
+	for (const auto& pair : borders) {
+		ids.push_back(pair.first);
+	}
+	std::sort(ids.begin(), ids.end());
+	return ids;
+}
+
 // Brush
 uint32_t Brush::id_counter = 0;
 Brush::Brush() :

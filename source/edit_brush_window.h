@@ -55,6 +55,7 @@ private:
 	void SetSelectedItemId(uint16_t itemId);
 	void UpdatePreviewSprite(const BrushEditEntry* entry, const std::pair<Position, uint16_t>* tile = nullptr);
 	void UpdateCompositePanelVisibility();
+	void ApplyBorderFieldsFromControls();
 	wxString FormatEntryLabel(const BrushEditEntry& entry) const;
 	wxString FormatCompositeTileLabel(const std::pair<Position, uint16_t>& tile) const;
 
@@ -63,9 +64,14 @@ private:
 	void OnChanceChanged(wxSpinEvent& event);
 	void OnItemIdChanged(wxSpinEvent& event);
 	void OnTilePositionChanged(wxSpinEvent& event);
+	void OnBorderFieldChanged(wxCommandEvent& event);
+	void OnBorderSpinChanged(wxSpinEvent& event);
 	void OnClickPickItem(wxCommandEvent& event);
+	void OnClickPickBorder(wxCommandEvent& event);
 	void OnClickAddItem(wxCommandEvent& event);
 	void OnClickAddComposite(wxCommandEvent& event);
+	void OnClickAddBorder(wxCommandEvent& event);
+	void OnClickAddOptional(wxCommandEvent& event);
 	void OnClickAddTile(wxCommandEvent& event);
 	void OnClickRemoveTile(wxCommandEvent& event);
 	void OnClickRemoveEntry(wxCommandEvent& event);
@@ -85,11 +91,23 @@ private:
 	wxSpinCtrl* tile_y_spin;
 	wxSpinCtrl* tile_z_spin;
 	wxStaticText* tile_pos_label;
+	wxChoice* border_align_choice;
+	wxTextCtrl* border_to_text;
+	wxSpinCtrl* border_id_spin;
+	wxCheckBox* border_super_check;
+	wxSpinCtrl* ground_equivalent_spin;
+	wxStaticText* border_align_label;
+	wxStaticText* border_to_label;
+	wxStaticText* border_id_label;
+	wxStaticText* ground_equivalent_label;
 	wxSpinCtrl* item_id_spin;
 	wxSpinCtrl* chance_spin;
 	wxButton* pick_item_button;
+	wxButton* pick_border_button;
 	wxStaticText* item_name_label;
 	wxButton* add_composite_button;
+	wxButton* add_border_button;
+	wxButton* add_optional_button;
 	wxButton* add_tile_button;
 	wxButton* remove_tile_button;
 
