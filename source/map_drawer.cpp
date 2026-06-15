@@ -52,6 +52,29 @@
 
 namespace {
 
+constexpr uint32_t TOOLTIP_ICON_TEXT = 1954; // paper
+constexpr uint32_t TOOLTIP_ICON_DESTINATION = 1387; // portal
+constexpr uint32_t TOOLTIP_ICON_ACTION = 1945; // lever (aid)
+constexpr uint32_t TOOLTIP_ICON_UNIQUE = 1946; // lever2 (uid)
+constexpr float TOOLTIP_ICON_SCALE = 0.65f;
+constexpr float TOOLTIP_ICON_CELL = 18.0f;
+constexpr float TOOLTIP_ICON_OFFSET_X = -4.0f;
+constexpr float TOOLTIP_ICON_OFFSET_Y = -4.0f;
+constexpr float TOOLTIP_ICON_BG_PAD = 2.0f;
+constexpr float TOOLTIP_ICON_OUTLINE = 1.0f;
+
+void getTooltipIconDrawPosition(uint32_t spriteId, float slotCenterX, float slotCenterY, float& anchorX, float& anchorY) {
+	GameSprite* spr = g_items[spriteId].sprite;
+	if (spr == nullptr) {
+		anchorX = slotCenterX;
+		anchorY = slotCenterY;
+		return;
+	}
+
+	anchorX = slotCenterX + spr->getDrawOffset().first + float(spr->width - 1) * TileSize / 2.0f - TileSize / 2.0f;
+	anchorY = slotCenterY + spr->getDrawOffset().second + float(spr->height - 1) * TileSize / 2.0f - TileSize / 2.0f;
+}
+
 void PushScreenSpaceGL(int screenWidth, int screenHeight) {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
@@ -236,6 +259,7 @@ bool DrawingOptions::isDrawLight() const noexcept {
 MapDrawer::MapDrawer(MapCanvas* canvas) : canvas(canvas), editor(canvas->editor) {
 	light_drawer = std::make_shared<LightDrawer>();
 	tooltips.reserve(32);
+	tooltip_markers.reserve(64);
 }
 
 MapDrawer::~MapDrawer() {
@@ -299,6 +323,7 @@ void MapDrawer::SetupGL() {
 
 void MapDrawer::Release() {
 	tooltips.clear();
+	tooltip_markers.clear();
 
 	if (light_drawer) {
 		light_drawer->clear();
@@ -314,6 +339,7 @@ void MapDrawer::Release() {
 void MapDrawer::Draw() {
 	DrawBackground();
 	DrawMap();
+	DrawTooltipIcons();
 	if (options.isDrawLight()) {
 		DrawLight();
 	}
@@ -339,6 +365,7 @@ void MapDrawer::Draw() {
 		DrawIngameBox();
 	}
 	DrawMapCommentTooltips();
+	DrawHoveredItemTooltips();
 	if (options.show_tooltips || !tooltips.empty()) {
 		DrawTooltips();
 	}
@@ -1487,6 +1514,105 @@ void MapDrawer::DrawMapCommentTooltips() {
 	MakeTooltip(draw_x, draw_y, tip.str(), 255, 220, 120, false);
 }
 
+void MapDrawer::DrawHoveredItemTooltips() {
+	if (!options.show_tooltips) {
+		return;
+	}
+
+	for (const MapTooltipMarker& marker : tooltip_markers) {
+		if (marker.map_x == mouse_map_x && marker.map_y == mouse_map_y) {
+			MakeTooltip(marker.draw_x, marker.draw_y, marker.text);
+			break;
+		}
+	}
+}
+
+void MapDrawer::DrawTooltipIcons() {
+	if (!options.show_tooltips) {
+		return;
+	}
+
+	for (const MapTooltipMarker& marker : tooltip_markers) {
+		std::vector<uint32_t> icons;
+		icons.reserve(4);
+		if (marker.has_text) {
+			icons.push_back(TOOLTIP_ICON_TEXT);
+		}
+		if (marker.has_destination) {
+			icons.push_back(TOOLTIP_ICON_DESTINATION);
+		}
+		if (marker.has_action) {
+			icons.push_back(TOOLTIP_ICON_ACTION);
+		}
+		if (marker.has_unique) {
+			icons.push_back(TOOLTIP_ICON_UNIQUE);
+		}
+		if (icons.empty()) {
+			continue;
+		}
+
+		const int columns = icons.size() > 2 ? 2 : static_cast<int>(icons.size());
+		const int rows = static_cast<int>((icons.size() + columns - 1) / columns);
+		const float bgLeft = float(marker.draw_x) + TOOLTIP_ICON_OFFSET_X;
+		const float bgTop = float(marker.draw_y) + TOOLTIP_ICON_OFFSET_Y;
+		const float bgRight = bgLeft + float(columns) * TOOLTIP_ICON_CELL + TOOLTIP_ICON_BG_PAD * 2.0f;
+		const float bgBottom = bgTop + float(rows) * TOOLTIP_ICON_CELL + TOOLTIP_ICON_BG_PAD * 2.0f;
+
+		GLboolean texturesEnabled = glIsEnabled(GL_TEXTURE_2D);
+		if (texturesEnabled) {
+			glDisable(GL_TEXTURE_2D);
+		}
+		glColor4ub(72, 72, 72, 150);
+		glBegin(GL_QUADS);
+		glVertex2f(bgLeft, bgTop);
+		glVertex2f(bgRight, bgTop);
+		glVertex2f(bgRight, bgBottom);
+		glVertex2f(bgLeft, bgBottom);
+		glEnd();
+		if (texturesEnabled) {
+			glEnable(GL_TEXTURE_2D);
+		}
+
+		const auto drawScaledIcon = [&](float slotCenterX, float slotCenterY, uint32_t spriteId, float offsetX, float offsetY, uint8_t red, uint8_t green, uint8_t blue) {
+			const float pivotX = slotCenterX + offsetX;
+			const float pivotY = slotCenterY + offsetY;
+			float anchorX = pivotX;
+			float anchorY = pivotY;
+			getTooltipIconDrawPosition(spriteId, pivotX, pivotY, anchorX, anchorY);
+
+			glPushMatrix();
+			glTranslatef(pivotX, pivotY, 0.0f);
+			glScalef(TOOLTIP_ICON_SCALE, TOOLTIP_ICON_SCALE, 1.0f);
+			glTranslatef(-pivotX, -pivotY, 0.0f);
+			BlitSpriteType(int(anchorX), int(anchorY), spriteId, red, green, blue, 255);
+			glPopMatrix();
+		};
+
+		for (size_t i = 0; i < icons.size(); ++i) {
+			const int col = static_cast<int>(i) % columns;
+			const int row = static_cast<int>(i) / columns;
+			const float slotCenterX = bgLeft + TOOLTIP_ICON_BG_PAD + (float(col) + 0.5f) * TOOLTIP_ICON_CELL;
+			const float slotCenterY = bgTop + TOOLTIP_ICON_BG_PAD + (float(row) + 0.5f) * TOOLTIP_ICON_CELL;
+
+			static const float outlineOffsets[][2] = {
+				{-TOOLTIP_ICON_OUTLINE, 0.0f},
+				{TOOLTIP_ICON_OUTLINE, 0.0f},
+				{0.0f, -TOOLTIP_ICON_OUTLINE},
+				{0.0f, TOOLTIP_ICON_OUTLINE},
+				{-TOOLTIP_ICON_OUTLINE, -TOOLTIP_ICON_OUTLINE},
+				{TOOLTIP_ICON_OUTLINE, -TOOLTIP_ICON_OUTLINE},
+				{-TOOLTIP_ICON_OUTLINE, TOOLTIP_ICON_OUTLINE},
+				{TOOLTIP_ICON_OUTLINE, TOOLTIP_ICON_OUTLINE},
+			};
+
+			for (const float* offset : outlineOffsets) {
+				drawScaledIcon(slotCenterX, slotCenterY, icons[i], offset[0], offset[1], 0, 0, 0);
+			}
+			drawScaledIcon(slotCenterX, slotCenterY, icons[i], 0.0f, 0.0f, 255, 255, 255);
+		}
+	}
+}
+
 
 void MapDrawer::DrawBrush() {
 	if (!g_gui.IsDrawingMode()) {
@@ -2371,7 +2497,7 @@ void MapDrawer::DrawRawBrush(int screenx, int screeny, ItemType* itemType, uint8
 	}
 }
 
-void MapDrawer::WriteTooltip(Item* item, std::ostringstream& stream, bool isHouseTile) {
+void MapDrawer::WriteTooltip(Item* item, TileTooltipData& data, bool isHouseTile) {
 	if (item == nullptr) {
 		return;
 	}
@@ -2408,27 +2534,31 @@ void MapDrawer::WriteTooltip(Item* item, std::ostringstream& stream, bool isHous
 		return;
 	}
 
-	if (stream.tellp() > 0) {
-		stream << "\n";
+	if (data.stream.tellp() > 0) {
+		data.stream << "\n";
 	}
 
-	stream << "id: " << id << "\n";
+	data.stream << "id: " << id << "\n";
 
 	if (action > 0) {
-		stream << "aid: " << action << "\n";
+		data.has_action = true;
+		data.stream << "aid: " << action << "\n";
 	}
 	if (unique > 0) {
-		stream << "uid: " << unique << "\n";
+		data.has_unique = true;
+		data.stream << "uid: " << unique << "\n";
 	}
 	if (doorId > 0) {
-		stream << "door id: " << static_cast<int>(doorId) << "\n";
+		data.stream << "door id: " << static_cast<int>(doorId) << "\n";
 	}
 	if (!text.empty()) {
-		stream << "text: " << text << "\n";
+		data.has_text = true;
+		data.stream << "text: " << text << "\n";
 	}
 	if (tp) {
+		data.has_destination = true;
 		Position dest = tp->getDestination();
-		stream << "destination: " << dest.x << ", " << dest.y << ", " << dest.z << "\n";
+		data.stream << "destination: " << dest.x << ", " << dest.y << ", " << dest.z << "\n";
 	}
 
 	// Key number
@@ -2436,7 +2566,7 @@ void MapDrawer::WriteTooltip(Item* item, std::ostringstream& stream, bool isHous
 		if (const Key* key = item->asKey()) {
 			uint16_t keyNumber = key->getKeyNumber();
 			if (keyNumber > 0) {
-				stream << "key number: " << keyNumber << "\n";
+				data.stream << "key number: " << keyNumber << "\n";
 			}
 		}
 	}
@@ -2449,16 +2579,16 @@ void MapDrawer::WriteTooltip(Item* item, std::ostringstream& stream, bool isHous
 		uint16_t questValue = door->getQuestValue();
 
 		if (keyHoleNumber > 0) {
-			stream << "key hole: " << keyHoleNumber << "\n";
+			data.stream << "key hole: " << keyHoleNumber << "\n";
 		}
 		if (doorLevel > 0) {
-			stream << "door level: " << doorLevel << "\n";
+			data.stream << "door level: " << doorLevel << "\n";
 		}
 		if (questNumber > 0) {
-			stream << "quest number: " << questNumber << "\n";
+			data.stream << "quest number: " << questNumber << "\n";
 		}
 		if (questValue > 0) {
-			stream << "quest value: " << questValue << "\n";
+			data.stream << "quest value: " << questValue << "\n";
 		}
 	}
 }
@@ -2578,8 +2708,10 @@ void MapDrawer::DrawTile(TileLocation* location) {
 		}
 	}
 
+	TileTooltipData tileTooltip;
+
 	if (options.show_tooltips && map_z == floor && tile->ground) {
-		WriteTooltip(tile->ground, tooltip);
+		WriteTooltip(tile->ground, tileTooltip);
 	}
 	// end filters for ground tile
 
@@ -2589,7 +2721,7 @@ void MapDrawer::DrawTile(TileLocation* location) {
 			for (ItemVector::iterator it = tile->items.begin(); it != tile->items.end(); it++) {
 				// item tooltip
 				if (options.show_tooltips && map_z == floor) {
-					WriteTooltip(*it, tooltip, tile->isHouseTile());
+					WriteTooltip(*it, tileTooltip, tile->isHouseTile());
 				}
 
 				// item animation
@@ -2644,11 +2776,20 @@ void MapDrawer::DrawTile(TileLocation* location) {
 				}
 			}
 
-			// tooltips
-			if (options.show_tooltips) {
-				MakeTooltip(draw_x, draw_y, tooltip.str());
+			// tooltip markers (icons drawn in DrawTooltipIcons after the map)
+			if (options.show_tooltips && tileTooltip.hasContent()) {
+				tooltip_markers.push_back(MapTooltipMarker {
+					map_x,
+					map_y,
+					draw_x,
+					draw_y,
+					tileTooltip.str(),
+					tileTooltip.has_text,
+					tileTooltip.has_destination,
+					tileTooltip.has_action,
+					tileTooltip.has_unique,
+				});
 			}
-			tooltip.str("");
 		}
 	}
 }

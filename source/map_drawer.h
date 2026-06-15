@@ -43,6 +43,36 @@ struct MapTooltip {
 	bool ellipsis;
 };
 
+struct TileTooltipData {
+	std::ostringstream stream;
+	bool has_text = false;
+	bool has_destination = false;
+	bool has_action = false;
+	bool has_unique = false;
+
+	bool hasContent() const {
+		return !stream.str().empty();
+	}
+
+	std::string str() const {
+		return stream.str();
+	}
+
+	bool hasIcons() const {
+		return has_text || has_destination || has_action || has_unique;
+	}
+};
+
+struct MapTooltipMarker {
+	int map_x, map_y;
+	int draw_x, draw_y;
+	std::string text;
+	bool has_text = false;
+	bool has_destination = false;
+	bool has_action = false;
+	bool has_unique = false;
+};
+
 // Storage during drawing, for option caching
 struct DrawingOptions {
 	DrawingOptions();
@@ -116,7 +146,7 @@ class MapDrawer {
 
 protected:
 	std::vector<MapTooltip> tooltips;
-	std::ostringstream tooltip;
+	std::vector<MapTooltipMarker> tooltip_markers;
 
 public:
 	MapDrawer(MapCanvas* canvas);
@@ -151,6 +181,7 @@ public:
 	bool UpdateLiveParticipantHover(int screenX, int screenY);
 	void DrawMapComments();
 	void DrawMapCommentTooltips();
+	void DrawHoveredItemTooltips();
 	void DrawLight();
 
 	void TakeScreenshot(uint8_t* screenshot_buffer);
@@ -172,7 +203,8 @@ protected:
 	void DrawTile(TileLocation* tile);
 	void DrawBrushIndicator(int x, int y, Brush* brush, uint8_t r, uint8_t g, uint8_t b);
 	void DrawHookIndicator(int x, int y, const ItemType& type);
-	void WriteTooltip(Item* item, std::ostringstream& stream, bool isHouseTile = false);
+	void WriteTooltip(Item* item, TileTooltipData& data, bool isHouseTile = false);
+	void DrawTooltipIcons();
 	void MakeTooltip(int screenx, int screeny, const std::string& text, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, bool truncateText = true);
 	void AddLight(TileLocation* location);
 
