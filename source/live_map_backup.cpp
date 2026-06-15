@@ -57,6 +57,10 @@ bool isMapBackupFile(const wxString& filename) {
 	return name.size() > 5 && (name.rfind(".otbm") == name.size() - 5 || name.rfind(".otgz") == name.size() - 5);
 }
 
+std::string backupFileBasename(const std::string& path) {
+	return nstr(wxFileName(wxstr(path)).GetFullName());
+}
+
 std::vector<std::string> collectBackupTimestamps(const std::string& backupDir) {
 	wxArrayString files;
 	if (wxDir::GetAllFiles(wxstr(backupDir), &files, wxEmptyString, wxDIR_FILES) == 0) {
@@ -65,11 +69,12 @@ std::vector<std::string> collectBackupTimestamps(const std::string& backupDir) {
 
 	std::set<std::string> timestamps;
 	for (const wxString& file : files) {
-		if (!isMapBackupFile(file)) {
+		const std::string filename = backupFileBasename(file.ToStdString());
+		if (!isMapBackupFile(wxstr(filename))) {
 			continue;
 		}
 
-		const std::string timestamp = extractBackupTimestamp(file.ToStdString());
+		const std::string timestamp = extractBackupTimestamp(filename);
 		if (!timestamp.empty()) {
 			timestamps.insert(timestamp);
 		}
@@ -96,7 +101,7 @@ bool zipBackupBatch(const std::string& backupDir, const std::vector<std::string>
 
 	std::vector<std::string> filesToArchive;
 	for (const wxString& file : files) {
-		const std::string filename = file.ToStdString();
+		const std::string filename = backupFileBasename(file.ToStdString());
 		if (filename.size() > 4 && filename.rfind(".zip") == filename.size() - 4) {
 			continue;
 		}
