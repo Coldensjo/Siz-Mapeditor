@@ -101,7 +101,7 @@ public:
 		return look_id;
 	}
 	virtual int getMaxVariation() const {
-		return alternatives.size();
+		return static_cast<int>(alternatives.size());
 	}
 	virtual std::string getName() const {
 		return name;

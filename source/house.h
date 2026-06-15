@@ -77,7 +77,7 @@ public:
 	~Houses();
 
 	uint32_t count() const {
-		return houses.size();
+		return static_cast<uint32_t>(houses.size());
 	}
 
 	HouseMap::iterator begin() {
