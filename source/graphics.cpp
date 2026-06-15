@@ -1091,7 +1091,18 @@ wxMemoryDC* GameSprite::getDC(SpriteSize size) {
 
 		const int image_size = std::max<int>(width, height) * SPRITE_PIXELS;
 		wxImage image(image_size, image_size);
-		image.Clear(bgshade);
+		if (bgshade < 0) {
+			unsigned char* data = image.GetData();
+			const int bytes = image_size * image_size * 3;
+			for (int i = 0; i < bytes; i += 3) {
+				data[i] = 0xFF;
+				data[i + 1] = 0x00;
+				data[i + 2] = 0xFF;
+			}
+			image.SetMaskColour(0xFF, 0x00, 0xFF);
+		} else {
+			image.Clear(bgshade);
+		}
 
 		for (uint8_t l = 0; l < layers; l++) {
 			for (uint8_t w = 0; w < width; w++) {

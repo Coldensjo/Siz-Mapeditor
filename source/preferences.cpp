@@ -285,12 +285,15 @@ wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
 
 	// Icon background color
 	icon_background_choice = newd wxChoice(graphics_page, wxID_ANY);
+	icon_background_choice->Append("Transparent background");
 	icon_background_choice->Append("Black background");
 	icon_background_choice->Append("Gray background");
 	icon_background_choice->Append("White background");
 	if (g_settings.getInteger(Config::ICON_BACKGROUND) == 255) {
-		icon_background_choice->SetSelection(2);
+		icon_background_choice->SetSelection(3);
 	} else if (g_settings.getInteger(Config::ICON_BACKGROUND) == 88) {
+		icon_background_choice->SetSelection(2);
+	} else if (g_settings.getInteger(Config::ICON_BACKGROUND) == 0) {
 		icon_background_choice->SetSelection(1);
 	} else {
 		icon_background_choice->SetSelection(0);
@@ -762,16 +765,21 @@ void PreferencesWindow::Apply() {
 	}
 	g_settings.setInteger(Config::USE_MEMCACHED_SPRITES_TO_SAVE, use_memcached_chkbox->GetValue());
 	if (icon_background_choice->GetSelection() == 0) {
+		if (g_settings.getInteger(Config::ICON_BACKGROUND) != -1) {
+			g_gui.gfx.cleanSoftwareSprites();
+		}
+		g_settings.setInteger(Config::ICON_BACKGROUND, -1);
+	} else if (icon_background_choice->GetSelection() == 1) {
 		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 0) {
 			g_gui.gfx.cleanSoftwareSprites();
 		}
 		g_settings.setInteger(Config::ICON_BACKGROUND, 0);
-	} else if (icon_background_choice->GetSelection() == 1) {
+	} else if (icon_background_choice->GetSelection() == 2) {
 		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 88) {
 			g_gui.gfx.cleanSoftwareSprites();
 		}
 		g_settings.setInteger(Config::ICON_BACKGROUND, 88);
-	} else if (icon_background_choice->GetSelection() == 2) {
+	} else if (icon_background_choice->GetSelection() == 3) {
 		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 255) {
 			g_gui.gfx.cleanSoftwareSprites();
 		}

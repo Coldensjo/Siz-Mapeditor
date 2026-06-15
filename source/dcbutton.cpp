@@ -142,7 +142,14 @@ void DCButton::OnPaint(wxPaintEvent& event) {
 		return;
 	}
 
-	pdc.SetBrush(*wxBLACK);
+	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
+	wxColour fillColour;
+	if (bgshade < 0) {
+		fillColour = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
+	} else {
+		fillColour = wxColour(bgshade, bgshade, bgshade);
+	}
+	pdc.SetBrush(wxBrush(fillColour));
 	pdc.DrawRectangle(0, 0, size_x, size_y);
 	if (type == DC_BTN_TOGGLE && GetValue()) {
 		pdc.SetPen(*shadow_pen);

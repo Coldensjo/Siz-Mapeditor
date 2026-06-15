@@ -340,8 +340,10 @@ namespace {
 		wxMemoryDC dc;
 		dc.SelectObject(bitmap);
 		const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
-		dc.SetBackground(wxBrush(wxColour(bgshade, bgshade, bgshade)));
-		dc.Clear();
+		if (bgshade >= 0) {
+			dc.SetBackground(wxBrush(wxColour(bgshade, bgshade, bgshade)));
+			dc.Clear();
+		}
 		sprite->DrawTo(&dc, SPRITE_SIZE_32x32, 0, 0, bitmapSize, bitmapSize);
 		dc.SelectObject(wxNullBitmap);
 
