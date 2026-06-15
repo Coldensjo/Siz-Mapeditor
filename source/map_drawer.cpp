@@ -127,6 +127,32 @@ LiveParticipantPanelLayout computeLiveParticipantPanelLayout(int screenWidth, co
 	return layout;
 }
 
+bool tryGetLiveAuthorColor(const Editor& editor, const std::string& author, uint8_t& r, uint8_t& g, uint8_t& b) {
+	if (!editor.IsLive()) {
+		return false;
+	}
+
+	const wxString authorName = wxstr(author);
+	for (const LiveParticipant& participant : editor.GetLive().getParticipantList()) {
+		if (participant.name == authorName) {
+			r = participant.color.Red();
+			g = participant.color.Green();
+			b = participant.color.Blue();
+			return true;
+		}
+	}
+
+	if (author == editor.getMapCommentAuthor()) {
+		const wxColor color = editor.getLiveCursorColor();
+		r = color.Red();
+		g = color.Green();
+		b = color.Blue();
+		return true;
+	}
+
+	return false;
+}
+
 void DrawScreenTextLabel(float right, float top, const wxString& text) {
 	if (text.empty()) {
 		return;
@@ -1449,7 +1475,12 @@ void MapDrawer::DrawMapComments() {
 		const float markerRight = tileRight - inset;
 		const float markerBottom = tileBottom - inset;
 
-		glColor4ub(255, 210, 64, 210);
+		uint8_t r = 255;
+		uint8_t g = 210;
+		uint8_t b = 64;
+		tryGetLiveAuthorColor(editor, tile.entries.front()->author, r, g, b);
+
+		glColor4ub(r, g, b, 210);
 		glBegin(GL_QUADS);
 		glVertex2f(markerLeft, markerTop);
 		glVertex2f(markerRight, markerTop);
@@ -1458,7 +1489,12 @@ void MapDrawer::DrawMapComments() {
 		glEnd();
 
 		glLineWidth(2.0f);
-		glColor4ub(180, 120, 0, 255);
+		glColor4ub(
+			static_cast<uint8_t>(r * 0.7f),
+			static_cast<uint8_t>(g * 0.7f),
+			static_cast<uint8_t>(b * 0.7f),
+			255
+		);
 		glBegin(GL_LINE_LOOP);
 		glVertex2f(markerLeft, markerTop);
 		glVertex2f(markerRight, markerTop);

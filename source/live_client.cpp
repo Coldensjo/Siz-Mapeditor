@@ -606,14 +606,15 @@ void LiveClient::parseHello(NetworkMessage& message) {
 
 	const std::string viewKey = makeLiveMapViewKey(connectionAddress, connectionPort);
 	Position savedPosition;
-	if (loadMapViewPosition(viewKey, savedPosition)) {
-		tab->SetScreenCenterPosition(savedPosition);
+	const bool hasSavedPosition = loadMapViewPosition(viewKey, savedPosition);
+
+	g_gui.FitViewToMap(tab, !hasSavedPosition && !sessionBounds.enabled);
+
+	if (hasSavedPosition) {
+		g_gui.RestoreMapTabViewPosition(tab, savedPosition);
 	} else if (sessionBounds.enabled) {
 		tab->SetScreenCenterPosition(Position(sessionBounds.centerX, sessionBounds.centerY, sessionBounds.centerZ));
-	} else {
-		tab->SetScreenCenterPosition(Position(map.getWidth() / 2, map.getHeight() / 2, GROUND_LAYER));
 	}
-	g_gui.FitViewToMap(tab);
 
 	if (sessionBounds.enabled) {
 		logMessage(wxString::Format(

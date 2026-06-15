@@ -62,7 +62,7 @@ public:
 
 	// Resize scrollbars to fit to the map dimensions
 	// This needs to be called after updating map height/width
-	void FitToMap();
+	void FitToMap(bool center = true);
 
 	// Screen position.
 	Position GetScreenCenterPosition();

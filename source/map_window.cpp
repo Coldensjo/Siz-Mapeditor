@@ -19,6 +19,7 @@
 
 #include "map_window.h"
 #include "gui.h"
+#include "map_tab.h"
 #include "sprites.h"
 #include "editor.h"
 
@@ -116,8 +117,8 @@ void MapWindow::GetViewSize(int* x, int* y) {
 	*y *= canvas->GetContentScaleFactor();
 }
 
-void MapWindow::FitToMap() {
-	SetSize(editor.map.getWidth() * TileSize, editor.map.getHeight() * TileSize, true);
+void MapWindow::FitToMap(bool center) {
+	SetSize(editor.map.getWidth() * TileSize, editor.map.getHeight() * TileSize, center);
 }
 
 Position MapWindow::GetScreenCenterPosition() {
@@ -166,12 +167,18 @@ void MapWindow::Scroll(int x, int y, bool center) {
 	hScroll->SetThumbPosition(x);
 	vScroll->SetThumbPosition(y);
 	g_gui.UpdateMinimap();
+	if (MapTab* mapTab = dynamic_cast<MapTab*>(this)) {
+		g_gui.NotifyMapViewPositionChanged(mapTab);
+	}
 }
 
 void MapWindow::ScrollRelative(int x, int y) {
 	hScroll->SetThumbPosition(hScroll->GetThumbPosition() + x);
 	vScroll->SetThumbPosition(vScroll->GetThumbPosition() + y);
 	g_gui.UpdateMinimap();
+	if (MapTab* mapTab = dynamic_cast<MapTab*>(this)) {
+		g_gui.NotifyMapViewPositionChanged(mapTab);
+	}
 }
 
 void MapWindow::OnGem(wxCommandEvent& WXUNUSED(event)) {

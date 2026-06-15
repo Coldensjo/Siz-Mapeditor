@@ -762,7 +762,10 @@ public:
 		}
 		if (g_autosaveIntervalSeconds > 0) {
 			std::cout << "[live] Auto-save every " << (g_autosaveIntervalSeconds / 60)
-			          << " minute(s) with timestamped backups." << std::endl;
+			          << " minute(s) with timestamped backups in the map's backup/ folder."
+			          << std::endl;
+			std::cout << "[live] When 10+ backups accumulate, the oldest 10 are zipped together."
+			          << std::endl;
 		} else {
 			std::cout << "[live] Auto-save disabled." << std::endl;
 		}

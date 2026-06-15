@@ -330,6 +330,7 @@
     <ClCompile Include="..\..\source\live_socket.cpp" />
     <ClCompile Include="..\..\source\live_assets.cpp" />
     <ClCompile Include="..\..\source\live_item_blocklist.cpp" />
+    <ClCompile Include="..\..\source\live_map_backup.cpp" />
     <ClCompile Include="..\..\source\live_tab.cpp" />
     <ClCompile Include="..\..\source\net_connection.cpp" />
     <ClInclude Include="..\..\source\live_action.h" />
@@ -339,6 +340,7 @@
     <ClInclude Include="..\..\source\live_server.h" />
     <ClInclude Include="..\..\source\live_socket.h" />
     <ClInclude Include="..\..\source\live_item_blocklist.h" />
+    <ClInclude Include="..\..\source\live_map_backup.h" />
     <ClInclude Include="..\..\source\live_tab.h" />
     <ClInclude Include="..\..\source\net_connection.h" />
   </ItemGroup>

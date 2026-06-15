@@ -28,6 +28,7 @@
 #include "settings.h"
 #include "gui.h"
 #include "map_display.h"
+#include "live_map_backup.h"
 #include "brush.h"
 #include "ground_brush.h"
 #include "wall_brush.h"
@@ -417,31 +418,42 @@ bool Editor::saveMap(FileName filename, bool showdialog) {
 		date << "-" << current_time->tm_min;
 		date << "-" << current_time->tm_sec;
 
+		const bool useLiveBackupFolder = g_gui.IsHeadless();
+		std::string backup_path = map_path;
+		if (useLiveBackupFolder) {
+			backup_path = getLiveMapBackupDirectory(map_path);
+			ensureLiveMapBackupDirectory(backup_path);
+		}
+
 		if (!backup_otbm.empty()) {
 			converter.SetFullName(wxstr(savefile));
-			std::string otbm_filename = map_path + nstr(converter.GetName());
+			std::string otbm_filename = backup_path + nstr(converter.GetName());
 			std::rename(backup_otbm.c_str(), std::string(otbm_filename + "." + date.str() + (save_otgz ? ".otgz" : ".otbm")).c_str());
 		}
 
 		if (!backup_house.empty()) {
 			converter.SetFullName(wxstr(map.housefile));
 			const std::string house_ext = nstr(converter.GetExt());
-			std::string house_filename = map_path + nstr(converter.GetName());
+			std::string house_filename = backup_path + nstr(converter.GetName());
 			std::rename(backup_house.c_str(), std::string(house_filename + "." + date.str() + "." + house_ext).c_str());
 		}
 
 		if (!backup_spawn.empty()) {
 			converter.SetFullName(wxstr(map.spawnfile));
 			const std::string spawn_ext = nstr(converter.GetExt());
-			std::string spawn_filename = map_path + nstr(converter.GetName());
+			std::string spawn_filename = backup_path + nstr(converter.GetName());
 			std::rename(backup_spawn.c_str(), std::string(spawn_filename + "." + date.str() + "." + spawn_ext).c_str());
 		}
 
 		if (!backup_comments.empty()) {
 			converter.SetFullName(wxstr(map.commentsfile));
 			const std::string comments_ext = nstr(converter.GetExt());
-			std::string comments_filename = map_path + nstr(converter.GetName());
+			std::string comments_filename = backup_path + nstr(converter.GetName());
 			std::rename(backup_comments.c_str(), std::string(comments_filename + "." + date.str() + "." + comments_ext).c_str());
+		}
+
+		if (useLiveBackupFolder) {
+			rotateLiveMapBackups(backup_path);
 		}
 	} else {
 		// Delete the temporary files

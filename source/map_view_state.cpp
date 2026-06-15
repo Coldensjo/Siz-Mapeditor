@@ -116,6 +116,12 @@ void saveMapViewPosition(const std::string& key, const Position& position) {
 	}
 
 	std::vector<MapViewEntry> entries = loadMapViewEntries();
+	for (const MapViewEntry& entry : entries) {
+		if (entry.first == key && entry.second == position) {
+			return;
+		}
+	}
+
 	for (auto it = entries.begin(); it != entries.end(); ++it) {
 		if (it->first == key) {
 			entries.erase(it);
@@ -135,6 +141,7 @@ void saveMapViewPosition(const std::string& key, const Position& position) {
 	std::ostringstream stream;
 	stream << position;
 	g_settings.setString(Config::RECENT_EDITED_MAP_POSITION, stream.str());
+	g_settings.save();
 }
 
 bool loadMapViewPosition(const std::string& key, Position& position) {

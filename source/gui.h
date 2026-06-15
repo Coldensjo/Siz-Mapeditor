@@ -314,7 +314,9 @@ public:
 	void RefreshView();
 	// Fit all/specified current map view to map dimensions
 	void FitViewToMap();
-	void FitViewToMap(MapTab* mt);
+	void FitViewToMap(MapTab* mt, bool center = true);
+	void RestoreMapTabViewPosition(MapTab* mapTab, const Position& position);
+	void NotifyMapViewPositionChanged(MapTab* mapTab);
 
 	void DoCut();
 	void DoCopy();
@@ -464,6 +466,7 @@ protected:
 	ClientVersionID loaded_version;
 	EditorMode mode;
 	bool pasting;
+	bool restoringMapViewPosition;
 
 	Hotkey hotkeys[10];
 	bool hotkeys_enabled;

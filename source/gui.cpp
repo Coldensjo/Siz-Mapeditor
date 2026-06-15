@@ -445,6 +445,7 @@ GUI::GUI() :
 	loaded_version(CLIENT_VERSION_NONE),
 	mode(SELECTION_MODE),
 	pasting(false),
+	restoringMapViewPosition(false),
 	hotkeys_enabled(true),
 
 	current_brush(nullptr),
@@ -878,14 +879,42 @@ void GUI::FitViewToMap() {
 	}
 }
 
-void GUI::FitViewToMap(MapTab* mt) {
+void GUI::FitViewToMap(MapTab* mt, bool center) {
 	for (int index = 0; index < tabbook->GetTabCount(); ++index) {
 		if (auto* tab = dynamic_cast<MapTab*>(tabbook->GetTab(index))) {
 			if (tab->HasSameReference(mt)) {
-				tab->GetView()->FitToMap();
+				tab->GetView()->FitToMap(center);
 			}
 		}
 	}
+}
+
+void GUI::RestoreMapTabViewPosition(MapTab* mapTab, const Position& position) {
+	if (!mapTab || !position.isValid()) {
+		return;
+	}
+
+	const auto apply = [this, mapTab, position]() {
+		restoringMapViewPosition = true;
+		mapTab->SetScreenCenterPosition(position);
+		restoringMapViewPosition = false;
+	};
+
+	apply();
+	if (root) {
+		wxTheApp->CallAfter([this, mapTab, position]() {
+			restoringMapViewPosition = true;
+			mapTab->SetScreenCenterPosition(position);
+			restoringMapViewPosition = false;
+		});
+	}
+}
+
+void GUI::NotifyMapViewPositionChanged(MapTab* mapTab) {
+	if (restoringMapViewPosition || !mapTab) {
+		return;
+	}
+	SaveMapTabViewPosition(mapTab);
 }
 
 bool GUI::ConnectToLiveServer() {
@@ -1030,10 +1059,6 @@ bool GUI::LoadMap(const FileName& fileName) {
 	const bool forceReloadVersion = mapConfig.hasPathOverrides() || g_lastMapLoadUsedPathOverrides;
 	g_lastMapLoadUsedPathOverrides = mapConfig.hasPathOverrides();
 
-	const std::string viewKey = makeLocalMapViewKey(nstr(fileName.GetFullPath()));
-	Position savedPosition;
-	const bool hasSavedPosition = loadMapViewPosition(viewKey, savedPosition);
-
 	Editor* editor;
 	try {
 		editor = newd Editor(copybuffer, fileName, mapConfig.hasClientVersion ? mapConfig.clientVersion : CLIENT_VERSION_NONE, forceReloadVersion);
@@ -1042,22 +1067,26 @@ bool GUI::LoadMap(const FileName& fileName) {
 		return false;
 	}
 
+	const std::string viewKey = makeLocalMapViewKey(editor->map.getFilename());
+	Position savedPosition;
+	const bool hasSavedPosition = loadMapViewPosition(viewKey, savedPosition);
+
 	auto* mapTab = newd MapTab(tabbook, editor);
 	mapTab->OnSwitchEditorMode(mode);
 
 	root->AddRecentFile(fileName);
 
-	mapTab->GetView()->FitToMap();
+	mapTab->GetView()->FitToMap(!hasSavedPosition);
 	UpdateTitle();
 	ListDialog("Map config warnings", mapConfig.warnings);
 	ListDialog("Map loader errors", mapTab->GetMap()->getWarnings());
 	RefreshPalettes();
 
-	FitViewToMap(mapTab);
+	FitViewToMap(mapTab, !hasSavedPosition);
 	root->UpdateMenubar();
 
 	if (hasSavedPosition) {
-		mapTab->SetScreenCenterPosition(savedPosition);
+		RestoreMapTabViewPosition(mapTab, savedPosition);
 	}
 	return true;
 }
