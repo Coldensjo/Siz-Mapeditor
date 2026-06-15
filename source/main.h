@@ -48,6 +48,15 @@ _Ret_bytecap_(_Size) inline void* __CRTDECL operator new[](size_t _Size, const c
 
 #endif
 
+#if defined(_MSC_VER)
+	// Legacy codebase + wx DLL consumer: benign /W3 noise (applied via PCH to all TUs)
+	#pragma warning(disable : 4244) // narrowing conversions (OpenGL, legacy math)
+	#pragma warning(disable : 4251) // wx STL members in exported classes
+	#pragma warning(disable : 4267) // size_t to smaller integer
+	#pragma warning(disable : 4275) // wx base-class DLL export mismatch
+	#pragma warning(disable : 4996) // deprecated wx APIs
+#endif
+
 // Boost libraries
 #include <boost/utility.hpp>
 #include <boost/range/adaptor/reversed.hpp>
