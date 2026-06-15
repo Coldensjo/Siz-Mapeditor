@@ -62,7 +62,7 @@ public:
 	void clear();
 
 	uint32_t count() const {
-		return towns.size();
+		return static_cast<uint32_t>(towns.size());
 	}
 
 	bool addTown(Town* town);
