@@ -781,3 +781,68 @@ void WallDecorationBrush::draw(BaseMap* map, Tile* tile, void* parameter) {
 		++iter;
 	}
 }
+
+void WallBrush::replaceWallItems(int alignment, const std::vector<std::pair<uint16_t, int>>& items) {
+	if (alignment < 0 || alignment >= 17) {
+		return;
+	}
+
+	WallNode& node = wall_items[alignment];
+	for (const WallType& wallType : node.items) {
+		ItemType& it = g_items[wallType.id];
+		if (it.brush == this) {
+			it.brush = nullptr;
+		}
+	}
+
+	node.items.clear();
+	node.total_chance = 0;
+
+	for (const auto& entry : items) {
+		ItemType& it = g_items[entry.first];
+		if (it.id == 0) {
+			continue;
+		}
+
+		it.isWall = true;
+		it.brush = this;
+
+		node.total_chance += entry.second;
+		WallType wallType;
+		wallType.id = entry.first;
+		wallType.chance = node.total_chance;
+		node.items.push_back(wallType);
+	}
+}
+
+bool WallBrush::extractEditEntries(std::vector<BrushEditEntry>& entries) const {
+	entries.clear();
+	for (int alignment = 0; alignment < 17; ++alignment) {
+		const WallNode& node = wall_items[alignment];
+		if (node.items.empty()) {
+			continue;
+		}
+
+		std::string alignmentName;
+		switch (alignment) {
+			case 0: alignmentName = "horizontal"; break;
+			case 1: alignmentName = "vertical"; break;
+			case 2: alignmentName = "corner"; break;
+			case 3: alignmentName = "pole"; break;
+			case 4: alignmentName = "entrance"; break;
+			default: alignmentName = "alignment " + std::to_string(alignment); break;
+		}
+
+		int previousChance = 0;
+		for (const WallType& wallType : node.items) {
+			BrushEditEntry entry;
+			entry.kind = BRUSH_EDIT_ITEM;
+			entry.item_id = wallType.id;
+			entry.chance = wallType.chance - previousChance;
+			entry.wall_alignment = alignmentName;
+			entries.push_back(entry);
+			previousChance = wallType.chance;
+		}
+	}
+	return true;
+}

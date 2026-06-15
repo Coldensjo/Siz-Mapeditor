@@ -34,6 +34,7 @@ DoodadBrush::DoodadBrush() :
 	one_size(false),
 	do_new_borders(false),
 	on_duplicate(false),
+	explicit_alternates(false),
 	clear_mapflags(0),
 	clear_statflags(0) {
 	////
@@ -223,6 +224,7 @@ bool DoodadBrush::load(pugi::xml_node node, wxArrayString& warnings) {
 		if (as_lower_str(childNode.name()) != "alternate") {
 			continue;
 		}
+		explicit_alternates = true;
 		if (!loadAlternative(childNode, warnings)) {
 			return false;
 		}
@@ -417,4 +419,105 @@ bool DoodadBrush::hasCompositeObjects(int ab) const {
 	AlternativeBlock* ab_ptr = alternatives[ab];
 	ASSERT(ab_ptr);
 	return ab_ptr->composite_chance > 0;
+}
+
+void DoodadBrush::replaceDefaultAlternative(
+	const std::vector<std::pair<int, uint16_t>>& singleItems,
+	const std::vector<std::pair<int, std::vector<std::pair<Position, uint16_t>>>>& composites) {
+	for (AlternativeBlock* alternative : alternatives) {
+		for (SingleBlock& single : alternative->single_items) {
+			ItemType& it = g_items[single.item->getID()];
+			if (it.doodad_brush == this) {
+				it.doodad_brush = nullptr;
+			}
+		}
+		for (CompositeBlock& composite : alternative->composite_items) {
+			for (const auto& tileEntry : composite.items) {
+				for (Item* item : tileEntry.second) {
+					ItemType& it = g_items[item->getID()];
+					if (it.doodad_brush == this) {
+						it.doodad_brush = nullptr;
+					}
+				}
+			}
+		}
+		delete alternative;
+	}
+	alternatives.clear();
+
+	AlternativeBlock* alternativeBlock = newd AlternativeBlock();
+	for (const auto& singleEntry : singleItems) {
+		ItemType& it = g_items[singleEntry.second];
+		if (it.id != 0) {
+			it.doodad_brush = this;
+		}
+
+		SingleBlock sb;
+		sb.chance = singleEntry.first;
+		sb.item = Item::Create(singleEntry.second);
+		alternativeBlock->single_items.push_back(sb);
+		alternativeBlock->single_chance += sb.chance;
+	}
+
+	for (const auto& compositeEntry : composites) {
+		alternativeBlock->composite_chance += compositeEntry.first;
+
+		CompositeBlock cb;
+		cb.chance = alternativeBlock->composite_chance;
+
+		for (const auto& tileEntry : compositeEntry.second) {
+			ItemVector items;
+			Item* item = Item::Create(tileEntry.second);
+			if (item) {
+				items.push_back(item);
+				ItemType& it = g_items[tileEntry.second];
+				if (it.id != 0) {
+					it.doodad_brush = this;
+				}
+			}
+			if (!items.empty()) {
+				cb.items.push_back(std::make_pair(tileEntry.first, items));
+			}
+		}
+		alternativeBlock->composite_items.push_back(cb);
+	}
+
+	alternatives.push_back(alternativeBlock);
+}
+
+bool DoodadBrush::extractEditEntries(std::vector<BrushEditEntry>& entries, wxString& error) const {
+	entries.clear();
+	if (explicit_alternates) {
+		error = "This brush uses alternate variations and cannot be edited yet.";
+		return false;
+	}
+	if (alternatives.empty()) {
+		error = "This brush has no editable entries.";
+		return false;
+	}
+
+	const AlternativeBlock* alternative = alternatives.front();
+	int previousCompositeChance = 0;
+	for (const CompositeBlock& composite : alternative->composite_items) {
+		BrushEditEntry entry;
+		entry.kind = BRUSH_EDIT_COMPOSITE;
+		entry.chance = composite.chance - previousCompositeChance;
+		previousCompositeChance = composite.chance;
+
+		for (const auto& tileEntry : composite.items) {
+			for (Item* item : tileEntry.second) {
+				entry.composite_tiles.push_back(std::make_pair(tileEntry.first, item->getID()));
+			}
+		}
+		entries.push_back(entry);
+	}
+
+	for (const SingleBlock& single : alternative->single_items) {
+		BrushEditEntry entry;
+		entry.kind = BRUSH_EDIT_ITEM;
+		entry.item_id = single.item->getID();
+		entry.chance = single.chance;
+		entries.push_back(entry);
+	}
+	return true;
 }

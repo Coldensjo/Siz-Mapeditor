@@ -19,6 +19,7 @@
 #define RME_DOODAD_BRUSH_H
 
 #include "brush.h"
+#include "brush_edit.h"
 
 //=============================================================================
 // Doodadbrush, add doodads!
@@ -78,6 +79,15 @@ public:
 	}
 	bool ownsItem(Item* item) const;
 
+	bool hasExplicitAlternates() const {
+		return explicit_alternates;
+	}
+	void replaceDefaultAlternative(
+		const std::vector<std::pair<int, uint16_t>>& singleItems,
+		const std::vector<std::pair<int, std::vector<std::pair<Position, uint16_t>>>>& composites
+	);
+	bool extractEditEntries(std::vector<BrushEditEntry>& entries, wxString& error) const;
+
 	virtual bool canSmear() const {
 		return draggable;
 	}
@@ -112,6 +122,7 @@ protected:
 	bool one_size;
 	bool do_new_borders;
 	bool on_duplicate;
+	bool explicit_alternates;
 	uint16_t clear_mapflags;
 	uint16_t clear_statflags;
 

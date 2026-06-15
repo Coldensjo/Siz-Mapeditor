@@ -133,6 +133,9 @@ bool Brushes::unserializeBrush(pugi::xml_node node, wxArrayString& warnings) {
 	}
 
 	if (!node.first_child()) {
+		if (!current_load_file.empty()) {
+			brush->setSourceFile(current_load_file);
+		}
 		brushes.insert(std::make_pair(brush->getName(), brush));
 		return true;
 	}
@@ -156,9 +159,16 @@ bool Brushes::unserializeBrush(pugi::xml_node node, wxArrayString& warnings) {
 		if (otherBrush != brush) {
 			warnings.push_back(wxString("Duplicate brush name ") << wxstr(brush->getName()) << ". Undefined behaviour may ensue.");
 		} else {
+			if (!current_load_file.empty()) {
+				brush->setSourceFile(current_load_file);
+			}
 			// Don't insert
 			return true;
 		}
+	}
+
+	if (!current_load_file.empty()) {
+		brush->setSourceFile(current_load_file);
 	}
 
 	brushes.insert(std::make_pair(brush->getName(), brush));

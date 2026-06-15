@@ -19,6 +19,7 @@
 #define RME_WALL_BRUSH_H
 
 #include "brush.h"
+#include "brush_edit.h"
 
 //=============================================================================
 // Wallbrush, for drawing walls
@@ -61,6 +62,9 @@ public:
 	virtual bool canDrag() const {
 		return true;
 	}
+
+	void replaceWallItems(int alignment, const std::vector<std::pair<uint16_t, int>>& items);
+	bool extractEditEntries(std::vector<BrushEditEntry>& entries) const;
 
 	static uint32_t full_border_types[16];
 	static uint32_t half_border_types[16];

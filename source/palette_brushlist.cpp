@@ -19,6 +19,7 @@
 
 #include "palette_brushlist.h"
 #include "gui.h"
+#include "edit_brush_window.h"
 #include "brush.h"
 #include "add_tileset_window.h"
 #include "add_item_window.h"
@@ -417,11 +418,15 @@ void BrushPanel::OnClickListBoxRow(wxCommandEvent& event) {
 	}
 	
 	ASSERT(tileset->getType() >= TILESET_UNKNOWN && tileset->getType() <= TILESET_HOUSE);
-	// We just notify the GUI of the action, it will take care of everything else
 	size_t n = event.GetSelection();
 
-	// Safety check: ensure n is within bounds
 	if (n >= tileset->size()) {
+		return;
+	}
+
+	Brush* brush = tileset->brushlist[n];
+	if (wxGetKeyState(WXK_CONTROL)) {
+		OpenBrushEditor(brush);
 		return;
 	}
 
@@ -656,6 +661,12 @@ void BrushIconBox::OnClickBrushButton(wxCommandEvent& event) {
 	wxObject* obj = event.GetEventObject();
 	BrushButton* btn = dynamic_cast<BrushButton*>(obj);
 	if (btn) {
+		if (wxGetKeyState(WXK_CONTROL)) {
+			OpenBrushEditor(btn->brush);
+			btn->SetValue(false);
+			return;
+		}
+
 		wxWindow* w = this;
 		while ((w = w->GetParent()) && dynamic_cast<PaletteWindow*>(w) == nullptr)
 			;

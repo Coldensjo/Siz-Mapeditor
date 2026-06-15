@@ -71,6 +71,10 @@ public:
 	bool unserializeBorder(pugi::xml_node node, wxArrayString& warnings);
 	bool unserializeBrush(pugi::xml_node node, wxArrayString& warnings);
 
+	void setCurrentLoadFile(const std::string& file) {
+		current_load_file = file;
+	}
+
 	const BrushMap& getMap() const {
 		return brushes;
 	}
@@ -79,6 +83,7 @@ protected:
 	typedef std::map<uint32_t, AutoBorder*> BorderMap;
 	BrushMap brushes;
 	BorderMap borders;
+	std::string current_load_file;
 
 	friend class AutoBorder;
 	friend class GroundBrush;
@@ -245,11 +250,19 @@ public:
 		usesCollection = true;
 	}
 
+	const std::string& getSourceFile() const {
+		return source_file;
+	}
+	void setSourceFile(const std::string& file) {
+		source_file = file;
+	}
+
 protected:
 	static uint32_t id_counter;
 	uint32_t id;
 	bool visible; // Visible in any palette?
 	bool usesCollection;
+	std::string source_file;
 };
 
 //=============================================================================

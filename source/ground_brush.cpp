@@ -1005,3 +1005,44 @@ void GroundBrush::doBorders(BaseMap* map, Tile* tile) {
 		}
 	}
 }
+
+void GroundBrush::replaceItems(const std::vector<std::pair<uint16_t, int>>& items) {
+	for (const ItemChanceBlock& block : border_items) {
+		ItemType& it = g_items[block.id];
+		if (it.brush == this) {
+			it.brush = nullptr;
+		}
+	}
+
+	border_items.clear();
+	total_chance = 0;
+
+	for (const auto& entry : items) {
+		ItemType& it = g_items[entry.first];
+		if (it.id == 0) {
+			continue;
+		}
+
+		it.brush = this;
+		total_chance += entry.second;
+
+		ItemChanceBlock block;
+		block.id = entry.first;
+		block.chance = total_chance;
+		border_items.push_back(block);
+	}
+}
+
+bool GroundBrush::extractEditEntries(std::vector<BrushEditEntry>& entries) const {
+	entries.clear();
+	int previousChance = 0;
+	for (const ItemChanceBlock& block : border_items) {
+		BrushEditEntry entry;
+		entry.kind = BRUSH_EDIT_ITEM;
+		entry.item_id = block.id;
+		entry.chance = block.chance - previousChance;
+		previousChance = block.chance;
+		entries.push_back(entry);
+	}
+	return true;
+}

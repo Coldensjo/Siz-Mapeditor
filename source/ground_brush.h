@@ -19,6 +19,7 @@
 #define RME_GROUND_BRUSH_H
 
 #include "brush.h"
+#include "brush_edit.h"
 
 //=============================================================================
 
@@ -71,6 +72,9 @@ public:
 	bool hasOptionalBorder() const {
 		return optional_border != nullptr;
 	}
+
+	void replaceItems(const std::vector<std::pair<uint16_t, int>>& items);
+	bool extractEditEntries(std::vector<BrushEditEntry>& entries) const;
 
 protected: // Members
 	int32_t z_order;

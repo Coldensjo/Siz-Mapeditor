@@ -81,6 +81,7 @@ bool Materials::loadMaterials(const FileName& identifier, wxString& error, wxArr
 		return false;
 	}
 
+	g_brushes.setCurrentLoadFile(identifier.GetFullPath().ToStdString());
 	unserializeMaterials(identifier, node, error, warnings);
 	return true;
 }

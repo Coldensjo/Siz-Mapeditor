@@ -132,6 +132,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\source\brush_edit.cpp" />
+    <ClCompile Include="..\..\source\edit_brush_window.cpp" />
     <ClCompile Include="..\..\source\add_item_window.cpp" />
     <ClCompile Include="..\..\source\add_tileset_window.cpp" />
     <ClCompile Include="..\..\source\artprovider.cpp" />
@@ -142,6 +144,8 @@
     <ClCompile Include="..\..\source\replace_items_window.cpp" />
     <ClCompile Include="..\..\source\tileset_window.cpp" />
     <ClCompile Include="..\..\source\welcome_dialog.cpp" />
+    <ClInclude Include="..\..\source\brush_edit.h" />
+    <ClInclude Include="..\..\source\edit_brush_window.h" />
     <ClInclude Include="..\..\source\add_item_window.h" />
     <ClInclude Include="..\..\source\add_tileset_window.h" />
     <ClInclude Include="..\..\source\artprovider.h" />
@@ -323,6 +327,7 @@
     <ClCompile Include="..\..\source\live_server.cpp" />
     <ClCompile Include="..\..\source\live_socket.cpp" />
     <ClCompile Include="..\..\source\live_assets.cpp" />
+    <ClCompile Include="..\..\source\live_item_blocklist.cpp" />
     <ClCompile Include="..\..\source\live_tab.cpp" />
     <ClCompile Include="..\..\source\net_connection.cpp" />
     <ClInclude Include="..\..\source\live_action.h" />
@@ -331,6 +336,7 @@
     <ClInclude Include="..\..\source\live_peer.h" />
     <ClInclude Include="..\..\source\live_server.h" />
     <ClInclude Include="..\..\source\live_socket.h" />
+    <ClInclude Include="..\..\source\live_item_blocklist.h" />
     <ClInclude Include="..\..\source\live_tab.h" />
     <ClInclude Include="..\..\source\net_connection.h" />
   </ItemGroup>
