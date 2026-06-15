@@ -914,6 +914,16 @@ void GUI::NotifyMapViewPositionChanged(MapTab* mapTab) {
 	if (restoringMapViewPosition || !mapTab) {
 		return;
 	}
+	// This notification fires on every scroll step, including middle-mouse
+	// panning. Persisting the position writes the entire settings file to disk
+	// (Settings::save), which causes visible stutter while panning. Throttle the
+	// disk write to at most once per second; the final resting position is still
+	// flushed by the explicit SaveMapTabViewPosition calls on tab switch, tab
+	// close and application exit.
+	if (mapViewPositionSaveWatch.Time() < 1000) {
+		return;
+	}
+	mapViewPositionSaveWatch.Start();
 	SaveMapTabViewPosition(mapTab);
 }
 

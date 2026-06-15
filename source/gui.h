@@ -467,6 +467,9 @@ protected:
 	EditorMode mode;
 	bool pasting;
 	bool restoringMapViewPosition;
+	// Throttles the (disk-writing) persistence of the map view position so that
+	// continuous scrolling/panning does not stutter. See NotifyMapViewPositionChanged.
+	wxStopWatch mapViewPositionSaveWatch;
 
 	Hotkey hotkeys[10];
 	bool hotkeys_enabled;
