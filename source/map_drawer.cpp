@@ -3122,6 +3122,12 @@ void MapDrawer::AddLight(TileLocation* location) {
 
 	auto position = location->getPosition();
 
+	// Solid ground blocks the view of floors below it, so lights on lower
+	// floors are only visible through openings (tiles with no ground).
+	if (tile->hasGround()) {
+		light_drawer->addOpaqueGround(position.x, position.y, position.z);
+	}
+
 	if (tile->ground) {
 		if (tile->ground->hasLight()) {
 			light_drawer->addLight(position.x, position.y, position.z, tile->ground->getLight());

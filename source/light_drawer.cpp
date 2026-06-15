@@ -51,7 +51,17 @@ void LightDrawer::draw(int map_x, int map_y, int end_x, int end_y, int scroll_x,
 			buffer[color_index + 2] = global_color.Blue();
 			buffer[color_index + 3] = 140; // global_color.Alpha();
 
+			uint8_t cover_z = 255;
+			auto cover_it = opaque_ground.find(columnKey(mx, my));
+			if (cover_it != opaque_ground.end()) {
+				cover_z = cover_it->second;
+			}
+
 			for (auto& light : lights) {
+				// Occluded: a higher floor's solid ground covers this column.
+				if (light.map_z > cover_z) {
+					continue;
+				}
 				float intensity = calculateIntensity(mx, my, light);
 				if (intensity == 0.f) {
 					continue;
@@ -104,12 +114,8 @@ void LightDrawer::setGlobalLightColor(uint8_t color) {
 }
 
 void LightDrawer::addLight(int map_x, int map_y, int map_z, const SpriteLight& light) {
-	if (map_z <= GROUND_LAYER) {
-		map_x -= (GROUND_LAYER - map_z);
-		map_y -= (GROUND_LAYER - map_z);
-	}
-
-	if (map_x <= 0 || map_x >= MAP_MAX_WIDTH || map_y <= 0 || map_y >= MAP_MAX_HEIGHT) {
+	const int source_z = map_z;
+	if (!applyFloorOffset(map_x, map_y, map_z)) {
 		return;
 	}
 
@@ -117,17 +123,34 @@ void LightDrawer::addLight(int map_x, int map_y, int map_z, const SpriteLight& l
 
 	if (!lights.empty()) {
 		Light& previous = lights.back();
-		if (previous.map_x == map_x && previous.map_y == map_y && previous.color == light.color) {
+		if (previous.map_x == map_x && previous.map_y == map_y && previous.map_z == source_z && previous.color == light.color) {
 			previous.intensity = std::max(previous.intensity, intensity);
 			return;
 		}
 	}
 
-	lights.push_back(Light { static_cast<uint16_t>(map_x), static_cast<uint16_t>(map_y), light.color, intensity });
+	lights.push_back(Light { static_cast<uint16_t>(map_x), static_cast<uint16_t>(map_y), static_cast<uint8_t>(source_z), light.color, intensity });
+}
+
+void LightDrawer::addOpaqueGround(int map_x, int map_y, int map_z) {
+	const int source_z = map_z;
+	if (!applyFloorOffset(map_x, map_y, map_z)) {
+		return;
+	}
+
+	const uint32_t key = columnKey(map_x, map_y);
+	auto it = opaque_ground.find(key);
+	if (it == opaque_ground.end()) {
+		opaque_ground.emplace(key, static_cast<uint8_t>(source_z));
+	} else if (source_z < it->second) {
+		// Keep the topmost (highest) floor that blocks this column.
+		it->second = static_cast<uint8_t>(source_z);
+	}
 }
 
 void LightDrawer::clear() noexcept {
 	lights.clear();
+	opaque_ground.clear();
 }
 
 void LightDrawer::createGLTexture() {
