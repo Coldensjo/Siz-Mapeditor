@@ -78,6 +78,7 @@ protected:
 	void parseNodeRequest(NetworkMessage& message);
 	void parseReceiveChanges(NetworkMessage& message);
 	void parseCursorUpdate(NetworkMessage& message);
+	void parseColorUpdate(NetworkMessage& message);
 	void parseClientPing(NetworkMessage& message);
 	void parseCommentAdd(NetworkMessage& message);
 	void parseCommentRemove(NetworkMessage& message);

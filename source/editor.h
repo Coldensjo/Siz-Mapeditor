@@ -95,6 +95,8 @@ public: // Functions
 	bool saveMap(FileName filename, bool showdialog); // returns false on failure
 	void addMapComment(const Position& pos, const std::string& text);
 	void sendLivePing(const Position& pos);
+	void setLiveCursorColor(const wxColor& color);
+	wxColor getLiveCursorColor() const;
 	bool removeMapComment(uint32_t commentId);
 	bool removeMapCommentAt(const Position& pos);
 	bool showMapCommentsAt(const Position& pos);

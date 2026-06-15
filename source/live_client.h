@@ -56,6 +56,12 @@ public:
 	//
 	void updateCursor(const Position& position);
 
+	void setCursorColor(const wxColor& color);
+	wxColor getOwnCursorColor() const {
+		return ownClientColor;
+	}
+	void sendCursorColor();
+
 	LiveLogTab* createLogWindow(wxWindow* parent);
 	MapTab* createEditorWindow();
 

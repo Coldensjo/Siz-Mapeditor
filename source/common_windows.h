@@ -20,6 +20,8 @@
 
 #include "main.h"
 
+#include <wx/clrpicker.h>
+
 #include "dcbutton.h"
 #include "positionctrl.h"
 
@@ -390,6 +392,7 @@ public:
 	uint16_t GetPort() const;
 	wxString GetUsername() const;
 	wxString GetPassword() const;
+	wxColor GetCursorColor() const;
 
 	void OnClickOK(wxCommandEvent& event);
 	void OnClickCancel(wxCommandEvent& event);
@@ -399,6 +402,7 @@ protected:
 	wxSpinCtrl* port_ctrl;
 	wxTextCtrl* username_ctrl;
 	wxTextCtrl* password_ctrl;
+	wxColourPickerCtrl* cursor_color_pick;
 
 	DECLARE_EVENT_TABLE()
 };

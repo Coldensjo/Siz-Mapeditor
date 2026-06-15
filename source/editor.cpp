@@ -585,6 +585,38 @@ void Editor::sendLivePing(const Position& pos) {
 	}
 }
 
+void Editor::setLiveCursorColor(const wxColor& color) {
+	if (!IsLiveClient() || !live_client) {
+		return;
+	}
+
+	live_client->setCursorColor(color);
+	live_client->sendCursorColor();
+
+	g_settings.setInteger(Config::LIVE_CURSOR_RED, color.Red());
+	g_settings.setInteger(Config::LIVE_CURSOR_GREEN, color.Green());
+	g_settings.setInteger(Config::LIVE_CURSOR_BLUE, color.Blue());
+	g_settings.setInteger(Config::LIVE_CURSOR_ALPHA, color.Alpha());
+
+	if (!g_gui.IsHeadless()) {
+		g_gui.RefreshView();
+		g_gui.UpdateMinimap();
+	}
+}
+
+wxColor Editor::getLiveCursorColor() const {
+	if (IsLiveClient() && live_client) {
+		return live_client->getOwnCursorColor();
+	}
+
+	return wxColor(
+		g_settings.getInteger(Config::LIVE_CURSOR_RED),
+		g_settings.getInteger(Config::LIVE_CURSOR_GREEN),
+		g_settings.getInteger(Config::LIVE_CURSOR_BLUE),
+		g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
+	);
+}
+
 bool Editor::promptAddMapComment(const Position& pos) {
 	wxTextEntryDialog dlg(g_gui.root, "Leave a note for other mappers:", "Add Map Comment");
 	if (dlg.ShowModal() != wxID_OK) {

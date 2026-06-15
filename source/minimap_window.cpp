@@ -53,7 +53,7 @@ void DrawLiveUserMarkers(wxDC& dc, Editor& editor, int start_x, int start_y, int
 		if (cursor.id == ownClientId) {
 			continue;
 		}
-		if (cursor.pos.z != floor) {
+		if (!isLiveMarkerVisibleOnFloor(floor, cursor.pos.z)) {
 			continue;
 		}
 

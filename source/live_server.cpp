@@ -168,10 +168,10 @@ void LiveServer::updateCursor(const Position& position) {
 	cursor.id = 0;
 	cursor.pos = position;
 	cursor.color = wxColor(
-		g_settings.getInteger(Config::CURSOR_RED),
-		g_settings.getInteger(Config::CURSOR_GREEN),
-		g_settings.getInteger(Config::CURSOR_BLUE),
-		g_settings.getInteger(Config::CURSOR_ALPHA)
+		g_settings.getInteger(Config::LIVE_CURSOR_RED),
+		g_settings.getInteger(Config::LIVE_CURSOR_GREEN),
+		g_settings.getInteger(Config::LIVE_CURSOR_BLUE),
+		g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
 	);
 	broadcastCursor(cursor);
 }

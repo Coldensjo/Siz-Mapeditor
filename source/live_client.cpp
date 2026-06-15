@@ -35,7 +35,12 @@ LiveClient::LiveClient() :
 	hasPendingCommentList(false), pendingCommentList(),
 	currentOperation(),
 	resolver(nullptr), socket(nullptr), editor(nullptr), stopped(false),
-	ownClientColor(0, 166, 0, 200), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
+	ownClientColor(
+		g_settings.getInteger(Config::LIVE_CURSOR_RED),
+		g_settings.getInteger(Config::LIVE_CURSOR_GREEN),
+		g_settings.getInteger(Config::LIVE_CURSOR_BLUE),
+		g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
+	), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
 	assetReceiveState(), ignoreIncomingAssets(false), waitingForServerAssets(false),
 	assetBytesExpected(0), assetBytesReceived(0), assetProgressReported(0) {
 	//
@@ -264,6 +269,26 @@ void LiveClient::updateCursor(const Position& position) {
 	send(message);
 }
 
+void LiveClient::setCursorColor(const wxColor& color) {
+	ownClientColor = color;
+	for (LiveParticipant& participant : participants) {
+		if (participant.id == ownClientId) {
+			participant.color = color;
+			break;
+		}
+	}
+}
+
+void LiveClient::sendCursorColor() {
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_CLIENT_UPDATE_COLOR);
+	message.write<uint8_t>(ownClientColor.Red());
+	message.write<uint8_t>(ownClientColor.Green());
+	message.write<uint8_t>(ownClientColor.Blue());
+	message.write<uint8_t>(ownClientColor.Alpha());
+	send(message);
+}
+
 LiveLogTab* LiveClient::createLogWindow(wxWindow* parent) {
 	MapTabbook* mtb = dynamic_cast<MapTabbook*>(parent);
 	ASSERT(mtb);
@@ -292,6 +317,10 @@ void LiveClient::sendHello() {
 	message.write<uint32_t>(g_gui.GetCurrentVersionID());
 	message.write<std::string>(nstr(name));
 	message.write<std::string>(nstr(password));
+	message.write<uint8_t>(ownClientColor.Red());
+	message.write<uint8_t>(ownClientColor.Green());
+	message.write<uint8_t>(ownClientColor.Blue());
+	message.write<uint8_t>(ownClientColor.Alpha());
 
 	send(message, [this]() {
 		logMessage("Hello sent, waiting for server response...");
@@ -782,6 +811,12 @@ void LiveClient::parsePing(NetworkMessage& message) {
 
 void LiveClient::parseClientList(NetworkMessage& message) {
 	readParticipantList(message);
+	for (const LiveParticipant& participant : participants) {
+		if (participant.id == ownClientId) {
+			ownClientColor = participant.color;
+			break;
+		}
+	}
 	requestViewportRefresh();
 	g_gui.RefreshView();
 	g_gui.UpdateMinimap();

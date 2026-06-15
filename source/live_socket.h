@@ -38,6 +38,10 @@ class QTreeNode;
 class Floor;
 class Tile;
 
+// True when a live marker on markerFloor should be visible to a viewer on viewerFloor.
+// Above-ground and underground are isolated; any floor within the same realm is visible.
+bool isLiveMarkerVisibleOnFloor(int viewerFloor, int markerFloor);
+
 struct LiveCursor {
 	uint32_t id;
 	wxColor color;

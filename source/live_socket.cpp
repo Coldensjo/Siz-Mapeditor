@@ -32,6 +32,12 @@
 #include <iostream>
 #include <algorithm>
 
+bool isLiveMarkerVisibleOnFloor(int viewerFloor, int markerFloor) {
+	const bool viewerUnderground = viewerFloor > GROUND_LAYER;
+	const bool markerUnderground = markerFloor > GROUND_LAYER;
+	return viewerUnderground == markerUnderground;
+}
+
 LiveSocket::LiveSocket() :
 	cursors(), participants(), ownClientId(0), mapReader(nullptr, 0), mapWriter(),
 	mapVersion(MapVersion(MAP_OTBM_4, CLIENT_VERSION_NONE)), log(nullptr),

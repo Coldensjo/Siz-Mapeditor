@@ -1759,6 +1759,19 @@ LiveConnectWindow::LiveConnectWindow(wxWindow* parent) :
 	password_ctrl = newd wxTextCtrl(this, wxID_ANY, wxstr(g_settings.getString(Config::LIVE_PASSWORD)), wxDefaultPosition, wxDefaultSize, wxTE_PASSWORD);
 	grid->Add(password_ctrl, 1, wxEXPAND);
 
+	grid->Add(newd wxStaticText(this, wxID_ANY, "Cursor color:"), 0, wxALIGN_CENTER_VERTICAL);
+	cursor_color_pick = newd wxColourPickerCtrl(
+		this,
+		wxID_ANY,
+		wxColor(
+			g_settings.getInteger(Config::LIVE_CURSOR_RED),
+			g_settings.getInteger(Config::LIVE_CURSOR_GREEN),
+			g_settings.getInteger(Config::LIVE_CURSOR_BLUE),
+			g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
+		)
+	);
+	grid->Add(cursor_color_pick, 1, wxEXPAND);
+
 	sizer->Add(grid, 1, wxEXPAND | wxALL, 10);
 
 	wxBoxSizer* buttons = newd wxBoxSizer(wxHORIZONTAL);
@@ -1785,6 +1798,10 @@ wxString LiveConnectWindow::GetUsername() const {
 
 wxString LiveConnectWindow::GetPassword() const {
 	return password_ctrl->GetValue();
+}
+
+wxColor LiveConnectWindow::GetCursorColor() const {
+	return cursor_color_pick->GetColour();
 }
 
 void LiveConnectWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {

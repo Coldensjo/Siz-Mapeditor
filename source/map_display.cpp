@@ -24,6 +24,7 @@
 #include <wx/wfstream.h>
 #include <wx/textdlg.h>
 #include <wx/msgdlg.h>
+#include <wx/colordlg.h>
 
 #include "gui.h"
 #include "editor.h"
@@ -707,11 +708,19 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 		uint32_t participantId = 0;
 		if (drawer->HitTestLiveParticipant(event.GetX(), event.GetY(), participantId)) {
 			const LiveSocket& live = editor.GetLive();
-			if (participantId != live.getOwnClientId()) {
-				Position position;
-				if (live.getCursorPosition(participantId, position) && position.isValid()) {
-					static_cast<MapWindow*>(GetParent())->SetScreenCenterPosition(position);
+			if (participantId == live.getOwnClientId()) {
+				wxColourData colourData;
+				colourData.SetColour(editor.getLiveCursorColor());
+				wxColourDialog dialog(this, &colourData);
+				if (dialog.ShowModal() == wxID_OK) {
+					editor.setLiveCursorColor(dialog.GetColourData().GetColour());
 				}
+				return;
+			}
+
+			Position position;
+			if (live.getCursorPosition(participantId, position) && position.isValid()) {
+				static_cast<MapWindow*>(GetParent())->SetScreenCenterPosition(position);
 			}
 			return;
 		}

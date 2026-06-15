@@ -885,11 +885,17 @@ bool GUI::ConnectToLiveServer() {
 	auto* client = newd LiveClient();
 	client->setName(dialog.GetUsername());
 	client->setPassword(dialog.GetPassword());
+	client->setCursorColor(dialog.GetCursorColor());
 
 	g_settings.setString(Config::LIVE_HOST, nstr(dialog.GetHost()));
 	g_settings.setInteger(Config::LIVE_PORT, dialog.GetPort());
 	g_settings.setString(Config::LIVE_USERNAME, nstr(dialog.GetUsername()));
 	g_settings.setString(Config::LIVE_PASSWORD, nstr(dialog.GetPassword()));
+	const wxColor cursorColor = dialog.GetCursorColor();
+	g_settings.setInteger(Config::LIVE_CURSOR_RED, cursorColor.Red());
+	g_settings.setInteger(Config::LIVE_CURSOR_GREEN, cursorColor.Green());
+	g_settings.setInteger(Config::LIVE_CURSOR_BLUE, cursorColor.Blue());
+	g_settings.setInteger(Config::LIVE_CURSOR_ALPHA, cursorColor.Alpha());
 
 	client->createLogWindow(tabbook);
 

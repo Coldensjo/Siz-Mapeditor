@@ -196,6 +196,9 @@ void LivePeer::parseEditorPacket(NetworkMessage message) {
 			case PACKET_CLIENT_UPDATE_CURSOR:
 				parseCursorUpdate(message);
 				break;
+			case PACKET_CLIENT_UPDATE_COLOR:
+				parseColorUpdate(message);
+				break;
 			case PACKET_CLIENT_PING:
 				parseClientPing(message);
 				break;
@@ -250,6 +253,11 @@ void LivePeer::parseHello(NetworkMessage& message) {
 	(void)message.read<uint32_t>(); // client-reported version; server assets are authoritative
 	std::string nickname = message.read<std::string>();
 	std::string password = message.read<std::string>();
+	const uint8_t r = message.read<uint8_t>();
+	const uint8_t g = message.read<uint8_t>();
+	const uint8_t b = message.read<uint8_t>();
+	const uint8_t a = message.read<uint8_t>();
+	setUsedColor(wxColor(r, g, b, a));
 
 	if (server->getPassword() != wxString(password.c_str(), wxConvUTF8)) {
 		livePeerLog(log, "Client tried to connect, but used the wrong password, connection refused.");
@@ -379,7 +387,7 @@ void LivePeer::parseReady(NetworkMessage& message) {
 		return;
 	}
 
-	setUsedColor(LiveSocket::colorForClientId(clientId));
+	setUsedColor(color);
 
 	server->updateClientList();
 
@@ -489,6 +497,20 @@ void LivePeer::parseCursorUpdate(NetworkMessage& message) {
 	cursor.color = color;
 
 	server->broadcastCursor(cursor);
+	if (!g_gui.IsHeadless()) {
+		g_gui.RefreshView();
+		g_gui.UpdateMinimap();
+	}
+}
+
+void LivePeer::parseColorUpdate(NetworkMessage& message) {
+	const uint8_t r = message.read<uint8_t>();
+	const uint8_t g = message.read<uint8_t>();
+	const uint8_t b = message.read<uint8_t>();
+	const uint8_t a = message.read<uint8_t>();
+	setUsedColor(wxColor(r, g, b, a));
+
+	server->updateClientList();
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
 		g_gui.UpdateMinimap();

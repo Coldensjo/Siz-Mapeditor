@@ -1009,7 +1009,7 @@ void MapDrawer::DrawLiveCursors() {
 		if (cursor.id == ownClientId) {
 			continue;
 		}
-		if (cursor.pos.z != floor) {
+		if (!isLiveMarkerVisibleOnFloor(floor, cursor.pos.z)) {
 			continue;
 		}
 
@@ -1122,7 +1122,7 @@ void MapDrawer::DrawLivePings() {
 
 	for (const ActiveLivePing& active : live.getActivePings()) {
 		const LivePing& ping = active.ping;
-		if (ping.pos.z != floor) {
+		if (!isLiveMarkerVisibleOnFloor(floor, ping.pos.z)) {
 			continue;
 		}
 
@@ -1281,7 +1281,7 @@ void MapDrawer::DrawLiveParticipants() {
 		glRasterPos2f(layout.startX + layout.padding + layout.textOffset, rowTop + 15.0f);
 		wxString label = participant.name;
 		if (isSelf) {
-			label << " (you)";
+			label << " (you - change color)";
 		}
 		for (size_t i = 0; i < label.length(); ++i) {
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(label[i]));
