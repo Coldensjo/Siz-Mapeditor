@@ -21,11 +21,16 @@
 #include "live_tab.h"
 #include "live_action.h"
 #include "live_assets.h"
+#include "live_item_blocklist.h"
 #include "editor.h"
 #include "gui.h"
+#include "map_view_state.h"
+#include "common_windows.h"
 #include "map_tab.h"
 #include "map_region.h"
 #include "settings.h"
+#include "items.h"
+#include "brush.h"
 
 #include <wx/event.h>
 
@@ -42,7 +47,8 @@ LiveClient::LiveClient() :
 		g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
 	), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
 	assetReceiveState(), ignoreIncomingAssets(false), waitingForServerAssets(false),
-	assetBytesExpected(0), assetBytesReceived(0), assetProgressReported(0) {
+	assetBytesExpected(0), assetBytesReceived(0), assetProgressReported(0),
+	connectionAddress(), connectionPort(0) {
 	//
 }
 
@@ -51,6 +57,9 @@ LiveClient::~LiveClient() {
 }
 
 bool LiveClient::connect(const std::string& address, uint16_t port) {
+	connectionAddress = address;
+	connectionPort = port;
+
 	NetworkConnection& connection = NetworkConnection::getInstance();
 	if (!connection.start()) {
 		setLastError("The previous connection has not been terminated yet.");
@@ -559,6 +568,9 @@ void LiveClient::parsePacket(NetworkMessage message) {
 			case PACKET_COMMENT_REMOVED:
 				parseCommentRemoved(message);
 				break;
+			case PACKET_ITEM_BLOCK_LIST:
+				parseItemBlockList(message);
+				break;
 			default: {
 				if (log) {
 					log->Message(wxString::Format("Unknown packet received (type 0x%02X)!", packetType));
@@ -591,7 +603,12 @@ void LiveClient::parseHello(NetworkMessage& message) {
 	mapVersion = map.getVersion();
 
 	MapTab* tab = createEditorWindow();
-	if (sessionBounds.enabled) {
+
+	const std::string viewKey = makeLiveMapViewKey(connectionAddress, connectionPort);
+	Position savedPosition;
+	if (loadMapViewPosition(viewKey, savedPosition)) {
+		tab->SetScreenCenterPosition(savedPosition);
+	} else if (sessionBounds.enabled) {
 		tab->SetScreenCenterPosition(Position(sessionBounds.centerX, sessionBounds.centerY, sessionBounds.centerZ));
 	} else {
 		tab->SetScreenCenterPosition(Position(map.getWidth() / 2, map.getHeight() / 2, GROUND_LAYER));
@@ -872,5 +889,49 @@ void LiveClient::parseUpdateOperation(NetworkMessage& message) {
 		g_gui.SetStatusText("Server Operation Finished.");
 	} else {
 		g_gui.SetStatusText("Server Operation in Progress: " + currentOperation + "... (" + std::to_string(percent) + "%)");
+	}
+}
+
+void LiveClient::parseItemBlockList(NetworkMessage& message) {
+	setBlockedItemIds({});
+	readBlockedItemList(message, blockedItemIds);
+}
+
+void LiveClient::setBlockedItemIds(std::set<uint16_t> ids) {
+	blockedItemIds = std::move(ids);
+}
+
+void LiveClient::warnIfBlockedBrushUse(const Brush* brush) {
+	const uint16_t blockedItemId = findBlockedItemInBrush(brush, blockedItemIds, dismissedBlockedWarnings);
+	if (blockedItemId != 0) {
+		showBlockedItemWarning(blockedItemId);
+	}
+}
+
+void LiveClient::showBlockedItemWarning(uint16_t itemId) {
+	const ItemType& itemType = g_items.getItemType(itemId);
+	wxString itemLabel;
+	if (itemType.id != 0) {
+		itemLabel = wxString::Format("Item %u (%s)", itemId, wxstr(itemType.name));
+	} else {
+		itemLabel = wxString::Format("Item %u", itemId);
+	}
+
+	const wxString message = wxString::Format(
+		"An admin has blacklisted %s.\n\nIt is deemed not fit for this map. You may still use it, but please consider an alternative.",
+		itemLabel
+	);
+
+	bool dontShowAgain = false;
+	if (g_gui.IsHeadless() || !g_gui.root) {
+		std::cout << "[Blocked Item] " << message.ToStdString() << std::endl;
+	} else {
+		BlockedItemWarningDialog dialog(g_gui.root, message);
+		dialog.ShowModal();
+		dontShowAgain = dialog.GetDontShowAgain();
+	}
+
+	if (dontShowAgain) {
+		dismissedBlockedWarnings.insert(itemId);
 	}
 }

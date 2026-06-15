@@ -1723,6 +1723,10 @@ void Editor::drawInternal(Position offset, bool alt, bool dodraw) {
 		return;
 	}
 
+	if (dodraw) {
+		warnLiveBlockedBrushUse(brush);
+	}
+
 	if (brush->isDoodad()) {
 		BatchAction* batch = actionQueue->createBatch(ACTION_DRAW);
 		Action* action = actionQueue->createAction(batch);
@@ -1919,6 +1923,10 @@ void Editor::drawInternal(const PositionVector& tilestodraw, bool alt, bool dodr
 		return;
 	}
 
+	if (dodraw) {
+		warnLiveBlockedBrushUse(brush);
+	}
+
 #ifdef __DEBUG__
 	if (brush->isGround() || brush->isWall()) {
 		// Wrong function, end call
@@ -1983,6 +1991,10 @@ void Editor::drawInternal(const PositionVector& tilestodraw, PositionVector& til
 	Brush* brush = g_gui.GetCurrentBrush();
 	if (!brush) {
 		return;
+	}
+
+	if (dodraw) {
+		warnLiveBlockedBrushUse(brush);
 	}
 
 	if (brush->isGround() || brush->isEraser()) {
@@ -2261,6 +2273,12 @@ void Editor::drawInternal(const PositionVector& tilestodraw, PositionVector& til
 			}
 		}
 		addAction(action, 2);
+	}
+}
+
+void Editor::warnLiveBlockedBrushUse(const Brush* brush) {
+	if (IsLiveClient() && live_client) {
+		live_client->warnIfBlockedBrushUse(brush);
 	}
 }
 

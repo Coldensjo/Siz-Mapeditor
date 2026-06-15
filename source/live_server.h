@@ -22,6 +22,8 @@
 #include "net_connection.h"
 #include "action.h"
 
+#include <set>
+
 class LivePeer;
 class LiveLogTab;
 class QTreeNode;
@@ -68,6 +70,13 @@ public:
 	}
 	void kickClient(const wxString& name);
 
+	bool blockItems(const std::string& spec, wxString& feedback);
+	const std::set<uint16_t>& getBlockedItemIds() const {
+		return blockedItemIds;
+	}
+	void sendBlockList(LivePeer* peer);
+	void broadcastBlockList();
+
 	//
 	void broadcastNodes(DirtyList& dirtyList);
 	void broadcastCursor(const LiveCursor& cursor);
@@ -89,6 +98,8 @@ protected:
 
 	uint32_t clientIds;
 	uint16_t port;
+
+	std::set<uint16_t> blockedItemIds;
 
 	bool stopped;
 };

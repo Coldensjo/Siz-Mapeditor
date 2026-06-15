@@ -49,6 +49,7 @@ enum LivePacketType {
 	PACKET_COMMENT = 0x96,
 	PACKET_COMMENT_REMOVED = 0x97,
 	PACKET_PING = 0x98,
+	PACKET_ITEM_BLOCK_LIST = 0x99,
 };
 
 #endif

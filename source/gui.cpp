@@ -44,6 +44,7 @@
 #include "live_socket.h"
 #include "live_client.h"
 #include "live_tab.h"
+#include "map_view_state.h"
 
 #ifdef __WXOSX__
 	#include <AGL/agl.h>
@@ -802,6 +803,36 @@ void GUI::UnloadVersion() {
 	}
 }
 
+void GUI::SaveMapTabViewPosition(MapTab* mapTab) {
+	if (!mapTab) {
+		return;
+	}
+
+	Editor* editor = mapTab->GetEditor();
+	if (!editor) {
+		return;
+	}
+
+	const std::string key = getMapViewKey(*editor);
+	if (key.empty()) {
+		return;
+	}
+
+	saveMapViewPosition(key, mapTab->GetScreenCenterPosition());
+}
+
+void GUI::SaveAllMapViewPositions() {
+	if (!tabbook) {
+		return;
+	}
+
+	for (int index = 0; index < tabbook->GetTabCount(); ++index) {
+		if (auto* mapTab = dynamic_cast<MapTab*>(tabbook->GetTab(index))) {
+			SaveMapTabViewPosition(mapTab);
+		}
+	}
+}
+
 void GUI::SaveCurrentMap(FileName filename, bool showdialog) {
 	MapTab* mapTab = GetCurrentMapTab();
 	if (mapTab) {
@@ -811,13 +842,7 @@ void GUI::SaveCurrentMap(FileName filename, bool showdialog) {
 		}
 		if (editor) {
 			editor->saveMap(filename, showdialog);
-
-			const std::string& filename = editor->map.getFilename();
-			const Position& position = mapTab->GetScreenCenterPosition();
-			std::ostringstream stream;
-			stream << position;
-			g_settings.setString(Config::RECENT_EDITED_MAP_PATH, filename);
-			g_settings.setString(Config::RECENT_EDITED_MAP_POSITION, stream.str());
+			SaveMapTabViewPosition(mapTab);
 		}
 	}
 
@@ -1005,6 +1030,10 @@ bool GUI::LoadMap(const FileName& fileName) {
 	const bool forceReloadVersion = mapConfig.hasPathOverrides() || g_lastMapLoadUsedPathOverrides;
 	g_lastMapLoadUsedPathOverrides = mapConfig.hasPathOverrides();
 
+	const std::string viewKey = makeLocalMapViewKey(nstr(fileName.GetFullPath()));
+	Position savedPosition;
+	const bool hasSavedPosition = loadMapViewPosition(viewKey, savedPosition);
+
 	Editor* editor;
 	try {
 		editor = newd Editor(copybuffer, fileName, mapConfig.hasClientVersion ? mapConfig.clientVersion : CLIENT_VERSION_NONE, forceReloadVersion);
@@ -1027,15 +1056,8 @@ bool GUI::LoadMap(const FileName& fileName) {
 	FitViewToMap(mapTab);
 	root->UpdateMenubar();
 
-	std::string path = g_settings.getString(Config::RECENT_EDITED_MAP_PATH);
-	if (!path.empty()) {
-		FileName file(path);
-		if (file == fileName) {
-			std::istringstream stream(g_settings.getString(Config::RECENT_EDITED_MAP_POSITION));
-			Position position;
-			stream >> position;
-			mapTab->SetScreenCenterPosition(position);
-		}
+	if (hasSavedPosition) {
+		mapTab->SetScreenCenterPosition(savedPosition);
 	}
 	return true;
 }
@@ -1121,6 +1143,10 @@ void GUI::CloseCurrentEditor() {
 	UnnamedRenderingLock();
 	WindowFreezeGuard freeze_guard(root);
 
+	if (auto* mapTab = dynamic_cast<MapTab*>(tabbook->GetTab(selection))) {
+		SaveMapTabViewPosition(mapTab);
+	}
+
 	tabbook->DeleteTab(selection);
 	RefreshPalettes();
 	if (root) {
@@ -1161,6 +1187,7 @@ bool GUI::CloseAllEditors() {
 		if (!freeze_guard.isActive()) {
 			freeze_guard.reset(root);
 		}
+		SaveMapTabViewPosition(mapTab);
 		tabbook->DeleteTab(i--);
 		palettesNeedRefresh = true;
 	}
@@ -1212,6 +1239,7 @@ void GUI::CloseLiveEditors(LiveSocket* sender) {
 		if (mapTab) {
 			Editor* editor = mapTab->GetEditor();
 			if (editor && editor->IsLive() && &editor->GetLive() == sender) {
+				SaveMapTabViewPosition(mapTab);
 				tabbook->DeleteTab(i);
 				i = -1;
 			}
@@ -1372,6 +1400,8 @@ void GUI::SavePerspective() {
 		wxString s = aui_manager->SavePaneInfo(aui_manager->GetPane(minimap));
 		g_settings.setString(Config::MINIMAP_LAYOUT, nstr(s));
 	}
+
+	SaveAllMapViewPositions();
 
 	root->GetAuiToolBar()->SavePerspective();
 }
@@ -2204,6 +2234,12 @@ bool GUI::SelectBrush(const Brush* whatbrush, PaletteType primary) {
 
 	SelectBrushInternal(const_cast<Brush*>(whatbrush));
 	root->GetAuiToolBar()->UpdateBrushButtons();
+
+	Editor* editor = GetCurrentEditor();
+	if (editor) {
+		editor->warnLiveBlockedBrushUse(whatbrush);
+	}
+
 	return true;
 }
 

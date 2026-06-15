@@ -21,6 +21,7 @@
 #include "live_peer.h"
 #include "live_tab.h"
 #include "live_action.h"
+#include "live_item_blocklist.h"
 
 #include "editor.h"
 #include "settings.h"
@@ -268,6 +269,58 @@ void LiveServer::kickClient(const wxString& name) {
 		}
 	}
 	liveServerLog(log, "No connected user named '" + name + "'.");
+}
+
+bool LiveServer::blockItems(const std::string& spec, wxString& feedback) {
+	std::set<uint16_t> newItems;
+	std::string error;
+	if (!parseBlockItemSpec(spec, newItems, error)) {
+		feedback = wxString(error.c_str(), wxConvUTF8);
+		return false;
+	}
+
+	size_t added = 0;
+	for (uint16_t itemId : newItems) {
+		if (blockedItemIds.insert(itemId).second) {
+			++added;
+		}
+	}
+
+	if (added == 0) {
+		feedback = "All specified item ids are already blocked.";
+		return true;
+	}
+
+	feedback = wxString::Format("Blocked %zu item id(s). Total blocked: %zu.", added, blockedItemIds.size());
+	broadcastBlockList();
+	return true;
+}
+
+void LiveServer::sendBlockList(LivePeer* peer) {
+	if (!peer) {
+		return;
+	}
+
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_ITEM_BLOCK_LIST);
+	writeBlockedItemList(message, blockedItemIds);
+	peer->send(message);
+}
+
+void LiveServer::broadcastBlockList() {
+	if (clients.empty()) {
+		return;
+	}
+
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_ITEM_BLOCK_LIST);
+	writeBlockedItemList(message, blockedItemIds);
+
+	for (auto& clientEntry : clients) {
+		if (clientEntry.second->connected) {
+			clientEntry.second->send(message);
+		}
+	}
 }
 
 void LiveServer::broadcastNodes(DirtyList& dirtyList) {

@@ -123,6 +123,8 @@ public:
 	 * This is the position of all windows etc. in the editor
 	 */
 	void SavePerspective();
+	void SaveMapTabViewPosition(MapTab* mapTab);
+	void SaveAllMapViewPositions();
 
 	/**
 	 * Loads the stored perspective from the configuration file

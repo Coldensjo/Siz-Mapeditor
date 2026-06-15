@@ -380,6 +380,25 @@ protected:
 	DECLARE_EVENT_TABLE();
 };
 
+class BlockedItemWarningDialog : public wxDialog {
+public:
+	BlockedItemWarningDialog(wxWindow* parent, const wxString& message);
+	~BlockedItemWarningDialog() = default;
+
+	bool GetDontShowAgain() const {
+		return dont_show_again && dont_show_again->GetValue();
+	}
+
+	void OnClickOK(wxCommandEvent&) {
+		EndModal(wxID_OK);
+	}
+
+protected:
+	wxCheckBox* dont_show_again;
+
+	DECLARE_EVENT_TABLE();
+};
+
 /**
  * Connect to a live collaboration server.
  */

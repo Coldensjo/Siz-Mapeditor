@@ -423,7 +423,7 @@ public:
 	void clear();
 
 	ItemType& operator[](size_t id) {
-		return getItemType(id);
+		return getItemType(static_cast<int>(id));
 	}
 	uint16_t getMaxID() const {
 		return max_item_id;

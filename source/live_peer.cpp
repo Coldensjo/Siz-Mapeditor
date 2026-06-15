@@ -409,6 +409,7 @@ void LivePeer::parseReady(NetworkMessage& message) {
 
 	send(outMessage);
 	server->sendCommentList(this);
+	server->sendBlockList(this);
 }
 
 void LivePeer::parseNodeRequest(NetworkMessage& message) {

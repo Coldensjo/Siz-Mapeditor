@@ -1728,6 +1728,22 @@ EVT_BUTTON(LIST_DIALOG_COPY_BUTTON, WarningDialog::OnClickCopy)
 EVT_BUTTON(wxID_OK, WarningDialog::OnClickOK)
 END_EVENT_TABLE()
 
+BlockedItemWarningDialog::BlockedItemWarningDialog(wxWindow* parent, const wxString& message) :
+	wxDialog(parent, wxID_ANY, "Blocked Item", wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX),
+	dont_show_again(nullptr) {
+	wxBoxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
+	sizer->Add(newd wxStaticText(this, wxID_ANY, message), 0, wxALL | wxEXPAND, 10);
+	dont_show_again = newd wxCheckBox(this, wxID_ANY, "Don't show again for this item");
+	sizer->Add(dont_show_again, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10);
+	sizer->Add(newd wxButton(this, wxID_OK, "OK"), 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 10);
+	SetSizerAndFit(sizer);
+	Centre(wxBOTH);
+}
+
+BEGIN_EVENT_TABLE(BlockedItemWarningDialog, wxDialog)
+EVT_BUTTON(wxID_OK, BlockedItemWarningDialog::OnClickOK)
+END_EVENT_TABLE()
+
 // ============================================================================
 // Live Connect Window
 
@@ -1737,8 +1753,8 @@ EVT_BUTTON(wxID_CANCEL, LiveConnectWindow::OnClickCancel)
 END_EVENT_TABLE()
 
 LiveConnectWindow::LiveConnectWindow(wxWindow* parent) :
-	wxDialog(parent, wxID_ANY, "Connect to Live Server", wxDefaultPosition, wxSize(360, 220)),
-	host_ctrl(nullptr), port_ctrl(nullptr), username_ctrl(nullptr), password_ctrl(nullptr) {
+	wxDialog(parent, wxID_ANY, "Connect to Live Server", wxDefaultPosition, wxSize(360, 260)),
+	host_ctrl(nullptr), port_ctrl(nullptr), username_ctrl(nullptr), password_ctrl(nullptr), cursor_color_pick(nullptr) {
 	wxBoxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
 	wxFlexGridSizer* grid = newd wxFlexGridSizer(2, 5, 5);
 	grid->AddGrowableCol(1, 1);

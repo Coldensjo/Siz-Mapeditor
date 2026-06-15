@@ -218,7 +218,9 @@
     <ClInclude Include="..\..\source\main_menubar.h" />
     <ClCompile Include="..\..\source\main_menubar.cpp" />
     <ClInclude Include="..\..\source\map_tab.h" />
+    <ClInclude Include="..\..\source\map_view_state.h" />
     <ClCompile Include="..\..\source\map_tab.cpp" />
+    <ClCompile Include="..\..\source\map_view_state.cpp" />
     <ClInclude Include="..\..\source\minimap_window.h" />
     <ClCompile Include="..\..\source\minimap_window.cpp" />
     <ClInclude Include="..\..\source\process_com.h" />

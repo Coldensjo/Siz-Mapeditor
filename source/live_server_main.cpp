@@ -79,7 +79,7 @@ void printUsage() {
 	          << "  --items <directory>   Folder with items.otb and items.xml\n"
 	          << "  --monsters <directory> Folder with monster XML files\n"
 	          << "  --npcs <directory>    Folder with NPC XML files\n"
-	          << "\nConsole commands: save, list, kick <name>, exit\n";
+	          << "\nConsole commands: save, list, kick <name>, block <id|from-to>, exit\n";
 }
 
 wxString getMapServerConfigPath() {
@@ -633,8 +633,24 @@ void processCommand(const std::string& line) {
 		if (g_server) {
 			g_server->kickClient(wxstr(name));
 		}
+	} else if (cmd == "block") {
+		std::string spec;
+		iss >> spec;
+		if (spec.empty()) {
+			std::cout << "[live] Usage: block <id> or block <from>-<to>" << std::endl;
+			return;
+		}
+		if (!g_server) {
+			return;
+		}
+		wxString feedback;
+		if (g_server->blockItems(spec, feedback)) {
+			std::cout << "[live] " << feedback.ToStdString() << std::endl;
+		} else {
+			std::cout << "[live] " << feedback.ToStdString() << std::endl;
+		}
 	} else {
-		std::cout << "[live] Unknown command. Try: save, list, kick <name>, exit" << std::endl;
+		std::cout << "[live] Unknown command. Try: save, list, kick <name>, block <id|from-to>, exit" << std::endl;
 	}
 }
 
@@ -750,7 +766,7 @@ public:
 		} else {
 			std::cout << "[live] Auto-save disabled." << std::endl;
 		}
-		std::cout << "[live] Type 'save', 'list', 'kick <name>', or 'exit'." << std::endl;
+		std::cout << "[live] Type 'save', 'list', 'kick <name>', 'block <id|from-to>', or 'exit'." << std::endl;
 		g_lastAutosave = std::chrono::steady_clock::now();
 		return true;
 	}

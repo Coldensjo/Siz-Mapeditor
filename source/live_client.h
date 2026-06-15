@@ -46,6 +46,12 @@ public:
 
 	//
 	std::string getHostName() const;
+	const std::string& getConnectionAddress() const {
+		return connectionAddress;
+	}
+	uint16_t getConnectionPort() const {
+		return connectionPort;
+	}
 
 	//
 	void receiveHeader();
@@ -73,6 +79,9 @@ public:
 	void sendCommentAdd(const Position& pos, const std::string& text);
 	void sendCommentRemove(uint32_t commentId);
 	void sendPing(const Position& pos);
+
+	void warnIfBlockedBrushUse(const Brush* brush);
+	void setBlockedItemIds(std::set<uint16_t> ids);
 
 	// Flags a node as queried and stores it, need to call SendNodeRequest to send it to server
 	void queryNode(int32_t ndx, int32_t ndy, bool underground);
@@ -107,6 +116,8 @@ protected:
 	void parseCommentRemoved(NetworkMessage& message);
 	void parseStartOperation(NetworkMessage& message);
 	void parseUpdateOperation(NetworkMessage& message);
+	void parseItemBlockList(NetworkMessage& message);
+	void showBlockedItemWarning(uint16_t itemId);
 
 	//
 	NetworkMessage readMessage;
@@ -121,7 +132,13 @@ protected:
 	std::shared_ptr<asio::ip::tcp::resolver> resolver;
 	std::shared_ptr<asio::ip::tcp::socket> socket;
 
+	std::string connectionAddress;
+	uint16_t connectionPort;
+
 	Editor* editor;
+
+	std::set<uint16_t> blockedItemIds;
+	std::set<uint16_t> dismissedBlockedWarnings;
 
 	wxColor ownClientColor;
 	bool stopped;
