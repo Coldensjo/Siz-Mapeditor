@@ -105,6 +105,7 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 
 		g_gui.RefreshPalettes(nullptr, false);
 		g_gui.UpdateMenus();
+		g_gui.SaveMapTabViewPosition(mapTab);
 		return;
 	}
 }
@@ -137,6 +138,7 @@ void MapTabbook::OnNotebookPageChanged(wxAuiNotebookEvent& evt) {
 	}
 
 	if (oldMapTab) {
+		g_gui.SaveMapTabViewPosition(oldMapTab);
 		oldMapTab->VisibilityCheck();
 	}
 	if (newMapTab) {

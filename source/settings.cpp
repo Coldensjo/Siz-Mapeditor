@@ -402,6 +402,7 @@ void Settings::IO(IOMode mode) {
 	Int(GOTO_WEBSITE_ON_BOOT, 0);
 	String(RECENT_EDITED_MAP_PATH, "");
 	String(RECENT_EDITED_MAP_POSITION, "");
+	String(MAP_VIEW_POSITIONS, "");
 
 	Int(FIND_ITEM_MODE, 0);
 	Int(JUMP_TO_ITEM_MODE, 0);
