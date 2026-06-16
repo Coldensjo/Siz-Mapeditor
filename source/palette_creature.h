@@ -21,6 +21,7 @@
 #include "palette_common.h"
 
 class CreatureListBox;
+class CreatureSpriteGrid;
 
 class CreaturePalettePanel : public PalettePanel {
 public:
@@ -49,6 +50,8 @@ protected:
 	void SelectTileset(size_t index);
 	void SelectCreature(size_t index);
 	void SelectCreature(std::string name);
+	// Switches between the single-column list view and the grid view
+	void SetViewStyle(bool use_grid);
 
 public:
 	// Event handling
@@ -57,10 +60,14 @@ public:
 
 	void OnTilesetChange(wxCommandEvent& event);
 	void OnListBoxChange(wxCommandEvent& event);
+	void OnViewStyleChange(wxCommandEvent& event);
 
 protected:
 	wxChoice* tileset_choice;
+	wxChoice* view_style_choice;
 	CreatureListBox* creature_list;
+	CreatureSpriteGrid* creature_grid;
+	bool use_grid_view;
 	wxSpinCtrl* creature_spawntime_spin;
 	wxSpinCtrl* spawn_size_spin;
 
