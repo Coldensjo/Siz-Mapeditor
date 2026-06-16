@@ -48,6 +48,8 @@ LiveClient::LiveClient() :
 	), pendingVersionId(CLIENT_VERSION_NONE), pendingAssetManifest(),
 	assetReceiveState(), ignoreIncomingAssets(false), waitingForServerAssets(false),
 	assetBytesExpected(0), assetBytesReceived(0), assetProgressReported(0),
+	updateReceiveState(), updateBytesExpected(0), updateBytesReceived(0),
+	updateProgressReported(0), receivingUpdate(false),
 	connectionAddress(), connectionPort(0) {
 	//
 }
@@ -541,6 +543,21 @@ void LiveClient::parsePacket(NetworkMessage message) {
 			case PACKET_ASSET_FILES_DONE:
 				parseAssetFilesDone(message);
 				break;
+			case PACKET_UPDATE_AVAILABLE:
+				parseUpdateAvailable(message);
+				break;
+			case PACKET_UPDATE_FILE_BEGIN:
+				parseUpdateFileBegin(message);
+				break;
+			case PACKET_UPDATE_FILE_CHUNK:
+				parseUpdateFileChunk(message);
+				break;
+			case PACKET_UPDATE_FILE_END:
+				parseUpdateFileEnd(message);
+				break;
+			case PACKET_UPDATE_DONE:
+				parseUpdateDone(message);
+				break;
 			case PACKET_NODE:
 				parseNode(message);
 				break;
@@ -789,6 +806,128 @@ void LiveClient::finishLiveVersionLoad() {
 	}
 
 	sendReady();
+}
+
+void LiveClient::failUpdate(const wxString& reason) {
+	receivingUpdate = false;
+	resetLiveUpdateReceiveState(updateReceiveState);
+	logMessage("Editor update failed: " + reason);
+	close();
+	g_gui.PopupDialog("Update Failed", reason, wxOK);
+	g_gui.CloseLiveEditors(this);
+}
+
+void LiveClient::parseUpdateAvailable(NetworkMessage& message) {
+	const uint32_t serverVersion = message.read<uint32_t>();
+	const uint32_t fileCount = message.read<uint32_t>();
+
+	(void)serverVersion;
+
+	resetLiveUpdateReceiveState(updateReceiveState);
+	receivingUpdate = true;
+	updateBytesExpected = 0;
+	updateBytesReceived = 0;
+	updateProgressReported = 0;
+
+	for (uint32_t i = 0; i < fileCount; ++i) {
+		(void)message.read<std::string>(); // filename (sent again per-file)
+		updateBytesExpected += message.read<uint32_t>();
+	}
+
+	logMessage("Your editor is out of date. Downloading update from server...");
+}
+
+void LiveClient::parseUpdateFileBegin(NetworkMessage& message) {
+	const std::string filename = message.read<std::string>();
+	const uint32_t size = message.read<uint32_t>();
+
+	if (!receivingUpdate) {
+		return;
+	}
+
+	wxString error;
+	if (!beginLiveUpdateReceive(updateReceiveState, filename, size, error)) {
+		failUpdate(error);
+	}
+}
+
+void LiveClient::parseUpdateFileChunk(NetworkMessage& message) {
+	const std::string chunk = message.read<std::string>();
+
+	if (!receivingUpdate) {
+		return;
+	}
+
+	updateBytesReceived += chunk.size();
+	if (updateBytesExpected > 0) {
+		const int percent = static_cast<int>((updateBytesReceived * 100) / updateBytesExpected);
+		if (percent >= updateProgressReported + 5) {
+			while (updateProgressReported + 5 <= percent) {
+				updateProgressReported += 5;
+			}
+			logMessage(wxString::Format("Downloading update... %d%%", updateProgressReported));
+		}
+	}
+
+	wxString error;
+	if (!appendLiveUpdateChunk(updateReceiveState, chunk, error)) {
+		failUpdate(error);
+	}
+}
+
+void LiveClient::parseUpdateFileEnd(NetworkMessage& WXUNUSED(message)) {
+	if (!receivingUpdate) {
+		return;
+	}
+
+	wxString error;
+	if (!finishLiveUpdateReceive(updateReceiveState, error)) {
+		failUpdate(error);
+	}
+}
+
+void LiveClient::parseUpdateDone(NetworkMessage& WXUNUSED(message)) {
+	if (!receivingUpdate) {
+		return;
+	}
+
+	receivingUpdate = false;
+	logMessage("Update downloaded.");
+
+	// The server closes the connection after the package is sent; tear down our
+	// side too so the running executable can be replaced.
+	close();
+
+	wxTheApp->CallAfter([this]() {
+		const long choice = g_gui.PopupDialog(
+			"Editor Update",
+			"A newer version of the editor is required to join this live server.\n\n"
+			"Update now? The editor will restart and reconnect automatically.",
+			wxYES | wxNO
+		);
+
+		if (choice != wxID_YES) {
+			logMessage("Update declined; disconnecting.");
+			resetLiveUpdateReceiveState(updateReceiveState);
+			g_gui.CloseLiveEditors(this);
+			return;
+		}
+
+		wxString error;
+		if (!applyLiveUpdateAndRestart(updateReceiveState, true, error)) {
+			g_gui.PopupDialog("Update Failed", error, wxOK);
+			resetLiveUpdateReceiveState(updateReceiveState);
+			g_gui.CloseLiveEditors(this);
+			return;
+		}
+
+		// New instance is launching; shut this one down so it can replace us.
+		resetLiveUpdateReceiveState(updateReceiveState);
+		g_gui.CloseLiveEditors(this);
+		if (g_gui.root) {
+			g_gui.root->Close(true);
+		}
+	});
 }
 
 void LiveClient::parseNode(NetworkMessage& message) {

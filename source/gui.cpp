@@ -974,6 +974,46 @@ bool GUI::ConnectToLiveServer() {
 	return true;
 }
 
+bool GUI::ReconnectToLastLiveServer() {
+	FinishWelcomeDialog();
+
+	if (root && !root->IsShown()) {
+		root->Show();
+	}
+
+	const wxString host = wxstr(g_settings.getString(Config::LIVE_HOST));
+	const int port = g_settings.getInteger(Config::LIVE_PORT);
+	if (host.empty() || port <= 0 || port > 65535) {
+		return false;
+	}
+
+	if (!CloseAllEditors()) {
+		return false;
+	}
+
+	auto* client = newd LiveClient();
+	client->setName(wxstr(g_settings.getString(Config::LIVE_USERNAME)));
+	client->setPassword(wxstr(g_settings.getString(Config::LIVE_PASSWORD)));
+	client->setCursorColor(wxColor(
+		g_settings.getInteger(Config::LIVE_CURSOR_RED),
+		g_settings.getInteger(Config::LIVE_CURSOR_GREEN),
+		g_settings.getInteger(Config::LIVE_CURSOR_BLUE),
+		g_settings.getInteger(Config::LIVE_CURSOR_ALPHA)
+	));
+
+	client->createLogWindow(tabbook);
+
+	if (!client->connect(nstr(host), static_cast<uint16_t>(port))) {
+		wxString error = client->getLastError();
+		CloseLiveEditors(client);
+		PopupDialog("Connection Error", error, wxOK);
+		return false;
+	}
+
+	UpdateMenubar();
+	return true;
+}
+
 bool GUI::NewMap() {
 	FinishWelcomeDialog();
 

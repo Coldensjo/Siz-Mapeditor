@@ -6,6 +6,7 @@
 
 #include "live_server.h"
 #include "live_peer.h"
+#include "live_update.h"
 #include "live_session_bounds.h"
 #include "editor.h"
 #include "gui.h"
@@ -50,6 +51,8 @@ struct MapServerConfig {
 	FileName monstersPath;
 	FileName npcsPath;
 	unsigned autosaveMinutes = 5;
+	std::vector<wxString> updateFiles;
+	bool updateFilesConfigured = false;
 };
 
 std::atomic<bool> g_running { true };
@@ -199,6 +202,18 @@ bool loadMapServerConfig(MapServerConfig& config) {
 		} else if (key == "NPCS" || key == "NPC") {
 			if (!value.empty()) {
 				config.npcsPath.AssignDir(value);
+			}
+		} else if (key == "UPDATE_FILES" || key == "UPDATE_FILE" || key == "UPDATE") {
+			if (!value.empty()) {
+				config.updateFilesConfigured = true;
+				wxArrayString entries = wxSplit(value, ';');
+				for (const wxString& entry : entries) {
+					wxString trimmed = entry;
+					trimmed.Trim(true).Trim(false);
+					if (!trimmed.empty()) {
+						config.updateFiles.push_back(trimmed);
+					}
+				}
 			}
 		} else if (key == "CENTER_X") {
 			hasCenterX = parseMapServerConfigLong(value, centerX);
@@ -593,6 +608,48 @@ bool configureClientForMap(const MapServerConfig& config) {
 	return false;
 }
 
+// Resolves the editor build the server hands to outdated clients. Uses the
+// configured UPDATE_FILES list, or defaults to Editor_x64.exe next to the
+// MapServer executable when present.
+void configureUpdatePackage(const MapServerConfig& config) {
+	if (!g_server) {
+		return;
+	}
+
+	std::vector<wxString> paths = config.updateFiles;
+	if (paths.empty() && !config.updateFilesConfigured) {
+		FileName execPath;
+		try {
+			execPath = dynamic_cast<wxStandardPaths&>(wxStandardPaths::Get()).GetExecutablePath();
+		} catch (const std::bad_cast&) {
+			execPath = FileName(".");
+		}
+		FileName defaultEditor(execPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), "Editor_x64.exe");
+		if (defaultEditor.FileExists()) {
+			paths.push_back(defaultEditor.GetFullPath());
+		}
+	}
+
+	if (paths.empty()) {
+		std::cout << "[live] Editor auto-update disabled (no UPDATE_FILES configured)." << std::endl;
+		return;
+	}
+
+	std::vector<LiveUpdateFile> files;
+	wxString error;
+	if (!collectUpdateFiles(paths, files, error)) {
+		std::cerr << "[live] Auto-update disabled: " << error.ToStdString() << std::endl;
+		return;
+	}
+
+	g_server->setUpdateFiles(files);
+	std::cout << "[live] Editor auto-update enabled; serving " << files.size()
+	          << " file(s) to outdated clients:" << std::endl;
+	for (const LiveUpdateFile& file : files) {
+		std::cout << "  - " << file.filename << " (" << file.size << " bytes)" << std::endl;
+	}
+}
+
 void processCommand(const std::string& line) {
 	std::istringstream iss(line);
 	std::string cmd;
@@ -745,6 +802,7 @@ public:
 		if (config.sessionBounds.enabled) {
 			g_server->setSessionBounds(config.sessionBounds);
 		}
+		configureUpdatePackage(config);
 
 		if (!g_server->bind()) {
 			std::cerr << g_server->getLastError().ToStdString() << std::endl;

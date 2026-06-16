@@ -43,7 +43,8 @@ static void livePeerLog(LiveLogTab* log, const wxString& message) {
 LivePeer::LivePeer(LiveServer* server, asio::ip::tcp::socket socket) :
 	LiveSocket(),
 	readMessage(), server(server), socket(std::move(socket)), color(), id(0), clientId(0), connected(false),
-	assetFiles(), assetFileIndex(0), assetStream(), assetBytesRemaining(0) {
+	assetFiles(), assetFileIndex(0), assetStream(), assetBytesRemaining(0),
+	updateFiles(), updateFileIndex(0), updateStream(), updateBytesRemaining(0) {
 	ASSERT(server != nullptr);
 	mapVersion = server->getEditor()->getMap().getVersion();
 }
@@ -225,6 +226,15 @@ void LivePeer::parseHello(NetworkMessage& message) {
 
 	uint32_t rmeVersion = message.read<uint32_t>();
 	if (rmeVersion != __RME_VERSION_ID__) {
+		// If the client is running an older build and the server has an update
+		// package configured, push the newer editor so the client can self-update
+		// and reconnect instead of being turned away.
+		if (rmeVersion < __RME_VERSION_ID__ && server->hasUpdatePackage()) {
+			livePeerLog(log, "Client is outdated; sending editor update.");
+			sendUpdatePackage();
+			return;
+		}
+
 		NetworkMessage outMessage;
 		outMessage.write<uint8_t>(PACKET_KICK);
 		outMessage.write<std::string>("Wrong editor version.");
@@ -363,6 +373,99 @@ void LivePeer::sendNextAssetChunk() {
 			});
 		} else {
 			sendNextAssetChunk();
+		}
+	});
+}
+
+void LivePeer::sendUpdatePackage() {
+	updateFiles = server->getUpdateFiles();
+	if (updateFiles.empty()) {
+		NetworkMessage outMessage;
+		outMessage.write<uint8_t>(PACKET_KICK);
+		outMessage.write<std::string>("Wrong editor version.");
+		send(outMessage);
+		close();
+		return;
+	}
+
+	NetworkMessage outMessage;
+	outMessage.write<uint8_t>(PACKET_UPDATE_AVAILABLE);
+	outMessage.write<uint32_t>(__RME_VERSION_ID__);
+	outMessage.write<uint32_t>(static_cast<uint32_t>(updateFiles.size()));
+	for (const LiveUpdateFile& file : updateFiles) {
+		outMessage.write<std::string>(file.filename);
+		outMessage.write<uint32_t>(file.size);
+	}
+
+	send(outMessage, [this]() {
+		startUpdateTransfer();
+	});
+}
+
+void LivePeer::startUpdateTransfer() {
+	updateFileIndex = 0;
+	sendNextUpdateChunk();
+}
+
+void LivePeer::sendNextUpdateChunk() {
+	if (updateFileIndex >= updateFiles.size()) {
+		NetworkMessage doneMessage;
+		doneMessage.write<uint8_t>(PACKET_UPDATE_DONE);
+		// Close once the final packet has flushed; the client takes over from here.
+		send(doneMessage, [this]() {
+			close();
+		});
+		return;
+	}
+
+	if (!updateStream.is_open()) {
+		const LiveUpdateFile& file = updateFiles[updateFileIndex];
+		updateStream.open(nstr(file.sourcePath.GetFullPath()), std::ios::binary);
+		if (!updateStream.is_open()) {
+			livePeerLog(log, "Failed to open update file: " + file.sourcePath.GetFullPath());
+			close();
+			return;
+		}
+
+		updateBytesRemaining = file.size;
+
+		NetworkMessage beginMessage;
+		beginMessage.write<uint8_t>(PACKET_UPDATE_FILE_BEGIN);
+		beginMessage.write<std::string>(file.filename);
+		beginMessage.write<uint32_t>(file.size);
+		send(beginMessage);
+	}
+
+	std::vector<char> buffer(LIVE_UPDATE_CHUNK_SIZE);
+	const size_t toRead = std::min<size_t>(LIVE_UPDATE_CHUNK_SIZE, updateBytesRemaining);
+	updateStream.read(buffer.data(), static_cast<std::streamsize>(toRead));
+	const std::streamsize bytesRead = updateStream.gcount();
+	if (bytesRead <= 0) {
+		livePeerLog(log, "Failed while reading update file for transfer.");
+		close();
+		return;
+	}
+
+	std::string chunk(buffer.data(), static_cast<size_t>(bytesRead));
+	updateBytesRemaining -= static_cast<uint32_t>(bytesRead);
+
+	NetworkMessage chunkMessage;
+	chunkMessage.write<uint8_t>(PACKET_UPDATE_FILE_CHUNK);
+	chunkMessage.write<std::string>(chunk);
+	send(chunkMessage, [this]() {
+		if (updateBytesRemaining == 0) {
+			if (updateStream.is_open()) {
+				updateStream.close();
+			}
+
+			NetworkMessage endMessage;
+			endMessage.write<uint8_t>(PACKET_UPDATE_FILE_END);
+			send(endMessage, [this]() {
+				++updateFileIndex;
+				sendNextUpdateChunk();
+			});
+		} else {
+			sendNextUpdateChunk();
 		}
 	});
 }

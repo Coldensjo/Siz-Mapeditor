@@ -21,6 +21,7 @@
 #include "live_socket.h"
 #include "net_connection.h"
 #include "live_assets.h"
+#include "live_update.h"
 
 #include <chrono>
 #include <functional>
@@ -107,6 +108,12 @@ protected:
 	void parseAssetFileEnd(NetworkMessage& message);
 	void parseAssetFilesDone(NetworkMessage& message);
 	void finishLiveVersionLoad();
+	void parseUpdateAvailable(NetworkMessage& message);
+	void parseUpdateFileBegin(NetworkMessage& message);
+	void parseUpdateFileChunk(NetworkMessage& message);
+	void parseUpdateFileEnd(NetworkMessage& message);
+	void parseUpdateDone(NetworkMessage& message);
+	void failUpdate(const wxString& reason);
 	void parseNode(NetworkMessage& message);
 	void parseCursorUpdate(NetworkMessage& message);
 	void parsePing(NetworkMessage& message);
@@ -151,6 +158,12 @@ protected:
 	uint64_t assetBytesExpected;
 	uint64_t assetBytesReceived;
 	int assetProgressReported;
+
+	LiveUpdateReceiveState updateReceiveState;
+	uint64_t updateBytesExpected;
+	uint64_t updateBytesReceived;
+	int updateProgressReported;
+	bool receivingUpdate;
 };
 
 #endif

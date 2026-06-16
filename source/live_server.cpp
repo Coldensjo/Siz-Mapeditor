@@ -27,6 +27,8 @@
 #include "settings.h"
 #include "gui.h"
 
+#include <wx/stdpaths.h>
+
 #include <iostream>
 
 // Logs to both the optional GUI log tab (when hosted in the editor) and the
@@ -46,6 +48,23 @@ LiveServer::LiveServer(Editor& editor) :
 	clients(), acceptor(nullptr), editor(&editor),
 	clientIds(0), port(0), stopped(false) {
 	mapVersion = editor.getMap().getVersion();
+
+	// When hosting from the GUI editor, offer the running executable to outdated
+	// clients by default. The standalone MapServer sets its own package from
+	// mapserver.cfg (UPDATE_FILES) and overrides this.
+	if (!g_gui.IsHeadless()) {
+		wxString error;
+		std::vector<LiveUpdateFile> files;
+		std::vector<wxString> paths;
+		try {
+			paths.push_back(dynamic_cast<wxStandardPaths&>(wxStandardPaths::Get()).GetExecutablePath());
+		} catch (const std::bad_cast&) {
+			// no executable path available; auto-update stays disabled
+		}
+		if (!paths.empty() && collectUpdateFiles(paths, files, error)) {
+			setUpdateFiles(files);
+		}
+	}
 }
 
 LiveServer::~LiveServer() {

@@ -33,6 +33,7 @@
 #include "map.h"
 #include "complexitem.h"
 #include "creature.h"
+#include "live_update.h"
 
 #include <wx/snglinst.h>
 
@@ -99,6 +100,15 @@ bool Application::OnInit() {
 	std::cout << "Review COPYING in RME distribution for details." << std::endl;
 	mt_seed(time(nullptr));
 	srand(time(nullptr));
+
+	// Remove any *.old files left behind by a previous live auto-update, and
+	// detect a relaunch that should rejoin the last live session.
+	cleanupLiveUpdateLeftovers();
+	for (int i = 1; i < argc; ++i) {
+		if (wxString(argv[i]) == "--live-reconnect") {
+			m_live_reconnect = true;
+		}
+	}
 
 #ifdef _USE_PROCESS_COM
 	m_proc_server = nullptr;
@@ -277,6 +287,14 @@ void Application::OnEventLoopEnter(wxEventLoopBase* loop) {
 	// Don't try to create a map if we didn't load the client map.
 	if (ClientVersion::getLatestVersion() == nullptr) {
 		return;
+	}
+
+	// Relaunched by the live auto-updater: rejoin the last session.
+	if (m_live_reconnect) {
+		m_live_reconnect = false;
+		if (g_gui.ReconnectToLastLiveServer()) {
+			return;
+		}
 	}
 
 	// Open a map.

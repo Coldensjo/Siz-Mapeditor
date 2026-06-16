@@ -21,8 +21,10 @@
 #include "live_socket.h"
 #include "net_connection.h"
 #include "action.h"
+#include "live_update.h"
 
 #include <set>
+#include <vector>
 
 class LivePeer;
 class LiveLogTab;
@@ -70,6 +72,17 @@ public:
 	}
 	void kickClient(const wxString& name);
 
+	// Editor auto-update: files pushed to outdated clients before they are kicked.
+	void setUpdateFiles(const std::vector<LiveUpdateFile>& files) {
+		updateFiles = files;
+	}
+	bool hasUpdatePackage() const {
+		return !updateFiles.empty();
+	}
+	const std::vector<LiveUpdateFile>& getUpdateFiles() const {
+		return updateFiles;
+	}
+
 	bool blockItems(const std::string& spec, wxString& feedback);
 	const std::set<uint16_t>& getBlockedItemIds() const {
 		return blockedItemIds;
@@ -100,6 +113,8 @@ protected:
 	uint16_t port;
 
 	std::set<uint16_t> blockedItemIds;
+
+	std::vector<LiveUpdateFile> updateFiles;
 
 	bool stopped;
 };

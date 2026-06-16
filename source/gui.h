@@ -371,6 +371,9 @@ public:
 	}
 	bool NewMap();
 	bool ConnectToLiveServer();
+	// Reconnect to the most recent live server using saved settings, skipping the
+	// connect dialog. Used after a live auto-update restart.
+	bool ReconnectToLastLiveServer();
 	void OpenMap();
 	void SaveMap();
 	void SaveMapAs();

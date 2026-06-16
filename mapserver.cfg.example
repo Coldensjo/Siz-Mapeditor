@@ -37,6 +37,15 @@ ITEMS=C:\Path\To\server\items
 MONSTERS=C:\Path\To\server\monster
 NPCS=C:\Path\To\server\npc
 
+# Editor auto-update: files pushed to outdated editors when they connect.
+# When a connecting editor reports an older build than this server, the listed
+# files are streamed to the client, which replaces its own copy and restarts.
+# Separate multiple files with ';'. If omitted, the server automatically offers
+# Editor_x64.exe from its own folder (when present). Set to a single space or a
+# non-existent path to disable.
+# Example: UPDATE_FILES=C:\Servers\Editor\Editor_x64.exe;C:\Servers\Editor\some.dll
+UPDATE_FILES=
+
 # Optional session bounds: limit editing to an area around a center tile
 # Set all four values, or leave them empty for the whole map
 CENTER_X=

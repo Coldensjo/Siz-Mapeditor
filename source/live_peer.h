@@ -21,6 +21,7 @@
 #include "live_socket.h"
 #include "net_connection.h"
 #include "live_assets.h"
+#include "live_update.h"
 
 #include <functional>
 #include <fstream>
@@ -66,6 +67,10 @@ public:
 	void startAssetTransfer();
 	void sendNextAssetChunk();
 
+	void sendUpdatePackage();
+	void startUpdateTransfer();
+	void sendNextUpdateChunk();
+
 protected:
 	void parseLoginPacket(NetworkMessage message);
 	void parseEditorPacket(NetworkMessage message);
@@ -100,6 +105,11 @@ protected:
 	size_t assetFileIndex;
 	std::ifstream assetStream;
 	uint32_t assetBytesRemaining;
+
+	std::vector<LiveUpdateFile> updateFiles;
+	size_t updateFileIndex;
+	std::ifstream updateStream;
+	uint32_t updateBytesRemaining;
 
 	friend class LiveLogTab;
 	friend class LiveServer;

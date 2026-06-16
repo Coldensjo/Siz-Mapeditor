@@ -352,6 +352,9 @@
     <ClInclude Include="..\..\source\live_server.h">
       <Filter>editor\network</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\source\live_update.h">
+      <Filter>editor\network</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\source\live_socket.h">
       <Filter>editor\network</Filter>
     </ClInclude>
@@ -657,6 +660,9 @@
       <Filter>editor\network</Filter>
     </ClCompile>
     <ClCompile Include="..\..\source\live_server_main.cpp">
+      <Filter>editor\network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\live_update.cpp">
       <Filter>editor\network</Filter>
     </ClCompile>
   </ItemGroup>
