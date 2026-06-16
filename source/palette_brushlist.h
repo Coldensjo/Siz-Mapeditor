@@ -186,6 +186,10 @@ public:
 	// Select the brush in the parameter, this only changes the look of the panel
 	bool SelectBrush(const Brush* whatbrush);
 
+	wxChoicebook* GetChoicebook() const {
+		return choicebook;
+	}
+
 	// Called when this page is displayed
 	void OnSwitchIn();
 

@@ -149,6 +149,11 @@ void Tileset::loadCategory(pugi::xml_node node, wxArrayString& warnings) {
 		return;
 	}
 
+	category->setXmlSourceTag(nodeName);
+	if (subCategory) {
+		subCategory->setXmlSourceTag(nodeName);
+	}
+
 	for (pugi::xml_node brushNode = node.first_child(); brushNode; brushNode = brushNode.next_sibling()) {
 		category->loadBrush(brushNode, warnings);
 		if (subCategory) {

@@ -373,6 +373,11 @@ bool Materials::unserializeTileset(pugi::xml_node node, wxArrayString& warnings)
 		tilesets.insert(std::make_pair(name, tileset));
 	}
 
+	const std::string& loadFile = g_brushes.getCurrentLoadFile();
+	if (!loadFile.empty()) {
+		tileset->setSourceFile(loadFile);
+	}
+
 	for (pugi::xml_node childNode = node.first_child(); childNode; childNode = childNode.next_sibling()) {
 		tileset->loadCategory(childNode, warnings);
 	}

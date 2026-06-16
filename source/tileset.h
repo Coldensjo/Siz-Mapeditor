@@ -50,8 +50,16 @@ public:
 
 	bool containsBrush(Brush* brush) const;
 
+	const std::string& getXmlSourceTag() const {
+		return xml_source_tag;
+	}
+	void setXmlSourceTag(const std::string& tag) {
+		xml_source_tag = tag;
+	}
+
 protected:
 	TilesetCategoryType type;
+	std::string xml_source_tag;
 
 public:
 	std::vector<Brush*> brushlist;
@@ -77,6 +85,13 @@ public:
 
 	bool containsBrush(Brush* brush) const;
 
+	const std::string& getSourceFile() const {
+		return source_file;
+	}
+	void setSourceFile(const std::string& file) {
+		source_file = file;
+	}
+
 public:
 	std::string name;
 	int16_t previousId;
@@ -84,6 +99,7 @@ public:
 
 protected:
 	Brushes& brushes;
+	std::string source_file;
 
 protected:
 	Tileset(const Tileset&);

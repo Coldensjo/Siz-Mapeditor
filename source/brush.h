@@ -75,6 +75,10 @@ public:
 		current_load_file = file;
 	}
 
+	const std::string& getCurrentLoadFile() const {
+		return current_load_file;
+	}
+
 	const BrushMap& getMap() const {
 		return brushes;
 	}

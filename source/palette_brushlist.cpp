@@ -20,11 +20,14 @@
 #include "palette_brushlist.h"
 #include "gui.h"
 #include "edit_brush_window.h"
+#include "edit_tileset_window.h"
 #include "brush.h"
+#include "brush_edit.h"
 #include "add_tileset_window.h"
 #include "add_item_window.h"
 #include "materials.h"
 #include "graphics.h"
+#include "settings.h"
 
 #include <algorithm>
 #include <limits>
@@ -33,6 +36,27 @@
 // ============================================================================
 // Brush Palette Panel
 // A common class for terrain/doodad/item/raw palette
+
+namespace {
+void OpenTilesetEditorForPage(BrushPalettePanel* panel, int pageIndex) {
+	if (!panel || pageIndex < 0) {
+		return;
+	}
+
+	wxChoicebook* choicebook = panel->GetChoicebook();
+	if (!choicebook || pageIndex >= static_cast<int>(choicebook->GetPageCount())) {
+		return;
+	}
+
+	const std::string tilesetName = choicebook->GetPageText(pageIndex).ToStdString();
+	auto tilesetIter = g_materials.tilesets.find(tilesetName);
+	if (tilesetIter == g_materials.tilesets.end()) {
+		return;
+	}
+
+	OpenTilesetEditor(tilesetIter->second, panel->GetType());
+}
+} // namespace
 
 BEGIN_EVENT_TABLE(BrushPalettePanel, PalettePanel)
 EVT_BUTTON(wxID_ADD, BrushPalettePanel::OnClickAddItemToTileset)
@@ -77,6 +101,19 @@ BrushPalettePanel::BrushPalettePanel(wxWindow* parent, const TilesetContainer& t
 	SetSizerAndFit(topsizer);
 
 	choicebook = tmp_choicebook;
+
+	if (g_settings.getBoolean(Config::SHOW_TILESET_EDITOR)) {
+		wxChoice* choice = choicebook->GetChoiceCtrl();
+		if (choice) {
+			choice->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+				if (event.ControlDown()) {
+					OpenTilesetEditorForPage(this, choicebook->GetSelection());
+					return;
+				}
+				event.Skip();
+			});
+		}
+	}
 }
 
 BrushPalettePanel::~BrushPalettePanel() {
@@ -202,6 +239,12 @@ bool BrushPalettePanel::SelectBrush(const Brush* whatbrush) {
 }
 
 void BrushPalettePanel::OnSwitchingPage(wxChoicebookEvent& event) {
+	if (g_settings.getBoolean(Config::SHOW_TILESET_EDITOR) && wxGetKeyState(WXK_CONTROL)) {
+		OpenTilesetEditorForPage(this, event.GetSelection());
+		event.Veto();
+		return;
+	}
+
 	event.Skip();
 	if (!choicebook) {
 		return;
@@ -426,7 +469,13 @@ void BrushPanel::OnClickListBoxRow(wxCommandEvent& event) {
 
 	Brush* brush = tileset->brushlist[n];
 	if (wxGetKeyState(WXK_CONTROL)) {
-		OpenBrushEditor(brush);
+		if (BrushCanBeEdited(brush)) {
+			OpenBrushEditor(brush);
+		} else if (g_settings.getBoolean(Config::SHOW_TILESET_EDITOR)) {
+			OpenTilesetEditor(const_cast<Tileset*>(&tileset->tileset), tileset->getType());
+		} else {
+			OpenBrushEditor(brush);
+		}
 		return;
 	}
 
@@ -662,7 +711,13 @@ void BrushIconBox::OnClickBrushButton(wxCommandEvent& event) {
 	BrushButton* btn = dynamic_cast<BrushButton*>(obj);
 	if (btn) {
 		if (wxGetKeyState(WXK_CONTROL)) {
-			OpenBrushEditor(btn->brush);
+			if (BrushCanBeEdited(btn->brush)) {
+				OpenBrushEditor(btn->brush);
+			} else if (g_settings.getBoolean(Config::SHOW_TILESET_EDITOR)) {
+				OpenTilesetEditor(const_cast<Tileset*>(&tileset->tileset), tileset->getType());
+			} else {
+				OpenBrushEditor(btn->brush);
+			}
 			btn->SetValue(false);
 			return;
 		}

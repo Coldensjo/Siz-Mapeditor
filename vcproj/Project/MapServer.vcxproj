@@ -134,6 +134,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\brush_edit.cpp" />
     <ClCompile Include="..\..\source\edit_brush_window.cpp" />
+    <ClCompile Include="..\..\source\edit_tileset_window.cpp" />
     <ClCompile Include="..\..\source\add_item_window.cpp" />
     <ClCompile Include="..\..\source\add_tileset_window.cpp" />
     <ClCompile Include="..\..\source\artprovider.cpp" />
@@ -147,6 +148,7 @@
     <ClCompile Include="..\..\source\welcome_dialog.cpp" />
     <ClInclude Include="..\..\source\brush_edit.h" />
     <ClInclude Include="..\..\source\edit_brush_window.h" />
+    <ClInclude Include="..\..\source\edit_tileset_window.h" />
     <ClInclude Include="..\..\source\add_item_window.h" />
     <ClInclude Include="..\..\source\add_tileset_window.h" />
     <ClInclude Include="..\..\source\artprovider.h" />
@@ -276,10 +278,12 @@
     <ClInclude Include="..\..\source\materials.h" />
     <ClCompile Include="..\..\source\materials.cpp" />
     <ClInclude Include="..\..\source\tileset.h" />
+    <ClInclude Include="..\..\source\tileset_edit.h" />
     <ClInclude Include="..\..\source\tomlcast.h" />
     <ClInclude Include="..\..\source\tomlnode.h" />
     <ClInclude Include="..\..\source\tomlutil.h" />
     <ClCompile Include="..\..\source\tileset.cpp" />
+    <ClCompile Include="..\..\source\tileset_edit.cpp" />
     <ClCompile Include="..\..\source\tomlnode.cpp" />
     <ClCompile Include="..\..\source\tomlutil.cpp" />
     <ClInclude Include="..\..\source\basemap.h" />
