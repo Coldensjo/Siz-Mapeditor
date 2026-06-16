@@ -11,6 +11,8 @@
 #include <wx/stdpaths.h>
 #include <wx/utils.h>
 
+#include <utility>
+
 namespace {
 
 wxString executableDirectory() {
@@ -159,8 +161,8 @@ bool finishLiveUpdateReceive(LiveUpdateReceiveState& state, wxString& error) {
 	return true;
 }
 
-bool applyLiveUpdateAndRestart(const LiveUpdateReceiveState& state, bool reconnect, wxString& error) {
-	if (state.receivedFiles.empty()) {
+bool applyLiveUpdateAndRestart(const wxFileName& stagingDir, const std::vector<std::string>& files, bool reconnect, wxString& error) {
+	if (files.empty()) {
 		error = "The server did not send any update files.";
 		return false;
 	}
@@ -175,21 +177,43 @@ bool applyLiveUpdateAndRestart(const LiveUpdateReceiveState& state, bool reconne
 	}
 	const wxString runningExe = execFile.GetFullName();
 
+	// Validate every staged file up front so we never start swapping with a
+	// truncated download.
+	for (const std::string& name : files) {
+		wxFileName staged(stagingDir);
+		staged.SetFullName(wxstr(name));
+		uint32_t size = 0;
+		if (!fileSizeIfExists(staged, size) || size == 0) {
+			error = "The downloaded update is incomplete; please try again.";
+			return false;
+		}
+	}
+
 	// Swap each staged file over the live one. The running executable cannot be
 	// deleted on Windows, but it can be renamed; we move it aside to *.old and
-	// drop the new build in its place.
-	for (const std::string& name : state.receivedFiles) {
-		wxFileName staged(state.stagingDir);
+	// drop the new build in its place. Track what we moved so we can roll back if
+	// a later file fails, leaving a working editor behind.
+	std::vector<std::pair<wxFileName, wxFileName>> backups; // <target, backup>
+	const auto rollback = [&backups]() {
+		for (auto it = backups.rbegin(); it != backups.rend(); ++it) {
+			const wxFileName& target = it->first;
+			const wxFileName& backup = it->second;
+			if (target.FileExists()) {
+				wxRemoveFile(target.GetFullPath());
+			}
+			if (backup.FileExists()) {
+				wxRenameFile(backup.GetFullPath(), target.GetFullPath(), true);
+			}
+		}
+	};
+
+	for (const std::string& name : files) {
+		wxFileName staged(stagingDir);
 		staged.SetFullName(wxstr(name));
 
 		wxFileName target;
 		target.AssignDir(execDir);
 		target.SetFullName(wxstr(name));
-
-		if (!staged.FileExists()) {
-			error = "Staged update file is missing: " + staged.GetFullPath();
-			return false;
-		}
 
 		if (target.FileExists()) {
 			wxFileName backup = target;
@@ -199,17 +223,24 @@ bool applyLiveUpdateAndRestart(const LiveUpdateReceiveState& state, bool reconne
 			}
 			if (!wxRenameFile(target.GetFullPath(), backup.GetFullPath(), true)) {
 				error = "Could not replace '" + target.GetFullName() + "'. Close other editor windows and try again.";
+				rollback();
 				return false;
 			}
+			backups.emplace_back(target, backup);
 		}
 
-		if (!wxRenameFile(staged.GetFullPath(), target.GetFullPath(), true)) {
-			// Best effort: try a copy if rename across handles failed.
-			if (!wxCopyFile(staged.GetFullPath(), target.GetFullPath(), true)) {
-				error = "Could not install the new '" + target.GetFullName() + "'.";
-				return false;
+		bool installed = wxRenameFile(staged.GetFullPath(), target.GetFullPath(), true);
+		if (!installed) {
+			// Rename can fail across volumes/handles; fall back to a copy.
+			if (wxCopyFile(staged.GetFullPath(), target.GetFullPath(), true)) {
+				wxRemoveFile(staged.GetFullPath());
+				installed = true;
 			}
-			wxRemoveFile(staged.GetFullPath());
+		}
+		if (!installed) {
+			error = "Could not install the new '" + target.GetFullName() + "'.";
+			rollback();
+			return false;
 		}
 	}
 

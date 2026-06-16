@@ -894,11 +894,25 @@ void LiveClient::parseUpdateDone(NetworkMessage& WXUNUSED(message)) {
 	receivingUpdate = false;
 	logMessage("Update downloaded.");
 
-	// The server closes the connection after the package is sent; tear down our
-	// side too so the running executable can be replaced.
-	close();
+	// Snapshot everything the updater needs into plain locals. The teardown below
+	// deletes this LiveClient (CloseLiveEditors -> delete), and the server's FIN
+	// can independently trigger handleError -> CloseLiveEditors, so the deferred
+	// prompt/apply must not touch 'this' or updateReceiveState afterwards.
+	const wxFileName stagingDir = updateReceiveState.stagingDir;
+	const std::vector<std::string> files = updateReceiveState.receivedFiles;
+	resetLiveUpdateReceiveState(updateReceiveState);
 
-	wxTheApp->CallAfter([this]() {
+	// Tear down the live session now (this may delete 'this').
+	close();
+	g_gui.CloseLiveEditors(this);
+
+	// Run the prompt + swap completely decoupled from the (now gone) live client.
+	wxTheApp->CallAfter([stagingDir, files]() {
+		if (files.empty()) {
+			g_gui.PopupDialog("Update Failed", "The server did not send any update files.", wxOK);
+			return;
+		}
+
 		const long choice = g_gui.PopupDialog(
 			"Editor Update",
 			"A newer version of the editor is required to join this live server.\n\n"
@@ -907,23 +921,16 @@ void LiveClient::parseUpdateDone(NetworkMessage& WXUNUSED(message)) {
 		);
 
 		if (choice != wxID_YES) {
-			logMessage("Update declined; disconnecting.");
-			resetLiveUpdateReceiveState(updateReceiveState);
-			g_gui.CloseLiveEditors(this);
 			return;
 		}
 
 		wxString error;
-		if (!applyLiveUpdateAndRestart(updateReceiveState, true, error)) {
+		if (!applyLiveUpdateAndRestart(stagingDir, files, true, error)) {
 			g_gui.PopupDialog("Update Failed", error, wxOK);
-			resetLiveUpdateReceiveState(updateReceiveState);
-			g_gui.CloseLiveEditors(this);
 			return;
 		}
 
 		// New instance is launching; shut this one down so it can replace us.
-		resetLiveUpdateReceiveState(updateReceiveState);
-		g_gui.CloseLiveEditors(this);
 		if (g_gui.root) {
 			g_gui.root->Close(true);
 		}

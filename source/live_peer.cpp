@@ -164,21 +164,27 @@ void LivePeer::send(NetworkMessage& message, std::function<void()> onSent) {
 }
 
 void LivePeer::parseLoginPacket(NetworkMessage message) {
-	uint8_t packetType;
-	while (message.position < message.buffer.size()) {
-		packetType = message.read<uint8_t>();
-		switch (packetType) {
-			case PACKET_HELLO_FROM_CLIENT:
-				parseHello(message);
-				break;
-			case PACKET_READY_CLIENT:
-				parseReady(message);
-				break;
-			default: {
-				livePeerLog(log, "Invalid login packet received, connection severed.");
-				close();
-				break;
-			}
+	// A login message carries exactly one packet (HELLO or READY). Handle it and
+	// stop: HELLO branches that reject/redirect the client (wrong version, update
+	// push) intentionally read only part of the buffer, so continuing the loop
+	// would misread the remaining HELLO fields as bogus packets and sever the
+	// connection mid-transfer.
+	if (message.position >= message.buffer.size()) {
+		return;
+	}
+
+	const uint8_t packetType = message.read<uint8_t>();
+	switch (packetType) {
+		case PACKET_HELLO_FROM_CLIENT:
+			parseHello(message);
+			break;
+		case PACKET_READY_CLIENT:
+			parseReady(message);
+			break;
+		default: {
+			livePeerLog(log, "Invalid login packet received, connection severed.");
+			close();
+			break;
 		}
 	}
 }

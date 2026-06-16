@@ -360,13 +360,20 @@ void Application::OnFatalException() {
 }
 
 bool Application::ParseCommandLineMap(wxString& fileName) {
-	if (argc == 2) {
-		fileName = wxString(argv[1]);
-		return true;
-	} else if (argc == 3) {
-		if (argv[1] == "-ws") {
-			g_settings.setInteger(Config::WELCOME_DIALOG, argv[2] == "1" ? 1 : 0);
+	// Return the first non-option argument as the map to open. Option flags such
+	// as -ws and --live-reconnect must be skipped here, otherwise they get
+	// mistaken for a map path (which also makes the single-instance IPC forward
+	// fire and fail when the editor is relaunched by the auto-updater).
+	for (int i = 1; i < argc; ++i) {
+		const wxString arg = argv[i];
+		if (arg.StartsWith("-")) {
+			if (arg == "-ws" && i + 1 < argc) {
+				g_settings.setInteger(Config::WELCOME_DIALOG, wxString(argv[++i]) == "1" ? 1 : 0);
+			}
+			continue;
 		}
+		fileName = arg;
+		return true;
 	}
 	return false;
 }

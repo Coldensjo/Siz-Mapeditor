@@ -60,9 +60,12 @@ bool finishLiveUpdateReceive(LiveUpdateReceiveState& state, wxString& error);
 
 // Client side: swap the staged files over the live ones (the running executable
 // is renamed to *.old, which Windows permits), then relaunch the editor. Pass
-// reconnect=true to have the new instance rejoin the last live session. Returns
-// false (with error) only if staging fails before the relaunch is attempted.
-bool applyLiveUpdateAndRestart(const LiveUpdateReceiveState& state, bool reconnect, wxString& error);
+// reconnect=true to have the new instance rejoin the last live session. Takes
+// plain copies (staging folder + downloaded file names) rather than the live
+// receive state so it is safe to run after the live client has been torn down.
+// Returns false (with error) only if staging fails before the relaunch; on
+// failure any partially-swapped file is rolled back so a working editor remains.
+bool applyLiveUpdateAndRestart(const wxFileName& stagingDir, const std::vector<std::string>& files, bool reconnect, wxString& error);
 
 // Startup housekeeping: remove leftover *.old files from a previous self-update.
 void cleanupLiveUpdateLeftovers();

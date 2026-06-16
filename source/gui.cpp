@@ -122,7 +122,12 @@ struct MapConfigSettings {
 	}
 };
 
-bool g_lastMapLoadUsedPathOverrides = false;
+// Signature of the path overrides applied by the most recently loaded map
+// (empty when that map used none). A version reload — which closes every other
+// open map — is only forced when the next map's override signature differs from
+// this. Two maps that resolve to the same version with the same overrides (or
+// none at all) therefore stay open side by side instead of closing each other.
+wxString g_lastMapOverridesSignature;
 
 wxString TrimConfigValue(wxString value) {
 	value.Trim(true).Trim(false);
@@ -319,6 +324,24 @@ wxString ResolveConfiguredDirectory(const FileName& mapFileName, const wxString&
 	}
 
 	return resolvedPath.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+}
+
+// Builds a signature describing the path overrides a map applies (empty when it
+// has none). Override directories are resolved to absolute paths so two maps in
+// different folders that point at the same assets compare equal. Mirrors the
+// "no overrides" state as an empty string so a plain map never forces a reload.
+wxString BuildMapOverridesSignature(const FileName& mapFileName, ClientVersionID resolvedClientVersion, const MapConfigSettings& mapConfig) {
+	if (!mapConfig.hasPathOverrides()) {
+		return wxString();
+	}
+
+	wxString signature;
+	signature << static_cast<int>(resolvedClientVersion);
+	signature << "|" << (mapConfig.hasClientDirectory ? ResolveConfiguredDirectory(mapFileName, mapConfig.clientDirectory) : wxString());
+	signature << "|" << (mapConfig.hasItemsDirectory ? ResolveConfiguredDirectory(mapFileName, mapConfig.itemsDirectory) : wxString());
+	signature << "|" << (mapConfig.hasMonstersDirectory ? ResolveConfiguredDirectory(mapFileName, mapConfig.monstersDirectory) : wxString());
+	signature << "|" << (mapConfig.hasNpcsDirectory ? ResolveConfiguredDirectory(mapFileName, mapConfig.npcsDirectory) : wxString());
+	return signature;
 }
 
 void AddInvalidDirectoryWarning(MapConfigSettings& settings, const FileName& mapFileName, const wxString& label, const wxString& rawValue) {
@@ -1089,7 +1112,11 @@ void GUI::SaveMapAs() {
 bool GUI::LoadMap(const FileName& fileName) {
 	FinishWelcomeDialog();
 
-	if (GetCurrentEditor() && !GetCurrentMap().hasChanged() && !GetCurrentMap().hasFile()) {
+	// Replace the current tab only if it is a throwaway scratch map (no file, no
+	// changes). A live map matches that test but must never be closed here — doing
+	// so would make the live view vanish while the client stays connected.
+	Editor* currentEditor = GetCurrentEditor();
+	if (currentEditor && !currentEditor->IsLive() && !GetCurrentMap().hasChanged() && !GetCurrentMap().hasFile()) {
 		g_gui.CloseCurrentEditor();
 	}
 
@@ -1106,8 +1133,14 @@ bool GUI::LoadMap(const FileName& fileName) {
 
 	ClientVersion::loadVersions();
 	resolvedClientVersion = ApplyMapConfigSettings(fileName, mapConfig, resolvedClientVersion);
-	const bool forceReloadVersion = mapConfig.hasPathOverrides() || g_lastMapLoadUsedPathOverrides;
-	g_lastMapLoadUsedPathOverrides = mapConfig.hasPathOverrides();
+
+	// Only force a full asset reload (which closes every other open map) when this
+	// map's path overrides differ from the previous load's. A version mismatch is
+	// handled separately by the editor constructor, so maps that share the version
+	// and overrides (or use none) can stay open together.
+	const wxString overridesSignature = BuildMapOverridesSignature(fileName, resolvedClientVersion, mapConfig);
+	const bool forceReloadVersion = overridesSignature != g_lastMapOverridesSignature;
+	g_lastMapOverridesSignature = overridesSignature;
 
 	Editor* editor;
 	try {
