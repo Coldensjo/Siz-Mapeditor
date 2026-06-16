@@ -1,14 +1,3 @@
-# CMake
-CMakeCache.txt
-CMakeFiles
-cmake_install.cmake
-Makefile
-build/
-build.*/
-build-debug
-build-release
-CMakeLists.txt.user*
-
 # RME
 rme
 rme.cfg
@@ -71,7 +60,6 @@ xcuserdata
 
 # CLion
 .idea/
-cmake-build-debug/
 
 # Notepad++
 *.bak
@@ -90,3 +78,4 @@ cmake-build-debug/
 
 # vcpkg
 /vcpkg_installed/
+/data
