@@ -42,6 +42,7 @@ private:
 	void OnItemIdChanged(wxSpinEvent& event);
 	void OnClickPickItem(wxCommandEvent& event);
 	void OnClickAddItem(wxCommandEvent& event);
+	void OnClickAddSeparator(wxCommandEvent& event);
 	void OnClickRemoveEntry(wxCommandEvent& event);
 	void OnClickSave(wxCommandEvent& event);
 	void OnClickCancel(wxCommandEvent& event);

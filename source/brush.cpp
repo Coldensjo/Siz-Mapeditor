@@ -752,3 +752,18 @@ void OptionalBorderBrush::undraw(BaseMap* map, Tile* tile) {
 void OptionalBorderBrush::draw(BaseMap* map, Tile* tile, void* parameter) {
 	tile->setOptionalBorder(true); // The bordering algorithm will handle this automagicaly
 }
+
+//=============================================================================
+// Palette separator
+
+PaletteSeparatorBrush::PaletteSeparatorBrush() {
+	////
+}
+
+PaletteSeparatorBrush::~PaletteSeparatorBrush() {
+	////
+}
+
+std::string PaletteSeparatorBrush::getName() const {
+	return "Separator";
+}

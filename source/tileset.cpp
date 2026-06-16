@@ -36,8 +36,19 @@ Tileset::~Tileset() {
 }
 
 void Tileset::clear() {
-	for (TilesetCategoryArray::iterator iter = categories.begin(); iter != categories.end(); ++iter) {
-		(*iter)->brushlist.clear();
+	std::vector<Brush*> deletedSeparators;
+	for (TilesetCategory* category : categories) {
+		for (Brush* brush : category->brushlist) {
+			if (brush && brush->isPaletteSeparator()) {
+				if (std::find(deletedSeparators.begin(), deletedSeparators.end(), brush) == deletedSeparators.end()) {
+					delete brush;
+					deletedSeparators.push_back(brush);
+				}
+			}
+		}
+	}
+	for (TilesetCategory* category : categories) {
+		category->brushlist.clear();
 	}
 }
 
@@ -176,6 +187,10 @@ bool TilesetCategory::isTrivial() const {
 	return (type == TILESET_ITEM) || (type == TILESET_RAW);
 }
 
+void TilesetCategory::clear() {
+	brushlist.clear();
+}
+
 void TilesetCategory::loadBrush(pugi::xml_node node, wxArrayString& warnings) {
 	pugi::xml_attribute attribute;
 
@@ -188,7 +203,19 @@ void TilesetCategory::loadBrush(pugi::xml_node node, wxArrayString& warnings) {
 	}
 
 	const std::string& nodeName = as_lower_str(node.name());
-	if (nodeName == "brush") {
+	if (nodeName == "separator") {
+		PaletteSeparatorBrush* brush = newd PaletteSeparatorBrush();
+		auto insertPosition = brushlist.end();
+		if (!brushName.empty()) {
+			for (auto itt = brushlist.begin(); itt != brushlist.end(); ++itt) {
+				if (*itt && !(*itt)->isPaletteSeparator() && (*itt)->getName() == brushName) {
+					insertPosition = ++itt;
+					break;
+				}
+			}
+		}
+		brushlist.insert(insertPosition, brush);
+	} else if (nodeName == "brush") {
 		if (!(attribute = node.attribute("name"))) {
 			return;
 		}

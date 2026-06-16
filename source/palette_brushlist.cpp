@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <limits>
 #include <wx/gbsizer.h>
+#include <wx/statline.h>
 
 // ============================================================================
 // Brush Palette Panel
@@ -55,6 +56,27 @@ void OpenTilesetEditorForPage(BrushPalettePanel* panel, int pageIndex) {
 	}
 
 	OpenTilesetEditor(tilesetIter->second, panel->GetType());
+}
+
+Brush* FirstSelectableBrush(const TilesetCategory* category) {
+	if (!category) {
+		return nullptr;
+	}
+	for (Brush* brush : category->brushlist) {
+		if (brush && !brush->isPaletteSeparator()) {
+			return brush;
+		}
+	}
+	return nullptr;
+}
+
+void AddPaletteSeparatorRow(wxWindow* parent, wxSizer* stacksizer, wxSizer*& rowsizer, int& item_counter) {
+	if (rowsizer) {
+		stacksizer->Add(rowsizer);
+		rowsizer = nullptr;
+	}
+	stacksizer->Add(newd wxStaticLine(parent), 0, wxEXPAND | wxLEFT | wxRIGHT, 4);
+	item_counter = 0;
 }
 } // namespace
 
@@ -425,7 +447,7 @@ Brush* BrushPanel::GetSelectedBrush() const {
 	}
 
 	if (tileset && tileset->size() > 0) {
-		return tileset->brushlist[0];
+		return FirstSelectableBrush(tileset);
 	}
 	return nullptr;
 }
@@ -468,6 +490,9 @@ void BrushPanel::OnClickListBoxRow(wxCommandEvent& event) {
 	}
 
 	Brush* brush = tileset->brushlist[n];
+	if (!brush || brush->isPaletteSeparator()) {
+		return;
+	}
 	if (wxGetKeyState(WXK_CONTROL)) {
 		if (BrushCanBeEdited(brush)) {
 			OpenBrushEditor(brush);
@@ -560,6 +585,21 @@ BrushIconBox::BrushIconBox(wxWindow* parent, const TilesetCategory* _tileset, Re
 		grid->SetEmptyCellSize(wxSize(0, 0));
 
 		for (BrushVector::const_iterator iter = tileset->brushlist.begin(); iter != tileset->brushlist.end(); ++iter) {
+			if (!*iter) {
+				continue;
+			}
+			if ((*iter)->isPaletteSeparator()) {
+				int sepRow = 0;
+				for (int c = 0; c < columns; ++c) {
+					sepRow = std::max(sepRow, column_fill[c]);
+				}
+				wxStaticLine* line = newd wxStaticLine(this);
+				grid->Add(line, wxGBPosition(sepRow, 0), wxGBSpan(1, columns), wxEXPAND);
+				for (int c = 0; c < columns; ++c) {
+					column_fill[c] = sepRow + 1;
+				}
+				continue;
+			}
 			ASSERT(*iter);
 			BrushButton* bb = newd BrushButton(this, *iter, RENDER_SIZE_ACTUAL);
 			int span_cols = 1;
@@ -602,6 +642,13 @@ BrushIconBox::BrushIconBox(wxWindow* parent, const TilesetCategory* _tileset, Re
 		wxSizer* rowsizer = nullptr;
 		int item_counter = 0;
 		for (BrushVector::const_iterator iter = tileset->brushlist.begin(); iter != tileset->brushlist.end(); ++iter) {
+			if (!*iter) {
+				continue;
+			}
+			if ((*iter)->isPaletteSeparator()) {
+				AddPaletteSeparatorRow(this, stacksizer, rowsizer, item_counter);
+				continue;
+			}
 			ASSERT(*iter);
 			++item_counter;
 
@@ -636,11 +683,12 @@ BrushIconBox::~BrushIconBox() {
 }
 
 void BrushIconBox::SelectFirstBrush() {
-	if (tileset && tileset->size() > 0) {
-		DeselectAll();
-		brush_buttons[0]->SetValue(true);
-		EnsureVisible((size_t)0);
+	if (brush_buttons.empty()) {
+		return;
 	}
+	DeselectAll();
+	brush_buttons[0]->SetValue(true);
+	EnsureVisible((size_t)0);
 }
 
 Brush* BrushIconBox::GetSelectedBrush() const {
@@ -710,6 +758,10 @@ void BrushIconBox::OnClickBrushButton(wxCommandEvent& event) {
 	wxObject* obj = event.GetEventObject();
 	BrushButton* btn = dynamic_cast<BrushButton*>(obj);
 	if (btn) {
+		if (!btn->brush || btn->brush->isPaletteSeparator()) {
+			btn->SetValue(false);
+			return;
+		}
 		if (wxGetKeyState(WXK_CONTROL)) {
 			if (BrushCanBeEdited(btn->brush)) {
 				OpenBrushEditor(btn->brush);
@@ -767,8 +819,14 @@ void BrushListBox::SelectFirstBrush() {
 	if (!tileset || tileset->size() == 0) {
 		return;
 	}
-	SetSelection(0);
-	wxWindow::ScrollLines(-1);
+	for (size_t n = 0; n < tileset->size(); ++n) {
+		Brush* brush = tileset->brushlist[n];
+		if (brush && !brush->isPaletteSeparator()) {
+			SetSelection(n);
+			wxWindow::ScrollLines(-1);
+			return;
+		}
+	}
 }
 
 Brush* BrushListBox::GetSelectedBrush() const {
@@ -778,11 +836,12 @@ Brush* BrushListBox::GetSelectedBrush() const {
 
 	int n = GetSelection();
 	if (n != wxNOT_FOUND && n >= 0 && static_cast<size_t>(n) < tileset->size()) {
-		return tileset->brushlist[n];
-	} else if (tileset->size() > 0) {
-		return tileset->brushlist[0];
+		Brush* brush = tileset->brushlist[n];
+		if (brush && !brush->isPaletteSeparator()) {
+			return brush;
+		}
 	}
-	return nullptr;
+	return FirstSelectableBrush(tileset);
 }
 
 bool BrushListBox::SelectBrush(const Brush* whatbrush) {
@@ -791,7 +850,8 @@ bool BrushListBox::SelectBrush(const Brush* whatbrush) {
 	}
 	
 	for (size_t n = 0; n < tileset->size(); ++n) {
-		if (tileset->brushlist[n] == whatbrush) {
+		Brush* brush = tileset->brushlist[n];
+		if (brush && !brush->isPaletteSeparator() && brush == whatbrush) {
 			SetSelection(n);
 			return true;
 		}
@@ -804,8 +864,18 @@ void BrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
 	if (!tileset || n >= tileset->size()) {
 		return;
 	}
-	
-	Sprite* spr = g_gui.gfx.getSprite(tileset->brushlist[n]->getLookID());
+
+	Brush* brush = tileset->brushlist[n];
+	if (!brush) {
+		return;
+	}
+	if (brush->isPaletteSeparator()) {
+		dc.SetPen(wxPen(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT)));
+		dc.DrawLine(rect.GetX() + 4, rect.GetY() + rect.GetHeight() / 2, rect.GetRight() - 4, rect.GetY() + rect.GetHeight() / 2);
+		return;
+	}
+
+	Sprite* spr = g_gui.gfx.getSprite(brush->getLookID());
 	if (spr) {
 		spr->DrawTo(&dc, SPRITE_SIZE_32x32, rect.GetX(), rect.GetY(), rect.GetWidth(), rect.GetHeight());
 	}
@@ -818,10 +888,13 @@ void BrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
 	} else {
 		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
 	}
-	dc.DrawText(wxstr(tileset->brushlist[n]->getName()), rect.GetX() + 40, rect.GetY() + 6);
+	dc.DrawText(wxstr(brush->getName()), rect.GetX() + 40, rect.GetY() + 6);
 }
 
 wxCoord BrushListBox::OnMeasureItem(size_t n) const {
+	if (tileset && n < tileset->size() && tileset->brushlist[n] && tileset->brushlist[n]->isPaletteSeparator()) {
+		return 10;
+	}
 	return 32;
 }
 

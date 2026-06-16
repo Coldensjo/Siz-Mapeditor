@@ -19,6 +19,7 @@ enum {
 	EDIT_TILESET_ITEM_ID,
 	EDIT_TILESET_PICK_ITEM,
 	EDIT_TILESET_ADD_ITEM,
+	EDIT_TILESET_ADD_SEPARATOR,
 	EDIT_TILESET_REMOVE_ENTRY,
 };
 
@@ -33,6 +34,9 @@ void DrawItemSprite(wxDC& dc, int clientId, int x, int y, int width, int height)
 }
 
 uint16_t GetEntryPreviewClientId(const TilesetEditEntry& entry) {
+	if (entry.kind == TilesetEditEntry::SEPARATOR) {
+		return 0;
+	}
 	if (entry.kind == TilesetEditEntry::ITEM) {
 		const ItemType& it = g_items.getItemType(entry.item_id);
 		return it.id != 0 ? it.clientID : 0;
@@ -55,7 +59,12 @@ void EditTilesetListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) cons
 	}
 
 	const TilesetEditEntry& entry = owner->entries[n];
-	DrawItemSprite(dc, GetEntryPreviewClientId(entry), rect.GetX() + 2, rect.GetY() + 2, 32, 32);
+	if (entry.kind != TilesetEditEntry::SEPARATOR) {
+		DrawItemSprite(dc, GetEntryPreviewClientId(entry), rect.GetX() + 2, rect.GetY() + 2, 32, 32);
+	} else {
+		dc.SetPen(wxPen(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT)));
+		dc.DrawLine(rect.GetX() + 4, rect.GetY() + rect.GetHeight() / 2, rect.GetRight() - 4, rect.GetY() + rect.GetHeight() / 2);
+	}
 
 	if (IsSelected(n)) {
 		if (HasFocus()) {
@@ -76,6 +85,7 @@ wxCoord EditTilesetListBox::OnMeasureItem(size_t WXUNUSED(n)) const {
 
 BEGIN_EVENT_TABLE(EditTilesetWindow, wxDialog)
 EVT_BUTTON(EDIT_TILESET_ADD_ITEM, EditTilesetWindow::OnClickAddItem)
+EVT_BUTTON(EDIT_TILESET_ADD_SEPARATOR, EditTilesetWindow::OnClickAddSeparator)
 EVT_BUTTON(EDIT_TILESET_REMOVE_ENTRY, EditTilesetWindow::OnClickRemoveEntry)
 EVT_BUTTON(wxID_SAVE, EditTilesetWindow::OnClickSave)
 EVT_BUTTON(wxID_CANCEL, EditTilesetWindow::OnClickCancel)
@@ -139,6 +149,7 @@ EditTilesetWindow::EditTilesetWindow(wxWindow* parent, Tileset* tileset, Tileset
 
 	wxSizer* button_row = newd wxBoxSizer(wxHORIZONTAL);
 	button_row->Add(newd wxButton(this, EDIT_TILESET_ADD_ITEM, "Add item"), 0, wxALL, 5);
+	button_row->Add(newd wxButton(this, EDIT_TILESET_ADD_SEPARATOR, "Add separator"), 0, wxALL, 5);
 	button_row->Add(newd wxButton(this, EDIT_TILESET_REMOVE_ENTRY, "Remove"), 0, wxALL, 5);
 	button_row->AddStretchSpacer();
 	button_row->Add(newd wxButton(this, wxID_SAVE, "Save"), 0, wxALL, 5);
@@ -152,6 +163,9 @@ EditTilesetWindow::EditTilesetWindow(wxWindow* parent, Tileset* tileset, Tileset
 }
 
 wxString EditTilesetWindow::FormatEntryLabel(const TilesetEditEntry& entry) const {
+	if (entry.kind == TilesetEditEntry::SEPARATOR) {
+		return "Separator";
+	}
 	if (entry.kind == TilesetEditEntry::ITEM) {
 		const ItemType& it = g_items.getItemType(entry.item_id);
 		if (it.id != 0) {
@@ -180,11 +194,16 @@ void EditTilesetWindow::UpdateEditFields() {
 	const bool hasSelection = selected != wxNOT_FOUND && static_cast<size_t>(selected) < entries.size();
 	const TilesetEditEntry* entry = hasSelection ? &entries[selected] : nullptr;
 	const bool isItem = entry && entry->kind == TilesetEditEntry::ITEM;
+	const bool isSeparator = entry && entry->kind == TilesetEditEntry::SEPARATOR;
 
 	item_id_spin->Enable(isItem);
 	pick_item_button->Enable(isItem);
 
-	if (isItem) {
+	if (isSeparator) {
+		item_id_spin->SetValue(0);
+		item_name_label->SetLabelText("\"Separator\"");
+		item_preview_button->SetSprite(0);
+	} else if (isItem) {
 		item_id_spin->SetValue(entry->item_id);
 		const ItemType& it = g_items.getItemType(entry->item_id);
 		if (it.id != 0) {
@@ -270,6 +289,15 @@ void EditTilesetWindow::OnClickAddItem(wxCommandEvent& WXUNUSED(event)) {
 	TilesetEditEntry entry;
 	entry.kind = TilesetEditEntry::ITEM;
 	entry.item_id = itemId;
+	entries.push_back(entry);
+	RefreshList();
+	entry_list->SetSelection(entries.size() - 1);
+	UpdateEditFields();
+}
+
+void EditTilesetWindow::OnClickAddSeparator(wxCommandEvent& WXUNUSED(event)) {
+	TilesetEditEntry entry;
+	entry.kind = TilesetEditEntry::SEPARATOR;
 	entries.push_back(entry);
 	RefreshList();
 	entry_list->SetSelection(entries.size() - 1);

@@ -67,12 +67,30 @@ void writeCompactItems(pugi::xml_node parent, const std::vector<uint16_t>& sorte
 	}
 }
 
+void deleteUniquePaletteSeparators(const BrushVector& brushes, std::vector<Brush*>& deleted) {
+	for (Brush* brush : brushes) {
+		if (brush && brush->isPaletteSeparator()) {
+			if (std::find(deleted.begin(), deleted.end(), brush) == deleted.end()) {
+				delete brush;
+				deleted.push_back(brush);
+			}
+		}
+	}
+}
+
 void syncMirroredCategories(Tileset* tileset, const std::string& xmlTag, const BrushVector& brushes) {
+	std::vector<Brush*> deletedSeparators;
 	for (TilesetCategory* category : tileset->categories) {
 		if (category && category->getXmlSourceTag() == xmlTag) {
+			deleteUniquePaletteSeparators(category->brushlist, deletedSeparators);
 			category->brushlist = brushes;
 		}
 	}
+}
+
+void deletePaletteSeparators(BrushVector& brushes) {
+	std::vector<Brush*> deleted;
+	deleteUniquePaletteSeparators(brushes, deleted);
 }
 
 } // namespace
@@ -88,7 +106,11 @@ bool TilesetExtractEditEntries(const TilesetCategory* category, std::vector<Tile
 		if (!brush) {
 			continue;
 		}
-		if (brush->isRaw()) {
+		if (brush->isPaletteSeparator()) {
+			TilesetEditEntry entry;
+			entry.kind = TilesetEditEntry::SEPARATOR;
+			entries.push_back(entry);
+		} else if (brush->isRaw()) {
 			TilesetEditEntry entry;
 			entry.kind = TilesetEditEntry::ITEM;
 			entry.item_id = brush->asRaw()->getItemID();
@@ -117,7 +139,9 @@ bool TilesetApplyEditEntries(Tileset* tileset, TilesetCategoryType categoryType,
 
 	BrushVector newBrushes;
 	for (const TilesetEditEntry& entry : entries) {
-		if (entry.kind == TilesetEditEntry::ITEM) {
+		if (entry.kind == TilesetEditEntry::SEPARATOR) {
+			newBrushes.push_back(newd PaletteSeparatorBrush());
+		} else if (entry.kind == TilesetEditEntry::ITEM) {
 			if (entry.item_id == 0 || g_items.getItemType(entry.item_id).id == 0) {
 				error = wxString::Format("Invalid item id #%u.", entry.item_id);
 				return false;
@@ -150,6 +174,7 @@ bool TilesetApplyEditEntries(Tileset* tileset, TilesetCategoryType categoryType,
 	if (!xmlTag.empty()) {
 		syncMirroredCategories(tileset, xmlTag, newBrushes);
 	} else {
+		deletePaletteSeparators(category->brushlist);
 		category->brushlist = newBrushes;
 	}
 
@@ -210,29 +235,22 @@ bool TilesetSaveToXml(Tileset* tileset, TilesetCategoryType categoryType, wxStri
 		child = next;
 	}
 
-	std::vector<std::string> brushNames;
-	std::vector<uint16_t> itemIds;
-	itemIds.reserve(category->brushlist.size());
-
 	for (Brush* brush : category->brushlist) {
 		if (!brush) {
 			continue;
 		}
+		if (brush->isPaletteSeparator()) {
+			categoryNode.append_child("separator");
+			continue;
+		}
 		if (brush->isRaw()) {
-			itemIds.push_back(brush->asRaw()->getItemID());
+			pugi::xml_node itemNode = categoryNode.append_child("item");
+			itemNode.append_attribute("id") = brush->asRaw()->getItemID();
 		} else {
-			brushNames.push_back(brush->getName());
+			pugi::xml_node brushNode = categoryNode.append_child("brush");
+			brushNode.append_attribute("name") = brush->getName().c_str();
 		}
 	}
-
-	std::sort(itemIds.begin(), itemIds.end());
-	itemIds.erase(std::unique(itemIds.begin(), itemIds.end()), itemIds.end());
-
-	for (const std::string& brushName : brushNames) {
-		pugi::xml_node brushNode = categoryNode.append_child("brush");
-		brushNode.append_attribute("name") = brushName.c_str();
-	}
-	writeCompactItems(categoryNode, itemIds);
 
 	if (!doc.save_file(sourceFile.c_str())) {
 		error = wxString::Format("Could not save '%s'.", wxstr(sourceFile));

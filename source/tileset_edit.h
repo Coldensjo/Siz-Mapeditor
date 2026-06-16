@@ -14,6 +14,7 @@ struct TilesetEditEntry {
 	enum Kind {
 		ITEM,
 		BRUSH,
+		SEPARATOR,
 	};
 
 	Kind kind = ITEM;

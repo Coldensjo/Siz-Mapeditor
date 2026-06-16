@@ -50,6 +50,7 @@ class HouseBrush;
 class HouseExitBrush;
 class FlagBrush;
 class EraserBrush;
+class PaletteSeparatorBrush;
 
 //=============================================================================
 // Brushes, holds all brushes
@@ -193,6 +194,9 @@ public:
 	virtual bool isEraser() const {
 		return false;
 	}
+	virtual bool isPaletteSeparator() const {
+		return false;
+	}
 
 	virtual RAWBrush* asRaw() {
 		return nullptr;
@@ -240,6 +244,9 @@ public:
 		return nullptr;
 	}
 	virtual EraserBrush* asEraser() {
+		return nullptr;
+	}
+	virtual PaletteSeparatorBrush* asPaletteSeparator() {
 		return nullptr;
 	}
 
@@ -433,6 +440,33 @@ public:
 		return true;
 	}
 	virtual int getLookID() const;
+	virtual std::string getName() const;
+};
+
+//=============================================================================
+// Palette separator, visual divider in tileset palettes only
+
+class PaletteSeparatorBrush : public Brush {
+public:
+	PaletteSeparatorBrush();
+	virtual ~PaletteSeparatorBrush();
+
+	bool isPaletteSeparator() const {
+		return true;
+	}
+	PaletteSeparatorBrush* asPaletteSeparator() {
+		return this;
+	}
+
+	virtual bool canDraw(BaseMap* map, const Position& position) const {
+		return false;
+	}
+	virtual void draw(BaseMap* map, Tile* tile, void* parameter = nullptr) { }
+	virtual void undraw(BaseMap* map, Tile* tile) { }
+
+	virtual int getLookID() const {
+		return 0;
+	}
 	virtual std::string getName() const;
 };
 
