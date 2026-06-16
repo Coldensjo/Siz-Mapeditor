@@ -55,7 +55,7 @@ To build a single target: right-click **Editor** or **MapServer** → **Build**.
 
 ## Build — command line (preferred for agents)
 
-**Always build through `vcproj\Editor.sln`, never by pointing MSBuild at a `.vcxproj` file directly.** The projects set `OutDir` to `$(SolutionDir)..\`, which resolves to the **repo root** only when `SolutionDir` comes from the solution (i.e. `vcproj\`). Building `vcproj\Project\Editor.vcxproj` alone leaves `SolutionDir` unset and drops `Editor_x64.exe` into `vcproj\` instead.
+**Prefer building through `vcproj\Editor.sln`** (it builds both projects at once). The projects anchor `OutDir` to `$(MSBuildThisFileDirectory)..\..\`, which always resolves to the **repo root** regardless of how the build is invoked — solution, a single `.vcxproj`, or the IDE. The output location no longer depends on `$(SolutionDir)`, so the exe will not land in `vcproj\`.
 
 From the **repo root**, find MSBuild with `vswhere`, then build the solution:
 
@@ -76,7 +76,7 @@ Editor.vcxproj -> C:\path\to\SizMapeditor\Editor_x64.exe
 MapServer.vcxproj -> C:\path\to\SizMapeditor\MapServer_x64.exe
 ```
 
-If the log shows `...\vcproj\Editor_x64.exe`, the build was invoked incorrectly — use `vcproj\Editor.sln` as shown above.
+The exe always lands in the repo root because `OutDir` is anchored to the project file location, not `$(SolutionDir)`.
 
 ### Build one project only
 
@@ -86,8 +86,6 @@ Still use the solution file; pass `/t:` to limit the build target:
 & $msbuild "vcproj\Editor.sln" /t:Editor /p:Configuration=Release /p:Platform=x64 /m /v:minimal
 & $msbuild "vcproj\Editor.sln" /t:MapServer /p:Configuration=Release /p:Platform=x64 /m /v:minimal
 ```
-
-Do **not** run MSBuild on `vcproj\Project\Editor.vcxproj` or `vcproj\Project\MapServer.vcxproj` directly.
 
 ### Debug build
 
@@ -166,7 +164,7 @@ Build logs are also written under `vcproj/Project/x64/{Configuration}/{Editor|Ma
 | LTCG / incremental link warnings | Usually non-fatal; a full rebuild often clears them |
 | `error C3859: PCH` / PCH issues | Clean then rebuild; ensure `main.h` is unchanged in incompatible ways across TUs |
 | Link errors for `archive`, `freeglut`, wx libs | vcpkg triplet must be `x64-windows`; Debug needs Debug vcpkg libs |
-| `.exe` lands in `vcproj\` instead of repo root | Build `vcproj\Editor.sln`, not `vcproj\Project\*.vcxproj`; run MSBuild from repo root |
+| `.exe` lands in `vcproj\` instead of repo root | Should not happen — `OutDir` is anchored to `$(MSBuildThisFileDirectory)..\..\` (repo root). If it does, the `.vcxproj` `OutDir` was reverted to `$(SolutionDir)..\`; restore the `MSBuildThisFileDirectory` form |
 
 Hard-coded fallback library paths in `.vcxproj` (e.g. `C:\vcpkg\...`) are developer-specific. The build should work through **vcpkg manifest integration** when `VCPKG_ROOT` and VS vcpkg integration are configured correctly.
 
