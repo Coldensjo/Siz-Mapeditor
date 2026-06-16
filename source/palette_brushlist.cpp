@@ -545,9 +545,10 @@ BrushIconBox::~BrushIconBox() {
 }
 
 void BrushIconBox::RecalculateGrid() {
-	// Determine how many columns fit in the currently available width, using
-	// the same heuristics the old widget-based layout used.
-	const int button_width = (use_actual_size || icon_size == RENDER_SIZE_32x32) ? 36 : 20;
+	// Determine how many columns fit in the currently available width. Use the
+	// real cell size as the divisor so the grid fills the panel - otherwise a
+	// gap grows between the icons and the scrollbar as the palette is widened.
+	const int button_width = slot_size;
 
 	int available_width = 0;
 	int client_height = 0;
