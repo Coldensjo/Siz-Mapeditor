@@ -73,10 +73,16 @@ public:
 
 	void OnKey(wxKeyEvent& event);
 	void OnChar(wxKeyEvent& event); // Intercept Ctrl+A to prevent SelectAll assertion
+	void OnMouseMotion(wxMouseEvent& event);
+	void OnMouseLeave(wxMouseEvent& event);
 
 	DECLARE_EVENT_TABLE();
 };
 
+// A virtualized icon grid. Instead of creating one native widget per brush
+// (which freezes the editor for tilesets with thousands of items, e.g. the
+// RAW "Others" category), it custom-draws only the icons currently visible
+// inside a single scrolled window - the same strategy the listbox uses.
 class BrushIconBox : public wxScrolledWindow, public BrushBoxInterface {
 public:
 	BrushIconBox(wxWindow* parent, const TilesetCategory* _tileset, RenderSize rsz, bool useActualSize = false);
@@ -86,8 +92,7 @@ public:
 		return this;
 	}
 
-	// Scrolls the window to the position of the named brush button
-	void EnsureVisible(BrushButton* btn);
+	// Scrolls the window so the brush at the given cell index is visible
 	void EnsureVisible(size_t n);
 
 	// Select the first brush
@@ -98,16 +103,32 @@ public:
 	bool SelectBrush(const Brush* brush);
 
 	// Event handling...
-	void OnClickBrushButton(wxCommandEvent& event);
+	void OnPaint(wxPaintEvent& event);
+	void OnSize(wxSizeEvent& event);
+	void OnMouseClick(wxMouseEvent& event);
+	void OnMouseMotion(wxMouseEvent& event);
+	void OnMouseLeave(wxMouseEvent& event);
 
 protected:
-	// Used internally to deselect all buttons before selecting a newd one.
-	void DeselectAll();
+	struct Cell {
+		Brush* brush; // nullptr means this cell is a separator line
+		wxRect rect; // position in unscrolled (virtual) coordinates
+	};
 
-protected:
-	std::vector<BrushButton*> brush_buttons;
+	// (Re)computes cell positions based on the current client width.
+	void RecalculateGrid();
+	// Returns the index of the cell at the given unscrolled point, or -1.
+	int CellIndexAt(const wxPoint& unscrolled) const;
+	void DrawCell(wxDC& dc, const Cell& cell, bool selected) const;
+	void HandleBrushSelection(Brush* brush);
+
+	std::vector<Cell> cells;
 	RenderSize icon_size;
 	bool use_actual_size;
+	int slot_size; // pixel size of one grid cell (fixed-size modes)
+	int columns; // number of columns the layout was computed for
+	int virtual_height; // total height of the laid-out grid
+	int selected_index; // index into cells of the selected brush, or -1
 
 	DECLARE_EVENT_TABLE();
 };
