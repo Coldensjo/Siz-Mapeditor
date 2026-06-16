@@ -129,24 +129,32 @@ bool Application::OnInit() {
 	if (g_settings.getInteger(Config::ONLY_ONE_INSTANCE)) {
 		m_single_instance_checker = newd wxSingleInstanceChecker; // Instance checker has to stay alive throughout the applications lifetime
 		if (m_single_instance_checker->IsAnotherRunning()) {
-			RMEProcessClient client;
-			wxConnectionBase* connection = client.MakeConnection("localhost", "rme_host", "rme_talk");
-			if (connection) {
-				wxString fileName;
-				if (ParseCommandLineMap(fileName)) {
+			// Only forward to the already-running instance when a map file was passed
+			// (e.g. opened from the shell). If the editor was launched on its own
+			// (no map argument), fall through and start an additional instance so the
+			// user can simply run Editor_x64.exe again to open another window.
+			wxString fileName;
+			if (ParseCommandLineMap(fileName)) {
+				RMEProcessClient client;
+				wxConnectionBase* connection = client.MakeConnection("localhost", "rme_host", "rme_talk");
+				if (connection) {
 					wxLogNull nolog; // We might get a timeout message if the file fails to open on the running instance. Let's not show that message.
 					connection->Execute(fileName);
+					connection->Disconnect();
 				}
-				connection->Disconnect();
+				wxDELETE(m_single_instance_checker);
+				return false; // Since we return false - OnExit is never called
 			}
-			wxDELETE(m_single_instance_checker);
-			return false; // Since we return false - OnExit is never called
-		}
 
-		// We act as server then
-		m_proc_server = newd RMEProcessServer();
-		if (!m_proc_server->Create("rme_host")) {
-			wxLogWarning("Could not register IPC service!");
+			// No map argument - let this instance run on its own. We can't act as the
+			// IPC server (another instance already owns it), so just drop the checker.
+			wxDELETE(m_single_instance_checker);
+		} else {
+			// We act as server then
+			m_proc_server = newd RMEProcessServer();
+			if (!m_proc_server->Create("rme_host")) {
+				wxLogWarning("Could not register IPC service!");
+			}
 		}
 	}
 #endif

@@ -34,6 +34,9 @@ class PaletteWindow;
 
 typedef TilesetCategoryType PaletteType;
 
+void ShowPaletteBrushHoverTooltip(const Brush* brush, const wxPoint& screenPos);
+void HidePaletteBrushHoverTooltip();
+
 class BrushButton : public ItemToggleButton {
 public:
 	BrushButton(wxWindow* parent, Brush* brush, RenderSize, uint32_t id = wxID_ANY);
@@ -43,6 +46,8 @@ public:
 	Brush* brush;
 
 	void OnKey(wxKeyEvent& event);
+	void OnMouseEnter(wxMouseEvent& event);
+	void OnMouseMotion(wxMouseEvent& event);
 
 	DECLARE_EVENT_TABLE()
 };

@@ -56,12 +56,12 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>MapServer_x64</TargetName>
-    <OutDir>$(SolutionDir)..\</OutDir>
+    <OutDir>$(MSBuildThisFileDirectory)..\..\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\MapServer\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>MapServer_x64</TargetName>
-    <OutDir>$(SolutionDir)..\</OutDir>
+    <OutDir>$(MSBuildThisFileDirectory)..\..\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\MapServer\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">

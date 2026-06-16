@@ -19,10 +19,147 @@
 
 #include "palette_common.h"
 #include "brush.h"
+#include "raw_brush.h"
+#include "items.h"
 #include "sprites.h"
 #include "gui.h"
 #include "common_windows.h"
 #include "application.h"
+
+#include <cctype>
+
+#ifdef __WXMSW__
+	#include <windows.h>
+#endif
+
+namespace {
+class PaletteHoverTooltip : public wxFrame {
+public:
+	PaletteHoverTooltip(wxWindow* parent) :
+		wxFrame(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+			wxBORDER_SIMPLE | wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxFRAME_TOOL_WINDOW) {
+		wxBoxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
+		label = newd wxStaticText(this, wxID_ANY, wxEmptyString);
+		const wxColour background(255, 255, 225);
+		label->SetBackgroundColour(background);
+		SetBackgroundColour(background);
+		sizer->Add(label, 1, wxALL, 3);
+		SetSizer(sizer);
+	}
+
+	void Update(const wxString& text, const wxPoint& screenPos) {
+		if (text.IsEmpty()) {
+			HideTooltip();
+			return;
+		}
+
+		label->SetLabel(text);
+		Layout();
+		Fit();
+
+		const wxSize size = GetSize();
+		// Anchor at the cursor tip and extend leftward.
+		int x = screenPos.x - size.GetWidth();
+		int y = screenPos.y;
+		const wxRect display = wxGetClientDisplayRect();
+		if (x < display.GetLeft()) {
+			x = display.GetLeft();
+		}
+		if (y + size.GetHeight() > display.GetBottom()) {
+			y = display.GetBottom() - size.GetHeight();
+		}
+		SetPosition(wxPoint(x, y));
+		if (!IsShown()) {
+			ShowWithoutActivating();
+		}
+		Raise();
+	}
+
+	void HideTooltip() {
+		if (IsShown()) {
+			Hide();
+		}
+	}
+
+#ifdef __WXMSW__
+	WXLRESULT MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override {
+		if (message == WM_NCHITTEST) {
+			return HTTRANSPARENT;
+		}
+		return wxFrame::MSWWindowProc(message, wParam, lParam);
+	}
+#endif
+
+private:
+	wxStaticText* label;
+};
+
+PaletteHoverTooltip* palette_hover_tooltip = nullptr;
+const Brush* cached_hover_brush = nullptr;
+wxString cached_hover_label;
+
+PaletteHoverTooltip* GetPaletteHoverTooltip() {
+	if (!palette_hover_tooltip && g_gui.root) {
+		palette_hover_tooltip = newd PaletteHoverTooltip(g_gui.root);
+	}
+	return palette_hover_tooltip;
+}
+
+wxString BrushHoverIdText(const Brush* brush) {
+	if (!brush || brush->isPaletteSeparator()) {
+		return wxEmptyString;
+	}
+	if (brush == cached_hover_brush) {
+		return cached_hover_label;
+	}
+
+	cached_hover_brush = brush;
+	cached_hover_label = wxEmptyString;
+
+	if (brush->isRaw()) {
+		cached_hover_label = i2ws(static_cast<const RAWBrush*>(brush)->getItemID());
+		return cached_hover_label;
+	}
+
+	const std::string& name = brush->getName();
+	if (!name.empty() && std::isdigit(static_cast<unsigned char>(name[0]))) {
+		const size_t separator = name.find(" - ");
+		if (separator != std::string::npos) {
+			cached_hover_label = wxstr(name.substr(0, separator));
+			return cached_hover_label;
+		}
+	}
+
+	const int lookId = brush->getLookID();
+	if (lookId > 0) {
+		for (uint16_t id = 100; id <= g_items.getMaxID(); ++id) {
+			const ItemType& it = g_items.getItemType(id);
+			if (it.id != 0 && it.clientID == static_cast<uint16_t>(lookId)) {
+				cached_hover_label = i2ws(it.id);
+				return cached_hover_label;
+			}
+		}
+	}
+
+	return cached_hover_label;
+}
+} // namespace
+
+void ShowPaletteBrushHoverTooltip(const Brush* brush, const wxPoint& screenPos) {
+	PaletteHoverTooltip* tooltip = GetPaletteHoverTooltip();
+	if (!tooltip) {
+		return;
+	}
+	tooltip->Update(BrushHoverIdText(brush), screenPos);
+}
+
+void HidePaletteBrushHoverTooltip() {
+	cached_hover_brush = nullptr;
+	cached_hover_label = wxEmptyString;
+	if (palette_hover_tooltip) {
+		palette_hover_tooltip->HideTooltip();
+	}
+}
 
 // ============================================================================
 // Palette Panel
@@ -905,6 +1042,8 @@ void BrushToolPanel::OnClickLockDoorCheckbox(wxCommandEvent& event) {
 
 BEGIN_EVENT_TABLE(BrushButton, ItemToggleButton)
 EVT_KEY_DOWN(BrushButton::OnKey)
+EVT_ENTER_WINDOW(BrushButton::OnMouseEnter)
+EVT_MOTION(BrushButton::OnMouseMotion)
 END_EVENT_TABLE()
 
 BrushButton::BrushButton(wxWindow* parent, Brush* _brush, RenderSize sz, uint32_t id) :
@@ -912,7 +1051,6 @@ BrushButton::BrushButton(wxWindow* parent, Brush* _brush, RenderSize sz, uint32_
 	brush(_brush) {
 	ASSERT(brush);
 	SetSprite(brush->getLookID());
-	SetToolTip(wxstr(brush->getName()));
 }
 
 BrushButton::~BrushButton() {
@@ -921,6 +1059,16 @@ BrushButton::~BrushButton() {
 
 void BrushButton::OnKey(wxKeyEvent& event) {
 	g_gui.AddPendingCanvasEvent(event);
+}
+
+void BrushButton::OnMouseEnter(wxMouseEvent& event) {
+	ShowPaletteBrushHoverTooltip(brush, wxGetMousePosition());
+	event.Skip();
+}
+
+void BrushButton::OnMouseMotion(wxMouseEvent& event) {
+	ShowPaletteBrushHoverTooltip(brush, wxGetMousePosition());
+	event.Skip();
 }
 
 // ============================================================================
