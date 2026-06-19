@@ -89,6 +89,10 @@ public:
 	}
 	void sendBlockList(LivePeer* peer);
 	void broadcastBlockList();
+	// Load the persisted blocked item list from the file next to the hosted map.
+	// Safe to call once after the map is loaded; a missing file leaves the list
+	// empty. Returns the number of ids loaded.
+	size_t loadBlockedItems();
 
 	//
 	void broadcastNodes(DirtyList& dirtyList);
@@ -113,6 +117,11 @@ protected:
 	uint16_t port;
 
 	std::set<uint16_t> blockedItemIds;
+
+	// Absolute path of the XML file (next to the hosted map) that persists the
+	// blocked item list across restarts. Empty when the map has no filename.
+	std::string getBlockedItemsFilePath() const;
+	void saveBlockedItems() const;
 
 	std::vector<LiveUpdateFile> updateFiles;
 

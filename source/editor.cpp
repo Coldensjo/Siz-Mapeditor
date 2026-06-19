@@ -206,6 +206,7 @@ bool Editor::IsClipboardAllowed() const {
 LiveServer* Editor::StartLiveServer() {
 	ASSERT(IsLocal());
 	live_server = newd LiveServer(*this);
+	live_server->loadBlockedItems();
 
 	delete actionQueue;
 	actionQueue = newd NetworkedActionQueue(*this);

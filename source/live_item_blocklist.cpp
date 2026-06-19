@@ -11,8 +11,12 @@
 #include "ground_brush.h"
 #include "wall_brush.h"
 #include "raw_brush.h"
+#include "items.h"
+
+#include "ext/pugixml.hpp"
 
 #include <algorithm>
+#include <wx/filename.h>
 
 namespace {
 
@@ -122,6 +126,60 @@ void collectBrushItemIds(const Brush* brush, std::vector<uint16_t>& out) {
 			appendUniqueItemId(out, tileEntry.second);
 		}
 	}
+}
+
+bool loadBlockedItemList(const std::string& path, std::set<uint16_t>& blockedItems, std::string& error) {
+	blockedItems.clear();
+
+	if (!wxFileName(wxString(path.c_str(), wxConvUTF8)).FileExists()) {
+		// No saved list yet; treat as an empty list rather than an error.
+		return true;
+	}
+
+	pugi::xml_document doc;
+	const pugi::xml_parse_result result = doc.load_file(path.c_str());
+	if (!result) {
+		error = std::string("Could not parse blocked item list: ") + result.description();
+		return false;
+	}
+
+	pugi::xml_node rootNode = doc.child("blocked_items");
+	if (!rootNode) {
+		error = "Blocked item list is missing its <blocked_items> root node.";
+		return false;
+	}
+
+	for (pugi::xml_node itemNode : rootNode.children("item")) {
+		const long itemId = itemNode.attribute("id").as_int(0);
+		if (itemId >= 1 && itemId <= 65535) {
+			blockedItems.insert(static_cast<uint16_t>(itemId));
+		}
+	}
+	return true;
+}
+
+bool saveBlockedItemList(const std::string& path, const std::set<uint16_t>& blockedItems, std::string& error) {
+	pugi::xml_document doc;
+
+	pugi::xml_node decl = doc.prepend_child(pugi::node_declaration);
+	decl.append_attribute("version") = "1.0";
+
+	pugi::xml_node rootNode = doc.append_child("blocked_items");
+	for (uint16_t itemId : blockedItems) {
+		pugi::xml_node itemNode = rootNode.append_child("item");
+		itemNode.append_attribute("id") = itemId;
+
+		const ItemType& itemType = g_items.getItemType(itemId);
+		if (!itemType.name.empty()) {
+			itemNode.append_attribute("name") = itemType.name.c_str();
+		}
+	}
+
+	if (!doc.save_file(path.c_str(), "\t", pugi::format_default, pugi::encoding_utf8)) {
+		error = "Could not write blocked item list to " + path;
+		return false;
+	}
+	return true;
 }
 
 uint16_t findBlockedItemInBrush(const Brush* brush, const std::set<uint16_t>& blockedItems, const std::set<uint16_t>& dismissedItems) {

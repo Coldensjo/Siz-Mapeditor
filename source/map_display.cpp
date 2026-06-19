@@ -43,6 +43,7 @@
 #include "map_comment.h"
 #include "application.h"
 #include "browse_tile_window.h"
+#include "wall_creator_window.h"
 
 #include "doodad_brush.h"
 #include "house_exit_brush.h"
@@ -63,6 +64,85 @@ bool liveEditAllowed(const Editor& editor, int x, int y) {
 	}
 	const LiveSessionBounds& bounds = editor.GetLive().getSessionBounds();
 	return !bounds.enabled || bounds.contains(x, y);
+}
+
+// The representative item id of a tile for wall creation: the top selected
+// item, otherwise the topmost item, otherwise the ground.
+uint16_t wallTileItemId(Tile* tile) {
+	if (!tile) {
+		return 0;
+	}
+	ItemVector selected = tile->getSelectedItems();
+	if (!selected.empty()) {
+		return selected.back()->getID();
+	}
+	if (!tile->items.empty()) {
+		return tile->items.back()->getID();
+	}
+	if (tile->ground) {
+		return tile->ground->getID();
+	}
+	return 0;
+}
+
+// Detects a 2x2 square of selected tiles (same floor) and maps each corner to
+// a wall piece, filling pieceIds in the order {horizontal, vertical, corner,
+// pole}. Layout: top-left=pole, top-right=horizontal, bottom-left=vertical,
+// bottom-right=corner.
+bool extractWallSquare(Selection& selection, uint16_t pieceIds[4]) {
+	if (selection.size() != 4) {
+		return false;
+	}
+
+	int minX = std::numeric_limits<int>::max();
+	int minY = std::numeric_limits<int>::max();
+	int floor = -1;
+	for (Tile* tile : selection.getTiles()) {
+		const Position pos = tile->getPosition();
+		if (floor == -1) {
+			floor = pos.z;
+		} else if (pos.z != floor) {
+			return false;
+		}
+		minX = std::min(minX, pos.x);
+		minY = std::min(minY, pos.y);
+	}
+
+	uint16_t corner = 0, horizontal = 0, vertical = 0, pole = 0;
+	for (Tile* tile : selection.getTiles()) {
+		const Position pos = tile->getPosition();
+		const bool right = (pos.x == minX + 1);
+		const bool bottom = (pos.y == minY + 1);
+		if ((pos.x != minX && !right) || (pos.y != minY && !bottom)) {
+			return false; // not within the 2x2 footprint
+		}
+
+		const uint16_t id = wallTileItemId(tile);
+		if (id == 0) {
+			return false;
+		}
+
+		if (!right && !bottom) {
+			pole = id;
+		} else if (right && !bottom) {
+			horizontal = id;
+		} else if (!right && bottom) {
+			vertical = id;
+		} else {
+			corner = id;
+		}
+	}
+
+	// All four distinct corners must be filled.
+	if (corner == 0 || horizontal == 0 || vertical == 0 || pole == 0) {
+		return false;
+	}
+
+	pieceIds[0] = horizontal;
+	pieceIds[1] = vertical;
+	pieceIds[2] = corner;
+	pieceIds[3] = pole;
+	return true;
 }
 
 } // namespace
@@ -123,6 +203,7 @@ EVT_MENU(MAP_POPUP_MENU_SELECT_CREATURE_BRUSH, MapCanvas::OnSelectCreatureBrush)
 EVT_MENU(MAP_POPUP_MENU_SELECT_SPAWN_BRUSH, MapCanvas::OnSelectSpawnBrush)
 EVT_MENU(MAP_POPUP_MENU_SELECT_HOUSE_BRUSH, MapCanvas::OnSelectHouseBrush)
 EVT_MENU(MAP_POPUP_MENU_MOVE_TO_TILESET, MapCanvas::OnSelectMoveTo)
+EVT_MENU(MAP_POPUP_MENU_CREATE_WALL, MapCanvas::OnCreateWall)
 // ----
 EVT_MENU(MAP_POPUP_MENU_PROPERTIES, MapCanvas::OnProperties)
 // ----
@@ -1817,6 +1898,11 @@ void MapCanvas::OnKeyDown(wxKeyEvent& event) {
 		}
 		case 'z':
 		case 'Z': { // Rotate counterclockwise (actually shift variaton, but whatever... :P)
+			if (event.ControlDown() || event.AltDown()) {
+				// Ctrl+Z / Ctrl+Shift+Z are Undo/Redo accelerators - don't eat them.
+				event.Skip();
+				break;
+			}
 			int nv = g_gui.GetBrushVariation();
 			--nv;
 			if (nv < 0) {
@@ -1828,6 +1914,11 @@ void MapCanvas::OnKeyDown(wxKeyEvent& event) {
 		}
 		case 'x':
 		case 'X': { // Rotate clockwise (actually shift variaton, but whatever... :P)
+			if (event.ControlDown() || event.AltDown()) {
+				// Ctrl+X is the Cut accelerator - don't eat it.
+				event.Skip();
+				break;
+			}
 			int nv = g_gui.GetBrushVariation();
 			++nv;
 			if (nv >= (g_gui.GetCurrentBrush() ? g_gui.GetCurrentBrush()->getMaxVariation() : 0)) {
@@ -2456,6 +2547,32 @@ void MapCanvas::OnSelectMoveTo(wxCommandEvent& WXUNUSED(event)) {
 	w->Destroy();
 }
 
+void MapCanvas::OnCreateWall(wxCommandEvent& WXUNUSED(event)) {
+	uint16_t pieceIds[4];
+	if (!extractWallSquare(editor.selection, pieceIds)) {
+		g_gui.PopupDialog("Create Wall", "Select exactly four items placed in a 2x2 square first.", wxOK);
+		return;
+	}
+
+	wxString name = wxGetTextFromUser(
+		"Name for the new wall (top-left = pole, top-right = horizontal,\nbottom-left = vertical, bottom-right = corner):",
+		"Create Wall", "", this
+	);
+	name.Trim(true).Trim(false);
+	if (name.IsEmpty()) {
+		return; // cancelled
+	}
+
+	wxString error;
+	if (CreateWallBrush(std::string(name.mb_str()), pieceIds, "Walls", error)) {
+		g_gui.PopupDialog("Wall created", "The wall has been created and added to the 'Walls' tileset.", wxOK);
+		g_gui.DestroyPalettes();
+		g_gui.NewPalette();
+	} else {
+		g_gui.PopupDialog("Error", error, wxOK);
+	}
+}
+
 void MapCanvas::OnProperties(wxCommandEvent& WXUNUSED(event)) {
 	if (editor.selection.size() != 1) {
 		return;
@@ -2629,6 +2746,12 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 	wxMenuItem* deleteItem = Append(MAP_POPUP_MENU_DELETE, "&Delete\tDEL", "Removes all seleceted items");
 	deleteItem->Enable(anything_selected);
+
+	uint16_t wallPieces[4];
+	if (extractWallSquare(editor.selection, wallPieces)) {
+		AppendSeparator();
+		Append(MAP_POPUP_MENU_CREATE_WALL, "Create &Wall from Square...", "Turn this 2x2 of items into a new wall brush in the Walls tileset");
+	}
 
 	if (anything_selected) {
 		if (editor.selection.size() == 1) {

@@ -290,6 +290,55 @@ void LiveServer::kickClient(const wxString& name) {
 	liveServerLog(log, "No connected user named '" + name + "'.");
 }
 
+std::string LiveServer::getBlockedItemsFilePath() const {
+	if (!editor) {
+		return std::string();
+	}
+
+	const std::string mapFilename = editor->getMap().getFilename();
+	if (mapFilename.empty()) {
+		return std::string();
+	}
+
+	FileName blockedFile(wxString(mapFilename.c_str(), wxConvUTF8));
+	blockedFile.SetName(blockedFile.GetName() + "-blocked");
+	blockedFile.SetExt("xml");
+	return std::string(blockedFile.GetFullPath().mb_str(wxConvUTF8));
+}
+
+size_t LiveServer::loadBlockedItems() {
+	const std::string path = getBlockedItemsFilePath();
+	if (path.empty()) {
+		return 0;
+	}
+
+	std::set<uint16_t> loaded;
+	std::string error;
+	if (!loadBlockedItemList(path, loaded, error)) {
+		liveServerLog(log, wxString(error.c_str(), wxConvUTF8));
+		return 0;
+	}
+
+	blockedItemIds = std::move(loaded);
+	if (!blockedItemIds.empty()) {
+		liveServerLog(log, wxString::Format("Loaded %zu blocked item id(s) from %s.",
+			blockedItemIds.size(), wxString(path.c_str(), wxConvUTF8)));
+	}
+	return blockedItemIds.size();
+}
+
+void LiveServer::saveBlockedItems() const {
+	const std::string path = getBlockedItemsFilePath();
+	if (path.empty()) {
+		return;
+	}
+
+	std::string error;
+	if (!saveBlockedItemList(path, blockedItemIds, error)) {
+		liveServerLog(log, wxString(error.c_str(), wxConvUTF8));
+	}
+}
+
 bool LiveServer::blockItems(const std::string& spec, wxString& feedback) {
 	std::set<uint16_t> newItems;
 	std::string error;
@@ -310,6 +359,7 @@ bool LiveServer::blockItems(const std::string& spec, wxString& feedback) {
 		return true;
 	}
 
+	saveBlockedItems();
 	feedback = wxString::Format("Blocked %zu item id(s). Total blocked: %zu.", added, blockedItemIds.size());
 	broadcastBlockList();
 	return true;
