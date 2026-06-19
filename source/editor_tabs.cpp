@@ -67,7 +67,12 @@ void MapTabbook::CycleTab(bool forward) {
 }
 
 void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
-	EditorTab* editorTab = GetTab(evt.GetInt());
+	// The page being closed is in GetSelection(); GetInt() is the unrelated
+	// wxCommandEvent int (0), which would make us inspect the wrong tab — e.g.
+	// closing a local map would act on whatever sits at index 0 (often the live
+	// tab) and disconnect the live session instead.
+	const int closingIndex = evt.GetSelection();
+	EditorTab* editorTab = GetTab(closingIndex);
 
 	// Closing a live tab with the X must go through the full disconnect path,
 	// otherwise the socket stays open (the server never notices the disconnect)
@@ -96,7 +101,7 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 
 	if (mapTab && mapTab->IsUniqueReference() && mapTab->GetMap()) {
 		if (mapTab->GetMap()->hasChanged()) {
-			SetFocusedTab(evt.GetInt());
+			SetFocusedTab(closingIndex);
 			if (!g_gui.root->DoQuerySave(false)) {
 				evt.Veto();
 				return;

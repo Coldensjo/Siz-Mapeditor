@@ -778,6 +778,24 @@ void LiveClient::finishLiveVersionLoad() {
 	waitingForServerAssets = false;
 	logMessage("Loading server client version...");
 
+	// Loading the server's client assets swaps the global asset state, so any open
+	// local maps must be closed first. Warn before discarding the user's work — at
+	// this point only local maps are open (the live map tab is created later), so
+	// GetOpenMapCount() counts exactly what would be closed.
+	if (!g_gui.IsHeadless() && g_gui.GetOpenMapCount() > 0) {
+		const long response = g_gui.PopupDialog(
+			"Close open maps?",
+			"Connecting to the live server loads the server's client assets and will close the map(s) you currently have open.\n\nDo you want to continue?",
+			wxYES | wxNO
+		);
+		if (response != wxID_YES) {
+			logMessage("Live connection cancelled - open maps were kept.");
+			close();
+			g_gui.CloseLiveEditors(this);
+			return;
+		}
+	}
+
 	if (!g_gui.CloseAllEditors()) {
 		logMessage("Could not close open maps for the live session.");
 		close();

@@ -499,6 +499,11 @@ void ActionQueue::addBatch(BatchAction* batch, int stacking_delay) {
 		batch->timestamp = time(nullptr);
 		current++;
 	} while (false);
+
+	// The queue changed, so the Undo/Redo state did too. Refresh the menubar so
+	// the menu items (and their keyboard accelerators, e.g. Ctrl+Z) are enabled;
+	// otherwise the accelerator is ignored while the menu item is still disabled.
+	g_gui.UpdateMenubar();
 }
 
 void ActionQueue::addAction(Action* action, int stacking_delay) {

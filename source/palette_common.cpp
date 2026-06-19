@@ -72,7 +72,11 @@ public:
 		if (!IsShown()) {
 			ShowWithoutActivating();
 		}
-		Raise();
+		// NOTE: Do not call Raise() here. On wxMSW Raise() calls
+		// ::SetForegroundWindow(), which steals activation to this tooltip frame
+		// and deactivates the main frame - that disables the main frame's menu
+		// accelerators (e.g. Ctrl+Z) while the hover tooltip is visible. The
+		// wxSTAY_ON_TOP style already keeps the tooltip above other windows.
 	}
 
 	void HideTooltip() {

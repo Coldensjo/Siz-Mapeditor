@@ -38,6 +38,9 @@ public:
 	void ReloadSettings(Map* from);
 	// Flushes all pages and forces them to be reloaded from the palette data again
 	void InvalidateContents();
+	// Refreshes only the page of a single tileset in the given category (if this
+	// palette holds it). Returns true if the page was found and refreshed.
+	bool RefreshTilesetPage(TilesetCategoryType type, const std::string& tilesetName);
 	// (Re)Loads all currently displayed data, called from InvalidateContents implicitly
 	void LoadCurrentContents();
 	// Goes to the selected page and selects any brush there

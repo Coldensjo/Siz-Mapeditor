@@ -25,6 +25,8 @@
 #include "brush_edit.h"
 #include "add_tileset_window.h"
 #include "add_item_window.h"
+#include "add_to_tileset_window.h"
+#include "raw_brush.h"
 #include "materials.h"
 #include "graphics.h"
 #include "sprites.h"
@@ -69,6 +71,23 @@ Brush* FirstSelectableBrush(const TilesetCategory* category) {
 		}
 	}
 	return nullptr;
+}
+
+// Ctrl+right-click on one or more RAW items opens the "Add to Tileset" dialog.
+void TryOpenAddToTileset(std::vector<uint16_t> ids, TilesetCategoryType currentType) {
+	if (ids.empty()) {
+		return;
+	}
+
+	AddToTilesetWindow* w = newd AddToTilesetWindow(g_gui.root, std::move(ids), currentType);
+	int ret = w->ShowModal();
+	const std::string changedTileset = w->GetResultTileset();
+	const TilesetCategoryType changedCategory = w->GetResultCategory();
+	w->Destroy();
+
+	if (ret != 0) {
+		g_gui.RefreshTilesetAddition(changedCategory, changedTileset);
+	}
 }
 } // namespace
 
@@ -315,6 +334,30 @@ void BrushPalettePanel::OnClickAddTileset(wxCommandEvent& WXUNUSED(event)) {
 	}
 }
 
+bool BrushPalettePanel::RefreshTilesetPage(const std::string& tilesetName) {
+	if (!choicebook) {
+		return false;
+	}
+
+	for (size_t i = 0; i < choicebook->GetPageCount(); ++i) {
+		if (choicebook->GetPageText(i).ToStdString() != tilesetName) {
+			continue;
+		}
+
+		BrushPanel* panel = dynamic_cast<BrushPanel*>(choicebook->GetPage(i));
+		if (panel) {
+			panel->InvalidateContents();
+			// Only rebuild the box for the page that's actually on screen; the
+			// rest reload lazily on their next OnSwitchIn.
+			if (static_cast<int>(i) == choicebook->GetSelection()) {
+				panel->LoadContents();
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
 void BrushPalettePanel::OnClickAddItemToTileset(wxCommandEvent& WXUNUSED(event)) {
 	if (!choicebook) {
 		return;
@@ -519,6 +562,7 @@ BEGIN_EVENT_TABLE(BrushIconBox, wxScrolledWindow)
 EVT_PAINT(BrushIconBox::OnPaint)
 EVT_SIZE(BrushIconBox::OnSize)
 EVT_LEFT_DOWN(BrushIconBox::OnMouseClick)
+EVT_RIGHT_DOWN(BrushIconBox::OnMouseRightClick)
 EVT_MOTION(BrushIconBox::OnMouseMotion)
 EVT_LEAVE_WINDOW(BrushIconBox::OnMouseLeave)
 END_EVENT_TABLE()
@@ -583,6 +627,7 @@ void BrushIconBox::RecalculateGrid() {
 	cells.clear();
 	cells.reserve(tileset->size());
 	selected_index = -1;
+	multi_selected.clear();
 
 	const int sep_height = 10;
 	const int full_width = columns * slot_size;
@@ -781,7 +826,8 @@ void BrushIconBox::OnPaint(wxPaintEvent& WXUNUSED(event)) {
 		if (r.GetBottom() < top || r.GetY() > bottom) {
 			continue;
 		}
-		DrawCell(dc, cells[i], static_cast<int>(i) == selected_index);
+		const bool sel = static_cast<int>(i) == selected_index || multi_selected.count(static_cast<int>(i)) > 0;
+		DrawCell(dc, cells[i], sel);
 	}
 }
 
@@ -888,10 +934,59 @@ void BrushIconBox::OnMouseClick(wxMouseEvent& event) {
 		return;
 	}
 
+	if (event.ShiftDown()) {
+		// Shift+click: toggle this cell in the multi-select set.
+		if (multi_selected.count(index)) {
+			multi_selected.erase(index);
+		} else {
+			multi_selected.insert(index);
+		}
+		Refresh();
+		return;
+	}
+
+	// Normal click: clear any multi-selection and select only this cell.
+	multi_selected.clear();
 	selected_index = index;
 	Refresh();
 	SetFocus();
 	HandleBrushSelection(brush);
+}
+
+void BrushIconBox::OnMouseRightClick(wxMouseEvent& event) {
+	if (!wxGetKeyState(WXK_CONTROL)) {
+		event.Skip();
+		return;
+	}
+
+	int ux = 0, uy = 0;
+	CalcUnscrolledPosition(event.GetX(), event.GetY(), &ux, &uy);
+	const int index = CellIndexAt(wxPoint(ux, uy));
+	if (index < 0) {
+		event.Skip();
+		return;
+	}
+
+	// Collect IDs from the clicked cell and every Shift-selected cell.
+	std::vector<uint16_t> ids;
+	auto collectRaw = [&](int idx) {
+		if (idx < 0 || idx >= static_cast<int>(cells.size())) return;
+		Brush* b = cells[idx].brush;
+		if (b && !b->isPaletteSeparator() && b->isRaw()) {
+			if (RAWBrush* raw = b->asRaw()) {
+				ids.push_back(raw->getItemID());
+			}
+		}
+	};
+
+	collectRaw(index);
+	for (int idx : multi_selected) {
+		if (idx != index) {
+			collectRaw(idx);
+		}
+	}
+
+	TryOpenAddToTileset(std::move(ids), tileset->getType());
 }
 
 // ============================================================================
@@ -901,6 +996,7 @@ BEGIN_EVENT_TABLE(BrushListBox, wxVListBox)
 EVT_KEY_DOWN(BrushListBox::OnKey)
 EVT_CHAR(BrushListBox::OnChar)
 EVT_MOTION(BrushListBox::OnMouseMotion)
+EVT_RIGHT_DOWN(BrushListBox::OnMouseRightClick)
 EVT_LEAVE_WINDOW(BrushListBox::OnMouseLeave)
 END_EVENT_TABLE()
 
@@ -937,6 +1033,26 @@ void BrushListBox::SelectFirstBrush() {
 			SetSelection(n);
 			wxWindow::ScrollLines(-1);
 			return;
+		}
+	}
+}
+
+void BrushListBox::OnMouseRightClick(wxMouseEvent& event) {
+	if (!wxGetKeyState(WXK_CONTROL) || !tileset) {
+		event.Skip();
+		return;
+	}
+
+	int n = VirtualHitTest(event.GetY());
+	if (n == wxNOT_FOUND || n < 0 || static_cast<size_t>(n) >= tileset->size()) {
+		event.Skip();
+		return;
+	}
+
+	Brush* b = tileset->brushlist[n];
+	if (b && !b->isPaletteSeparator() && b->isRaw()) {
+		if (RAWBrush* raw = b->asRaw()) {
+			TryOpenAddToTileset({ raw->getItemID() }, tileset->getType());
 		}
 	}
 }
@@ -1071,7 +1187,12 @@ void BrushListBox::OnKey(wxKeyEvent& event) {
 			} else {
 				[[fallthrough]];
 				default:
-					if (g_gui.GetCurrentTab() != nullptr) {
+					// Let menu accelerators (Ctrl+Z, Ctrl+X, Ctrl+C, ...) be handled
+					// by the frame instead of forwarding the raw key to the map canvas,
+					// where single-letter brush shortcuts would otherwise swallow them.
+					if (event.ControlDown() || event.AltDown()) {
+						event.Skip();
+					} else if (g_gui.GetCurrentTab() != nullptr) {
 						g_gui.GetCurrentMapTab()->GetEventHandler()->AddPendingEvent(event);
 					}
 			}

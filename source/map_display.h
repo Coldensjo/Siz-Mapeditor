@@ -96,6 +96,7 @@ public:
 	void OnSelectSpawnBrush(wxCommandEvent& event);
 	void OnSelectHouseBrush(wxCommandEvent& event);
 	void OnSelectMoveTo(wxCommandEvent& event);
+	void OnCreateWall(wxCommandEvent& event);
 	// ---
 	void OnProperties(wxCommandEvent& event);
 

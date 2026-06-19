@@ -348,6 +348,28 @@ void PaletteWindow::InvalidateContents() {
 	}
 }
 
+bool PaletteWindow::RefreshTilesetPage(TilesetCategoryType type, const std::string& tilesetName) {
+	BrushPalettePanel* panel = nullptr;
+	switch (type) {
+		case TILESET_TERRAIN:
+			panel = terrain_palette;
+			break;
+		case TILESET_DOODAD:
+			panel = doodad_palette;
+			break;
+		case TILESET_ITEM:
+			panel = item_palette;
+			break;
+		case TILESET_RAW:
+			panel = raw_palette;
+			break;
+		default:
+			break;
+	}
+
+	return panel ? panel->RefreshTilesetPage(tilesetName) : false;
+}
+
 void PaletteWindow::SelectPage(PaletteType id) {
 	if (id == GetSelectedPage()) {
 		return;

@@ -129,6 +129,16 @@ struct MapConfigSettings {
 // none at all) therefore stay open side by side instead of closing each other.
 wxString g_lastMapOverridesSignature;
 
+// The path overrides applied by the most recent map that carried a .config.
+// Re-applied when a later map of the same version has no overrides of its own,
+// so opening such a map keeps the active client settings instead of resetting
+// them to the persisted defaults (loadVersions() rebuilds the version objects on
+// every open, wiping any in-memory overrides).
+bool g_hasActiveAssetOverrides = false;
+ClientVersionID g_activeAssetOverrideVersion = CLIENT_VERSION_NONE;
+FileName g_activeAssetOverrideMapFile;
+MapConfigSettings g_activeAssetOverrideConfig;
+
 wxString TrimConfigValue(wxString value) {
 	value.Trim(true).Trim(false);
 	if (value.Length() >= 2) {
@@ -315,7 +325,11 @@ wxString ResolveConfiguredDirectory(const FileName& mapFileName, const wxString&
 	}
 
 	FileName resolvedPath;
-	resolvedPath.Assign(value);
+	// AssignDir (not Assign) so the whole value is treated as a directory. With
+	// Assign, a value without a trailing separator (e.g. ".../things/800") parses
+	// the last component as a filename and GetPath() drops it, leaving the wrong
+	// directory and breaking client/items/monster/npc asset lookup.
+	resolvedPath.AssignDir(value);
 	if (!resolvedPath.IsAbsolute()) {
 		const wxString mapDirectory = mapFileName.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
 		resolvedPath.Normalize(wxPATH_NORM_ALL, mapDirectory);
@@ -1134,11 +1148,30 @@ bool GUI::LoadMap(const FileName& fileName) {
 	ClientVersion::loadVersions();
 	resolvedClientVersion = ApplyMapConfigSettings(fileName, mapConfig, resolvedClientVersion);
 
+	// loadVersions() above rebuilds the version objects from the persisted
+	// defaults, so a map without its own overrides would otherwise revert the
+	// client paths. Remember the overrides of the map that supplied them and
+	// re-apply them for a later override-less map of the same version, so opening
+	// such a map keeps the active client settings instead of resetting them. The
+	// override signature is taken from whichever config is effectively in force so
+	// the inherited map matches the active one and does not trigger a reload.
+	wxString overridesSignature;
+	if (mapConfig.hasPathOverrides()) {
+		g_hasActiveAssetOverrides = true;
+		g_activeAssetOverrideVersion = resolvedClientVersion;
+		g_activeAssetOverrideMapFile = fileName;
+		g_activeAssetOverrideConfig = mapConfig;
+		overridesSignature = BuildMapOverridesSignature(fileName, resolvedClientVersion, mapConfig);
+	} else if (g_hasActiveAssetOverrides && resolvedClientVersion != CLIENT_VERSION_NONE && g_activeAssetOverrideVersion == resolvedClientVersion) {
+		MapConfigSettings inheritedConfig = g_activeAssetOverrideConfig;
+		ApplyMapConfigSettings(g_activeAssetOverrideMapFile, inheritedConfig, resolvedClientVersion);
+		overridesSignature = BuildMapOverridesSignature(g_activeAssetOverrideMapFile, resolvedClientVersion, g_activeAssetOverrideConfig);
+	}
+
 	// Only force a full asset reload (which closes every other open map) when this
-	// map's path overrides differ from the previous load's. A version mismatch is
-	// handled separately by the editor constructor, so maps that share the version
-	// and overrides (or use none) can stay open together.
-	const wxString overridesSignature = BuildMapOverridesSignature(fileName, resolvedClientVersion, mapConfig);
+	// map's effective path overrides differ from the previous load's. A version
+	// mismatch is handled separately by the editor constructor, so maps that share
+	// the version and overrides (or use none) can stay open together.
 	const bool forceReloadVersion = overridesSignature != g_lastMapOverridesSignature;
 	g_lastMapOverridesSignature = overridesSignature;
 
@@ -1636,6 +1669,21 @@ void GUI::RebuildPalettes() {
 	aui_manager->Update();
 }
 
+void GUI::RefreshTilesetAddition(TilesetCategoryType type, const std::string& tilesetName) {
+	bool found = false;
+	PaletteList tmp = palettes;
+	for (auto& palette : tmp) {
+		if (palette && palette->RefreshTilesetPage(type, tilesetName)) {
+			found = true;
+		}
+	}
+	// The page for this tileset/category does not exist yet (new tileset, or a
+	// category that previously had no entries) - structure changed, so rebuild.
+	if (!found) {
+		RebuildPalettes();
+	}
+}
+
 void GUI::ShowPalette() {
 	if (palettes.empty()) {
 		return;
@@ -1872,6 +1920,9 @@ void GUI::OnWelcomeDialogAction(wxCommandEvent& event) {
 }
 
 void GUI::UpdateMenubar() {
+	if (headless || !root) {
+		return;
+	}
 	root->UpdateMenubar();
 }
 

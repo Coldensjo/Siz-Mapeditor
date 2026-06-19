@@ -74,6 +74,7 @@ public:
 	void OnKey(wxKeyEvent& event);
 	void OnChar(wxKeyEvent& event); // Intercept Ctrl+A to prevent SelectAll assertion
 	void OnMouseMotion(wxMouseEvent& event);
+	void OnMouseRightClick(wxMouseEvent& event);
 	void OnMouseLeave(wxMouseEvent& event);
 
 	DECLARE_EVENT_TABLE();
@@ -106,6 +107,7 @@ public:
 	void OnPaint(wxPaintEvent& event);
 	void OnSize(wxSizeEvent& event);
 	void OnMouseClick(wxMouseEvent& event);
+	void OnMouseRightClick(wxMouseEvent& event);
 	void OnMouseMotion(wxMouseEvent& event);
 	void OnMouseLeave(wxMouseEvent& event);
 
@@ -129,6 +131,7 @@ protected:
 	int columns; // number of columns the layout was computed for
 	int virtual_height; // total height of the laid-out grid
 	int selected_index; // index into cells of the selected brush, or -1
+	std::set<int> multi_selected; // additional cells toggled via Shift+click
 
 	DECLARE_EVENT_TABLE();
 };
@@ -210,6 +213,12 @@ public:
 	wxChoicebook* GetChoicebook() const {
 		return choicebook;
 	}
+
+	// Refreshes the page belonging to the given tileset so a freshly added item
+	// shows up, without rebuilding the whole palette. Only the currently visible
+	// page is reloaded immediately; others are flagged to reload when next shown.
+	// Returns true if a page for the tileset exists in this panel.
+	bool RefreshTilesetPage(const std::string& tilesetName);
 
 	// Called when this page is displayed
 	void OnSwitchIn();

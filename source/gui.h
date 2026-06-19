@@ -394,6 +394,10 @@ public:
 	void ActivatePalette(PaletteWindow* p);
 	// Rebuild forces palette to reload the entire contents
 	void RebuildPalettes();
+	// Refresh just the page for a single tileset/category after an item was added
+	// to it, leaving the rest of the palette (and the current view) untouched.
+	// Falls back to a full rebuild only when the page does not exist yet.
+	void RefreshTilesetAddition(TilesetCategoryType type, const std::string& tilesetName);
 	// Refresh only updates the content (such as house/waypoint list)
 	void RefreshPalettes(Map* m = nullptr, bool usedfault = true);
 	// Won't refresh the palette in the parameter
