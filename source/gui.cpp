@@ -46,6 +46,14 @@
 #include "live_tab.h"
 #include "map_view_state.h"
 
+namespace {
+
+void ConfigureMinimapAuiPane(wxAuiPaneInfo& info) {
+	info.Caption("Minimap").CaptionVisible(false).Gripper(true).CloseButton(false);
+}
+
+} // namespace
+
 #ifdef __WXOSX__
 	#include <AGL/agl.h>
 #endif
@@ -1487,6 +1495,7 @@ void GUI::LoadPerspective() {
 
 				const wxString& data = wxstr(g_settings.getString(Config::MINIMAP_LAYOUT));
 				aui_manager->LoadPaneInfo(data, info);
+				ConfigureMinimapAuiPane(info);
 
 				minimap = newd MinimapWindow(root);
 				aui_manager->AddPane(minimap, info);
@@ -1495,6 +1504,7 @@ void GUI::LoadPerspective() {
 
 				const wxString& data = wxstr(g_settings.getString(Config::MINIMAP_LAYOUT));
 				aui_manager->LoadPaneInfo(data, info);
+				ConfigureMinimapAuiPane(info);
 			}
 
 			wxAuiPaneInfo& info = aui_manager->GetPane(minimap);
@@ -1517,6 +1527,9 @@ void GUI::LoadPerspective() {
 
 		aui_manager->Update();
 		root->UpdateMenubar();
+		if (minimap) {
+			minimap->UpdateCaptionChrome();
+		}
 	}
 
 	root->GetAuiToolBar()->LoadPerspective();
@@ -1727,9 +1740,14 @@ void GUI::CreateMinimap() {
 	} else {
 		minimap = newd MinimapWindow(root);
 		minimap->Show(true);
-		aui_manager->AddPane(minimap, wxAuiPaneInfo().Caption("Minimap"));
+		wxAuiPaneInfo info;
+		ConfigureMinimapAuiPane(info);
+		aui_manager->AddPane(minimap, info);
 	}
 	aui_manager->Update();
+	if (minimap) {
+		minimap->UpdateCaptionChrome();
+	}
 }
 
 void GUI::HideMinimap() {
@@ -1765,7 +1783,7 @@ void GUI::UpdateMinimap(bool immediate) {
 	if (IsMinimapVisible()) {
 		minimap->MarkDirty();
 		if (immediate) {
-			minimap->Refresh();
+			minimap->RefreshCanvas();
 		} else {
 			minimap->DelayedUpdate();
 		}
