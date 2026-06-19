@@ -20,6 +20,8 @@
 #include "carpet_brush.h"
 
 #include "basemap.h"
+#include "brush.h"
+#include "ground_brush.h"
 #include "items.h"
 
 //=============================================================================
@@ -28,7 +30,8 @@
 uint32_t CarpetBrush::carpet_types[256];
 
 CarpetBrush::CarpetBrush() :
-	look_id(0) {
+	look_id(0),
+	hate_friends(false) {
 	////
 }
 
@@ -47,7 +50,40 @@ bool CarpetBrush::load(pugi::xml_node node, wxArrayString& warnings) {
 	}
 
 	for (pugi::xml_node childNode = node.first_child(); childNode; childNode = childNode.next_sibling()) {
-		if (as_lower_str(childNode.name()) != "carpet") {
+		const std::string& childName = as_lower_str(childNode.name());
+		if (childName == "friend") {
+			const std::string& name = childNode.attribute("name").as_string();
+			if (!name.empty()) {
+				if (name == "all") {
+					friends.push_back(0xFFFFFFFF);
+				} else {
+					Brush* brush = g_brushes.getBrush(name);
+					if (brush && brush->isGround()) {
+						friends.push_back(brush->getID());
+					} else {
+						warnings.push_back("Brush '" + wxstr(name) + "' is not a ground brush.");
+					}
+				}
+			}
+			hate_friends = false;
+			continue;
+		} else if (childName == "enemy") {
+			const std::string& name = childNode.attribute("name").as_string();
+			if (!name.empty()) {
+				if (name == "all") {
+					friends.push_back(0xFFFFFFFF);
+				} else {
+					Brush* brush = g_brushes.getBrush(name);
+					if (brush && brush->isGround()) {
+						friends.push_back(brush->getID());
+					} else {
+						warnings.push_back("Brush '" + wxstr(name) + "' is not a ground brush.");
+					}
+				}
+			}
+			hate_friends = true;
+			continue;
+		} else if (childName != "carpet") {
 			continue;
 		}
 
@@ -147,8 +183,45 @@ bool CarpetBrush::canDraw(BaseMap* map, const Position& position) const {
 	return true;
 }
 
+bool CarpetBrush::hasFriendGround(const Tile* tile) const {
+	if (!tile || friends.empty()) {
+		return false;
+	}
+
+	GroundBrush* ground = tile->getGroundBrush();
+	if (!ground) {
+		return hate_friends;
+	}
+
+	for (uint32_t friendId : friends) {
+		if (friendId == ground->getID() || friendId == 0xFFFFFFFF) {
+			return !hate_friends;
+		}
+	}
+	return hate_friends;
+}
+
+bool CarpetBrush::hasMatchingNeighbour(BaseMap* map, uint32_t x, uint32_t y, uint32_t z) const {
+	Tile* tile = map->getTile(x, y, z);
+	if (!tile) {
+		return false;
+	}
+
+	for (Item* item : tile->items) {
+		if (item->getCarpetBrush() == this) {
+			return true;
+		}
+	}
+
+	return hasFriendGround(tile);
+}
+
 void CarpetBrush::draw(BaseMap* map, Tile* tile, void* parameter) {
 	undraw(map, tile); // Remove old
+	if (hasFriendGround(tile)) {
+		// Matching ground already carries these borders via automagic.
+		return;
+	}
 	tile->addItem(Item::Create(getRandomCarpet(CARPET_CENTER)));
 }
 
@@ -172,17 +245,7 @@ void CarpetBrush::undraw(BaseMap* map, Tile* tile) {
 
 void CarpetBrush::doCarpets(BaseMap* map, Tile* tile) {
 	static const auto hasMatchingCarpetBrushAtTile = [](BaseMap* map, CarpetBrush* carpetBrush, uint32_t x, uint32_t y, uint32_t z) -> bool {
-		Tile* tile = map->getTile(x, y, z);
-		if (!tile) {
-			return false;
-		}
-
-		for (Item* item : tile->items) {
-			if (item->getCarpetBrush() == carpetBrush) {
-				return true;
-			}
-		}
-		return false;
+		return carpetBrush->hasMatchingNeighbour(map, x, y, z);
 	};
 
 	ASSERT(tile);
@@ -194,16 +257,7 @@ void CarpetBrush::doCarpets(BaseMap* map, Tile* tile) {
 	uint32_t x = position.x;
 	uint32_t y = position.y;
 	uint32_t z = position.z;
-	/*
-	static const std::pair<int32_t, int32_t> positionOffset[8] = {
-		{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}
-	};
 
-	const auto& offset = positionOffset[i];
-	if(neighbours[i] && hasMatchingCarpetBrushAtTile(map, carpetBrush, x + offset.first, y + offset.second, z)) {
-		//
-	}
-	*/
 	for (Item* item : tile->items) {
 		ASSERT(item);
 
@@ -256,12 +310,10 @@ void CarpetBrush::doCarpets(BaseMap* map, Tile* tile) {
 		uint32_t tileData = 0;
 		for (uint32_t i = 0; i < 8; ++i) {
 			if (neighbours[i]) {
-				// Same table as this one, calculate what border
 				tileData |= static_cast<uint32_t>(1) << i;
 			}
 		}
 
-		// border type is always valid.
 		uint16_t id = carpetBrush->getRandomCarpet(static_cast<BorderType>(carpet_types[tileData]));
 		if (id != 0) {
 			item->setID(id);
@@ -294,7 +346,6 @@ uint16_t CarpetBrush::getRandomCarpet(BorderType alignment) {
 		}
 	}
 
-	// Find an item to place on the tile, first center, then the rest.
 	for (int32_t i = 0; i < 12; ++i) {
 		node = carpet_items[i];
 		if (node.total_chance > 0) {

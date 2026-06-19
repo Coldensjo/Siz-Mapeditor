@@ -64,6 +64,9 @@ public:
 		name = newName;
 	}
 
+	bool hasFriendGround(const Tile* tile) const;
+	bool hasMatchingNeighbour(BaseMap* map, uint32_t x, uint32_t y, uint32_t z) const;
+
 protected:
 	uint16_t getRandomCarpet(BorderType alignment);
 
@@ -83,6 +86,8 @@ protected:
 	CarpetNode carpet_items[14];
 	std::string name;
 	uint16_t look_id;
+	std::vector<uint32_t> friends;
+	bool hate_friends;
 
 	static uint32_t carpet_types[256];
 };
