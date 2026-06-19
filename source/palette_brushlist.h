@@ -45,9 +45,14 @@ public:
 	// Select the brush in the parameter, this only changes the look of the panel
 	virtual bool SelectBrush(const Brush* brush) = 0;
 
+	void SetPickerMode(bool picker) {
+		picker_mode = picker;
+	}
+
 protected:
 	const TilesetCategory* const tileset;
 	bool loaded;
+	bool picker_mode = false;
 };
 
 class BrushListBox : public wxVListBox, public BrushBoxInterface {
@@ -165,6 +170,7 @@ public:
 	Brush* GetSelectedBrush() const;
 	// Select the brush in the parameter, this only changes the look of the panel
 	bool SelectBrush(const Brush* whatbrush);
+	void SetPickerMode(bool picker);
 
 	// Called when the window is about to be displayed
 	void OnSwitchIn();
@@ -179,6 +185,7 @@ protected:
 	wxSizer* sizer;
 	BrushBoxInterface* brushbox;
 	bool loaded;
+	bool picker_mode = false;
 	BrushListType list_type;
 
 	DECLARE_EVENT_TABLE();

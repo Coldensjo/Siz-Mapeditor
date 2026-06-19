@@ -639,6 +639,51 @@ const GroundBrush::BorderBlock* GroundBrush::getBrushTo(GroundBrush* first, Grou
 	return nullptr;
 }
 
+bool GroundBrush::tileHasMatchingGround(Tile* tile, GroundBrush* sourceBrush) {
+	if (!tile || !sourceBrush) {
+		return false;
+	}
+	GroundBrush* groundBrush = tile->getGroundBrush();
+	return groundBrush && groundBrush->getID() == sourceBrush->getID();
+}
+
+void GroundBrush::collectConnectedTiles(BaseMap* map, const Position& start, GroundBrush* sourceBrush, PositionVector& out) {
+	out.clear();
+	if (!map || !start.isValid() || !sourceBrush) {
+		return;
+	}
+
+	if (!tileHasMatchingGround(map->getTile(start), sourceBrush)) {
+		return;
+	}
+
+	std::set<Position> visited;
+	std::deque<Position> queue;
+	queue.push_back(start);
+	visited.insert(start);
+
+	static const int dx[] = { 0, -1, 1, 0 };
+	static const int dy[] = { -1, 0, 0, 1 };
+
+	while (!queue.empty()) {
+		const Position pos = queue.front();
+		queue.pop_front();
+		out.push_back(pos);
+
+		for (int i = 0; i < 4; ++i) {
+			const Position neighbor(pos.x + dx[i], pos.y + dy[i], pos.z);
+			if (!neighbor.isValid() || visited.count(neighbor) != 0) {
+				continue;
+			}
+			if (!tileHasMatchingGround(map->getTile(neighbor), sourceBrush)) {
+				continue;
+			}
+			visited.insert(neighbor);
+			queue.push_back(neighbor);
+		}
+	}
+}
+
 inline GroundBrush* extractGroundBrushFromTile(BaseMap* map, uint32_t x, uint32_t y, uint32_t z) {
 	Tile* t = map->getTile(x, y, z);
 	return t ? t->getGroundBrush() : nullptr;

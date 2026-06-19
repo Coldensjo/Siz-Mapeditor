@@ -45,6 +45,8 @@ public:
 	virtual void draw(BaseMap* map, Tile* tile, void* parameter);
 	virtual void undraw(BaseMap* map, Tile* tile);
 	static void doBorders(BaseMap* map, Tile* tile);
+	static void collectConnectedTiles(BaseMap* map, const Position& start, GroundBrush* sourceBrush, PositionVector& out);
+	static bool tileHasMatchingGround(Tile* tile, GroundBrush* sourceBrush);
 	static const BorderBlock* getBrushTo(GroundBrush* first, GroundBrush* second);
 
 	virtual int32_t getZ() const {

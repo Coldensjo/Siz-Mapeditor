@@ -52,6 +52,10 @@ public:
 	// Creates walls on the target tile (does not depend on brush in any way)
 	static void doWalls(BaseMap* map, Tile* tile);
 
+	// Flood-fill all map tiles connected to start that share the same wall brush network.
+	static void collectConnectedTiles(BaseMap* map, const Position& start, WallBrush* sourceBrush, PositionVector& out);
+	static bool tileHasConnectableWall(Tile* tile, WallBrush* sourceBrush);
+
 	// If the specified wall item is part of this wall
 	bool hasWall(Item* item);
 	::DoorType getDoorTypeFromID(uint16_t id);

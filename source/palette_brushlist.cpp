@@ -395,6 +395,13 @@ BrushPanel::BrushPanel(wxWindow* parent) :
 	SetSizerAndFit(sizer);
 }
 
+void BrushPanel::SetPickerMode(bool picker) {
+	picker_mode = picker;
+	if (brushbox) {
+		brushbox->SetPickerMode(picker);
+	}
+}
+
 BrushPanel::~BrushPanel() {
 	////
 }
@@ -460,6 +467,7 @@ void BrushPanel::LoadContents() {
 			break;
 	}
 	ASSERT(brushbox != nullptr);
+	brushbox->SetPickerMode(picker_mode);
 	sizer->Add(brushbox->GetSelfWindow(), 1, wxEXPAND);
 	Fit();
 	brushbox->SelectFirstBrush();
@@ -514,6 +522,9 @@ void BrushPanel::OnSwitchOut() {
 
 void BrushPanel::OnClickListBoxRow(wxCommandEvent& event) {
 	if (!tileset || !brushbox) {
+		return;
+	}
+	if (picker_mode) {
 		return;
 	}
 	
@@ -900,6 +911,10 @@ void BrushIconBox::EnsureVisible(size_t n) {
 }
 
 void BrushIconBox::HandleBrushSelection(Brush* brush) {
+	if (picker_mode) {
+		return;
+	}
+
 	wxWindow* w = this;
 	while ((w = w->GetParent()) && dynamic_cast<PaletteWindow*>(w) == nullptr)
 		;

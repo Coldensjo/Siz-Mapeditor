@@ -44,6 +44,8 @@
 #include "application.h"
 #include "browse_tile_window.h"
 #include "wall_creator_window.h"
+#include "replace_wall_window.h"
+#include "replace_ground_window.h"
 
 #include "doodad_brush.h"
 #include "house_exit_brush.h"
@@ -203,7 +205,9 @@ EVT_MENU(MAP_POPUP_MENU_SELECT_CREATURE_BRUSH, MapCanvas::OnSelectCreatureBrush)
 EVT_MENU(MAP_POPUP_MENU_SELECT_SPAWN_BRUSH, MapCanvas::OnSelectSpawnBrush)
 EVT_MENU(MAP_POPUP_MENU_SELECT_HOUSE_BRUSH, MapCanvas::OnSelectHouseBrush)
 EVT_MENU(MAP_POPUP_MENU_MOVE_TO_TILESET, MapCanvas::OnSelectMoveTo)
-EVT_MENU(MAP_POPUP_MENU_CREATE_WALL, MapCanvas::OnCreateWall)
+EVT_MENU(	MAP_POPUP_MENU_CREATE_WALL, MapCanvas::OnCreateWall)
+EVT_MENU(MAP_POPUP_MENU_REPLACE_WALL, MapCanvas::OnReplaceWall)
+EVT_MENU(MAP_POPUP_MENU_REPLACE_GROUND, MapCanvas::OnReplaceGround)
 // ----
 EVT_MENU(MAP_POPUP_MENU_PROPERTIES, MapCanvas::OnProperties)
 // ----
@@ -2573,6 +2577,56 @@ void MapCanvas::OnCreateWall(wxCommandEvent& WXUNUSED(event)) {
 	}
 }
 
+void MapCanvas::OnReplaceWall(wxCommandEvent& WXUNUSED(event)) {
+	if (editor.selection.size() != 1) {
+		return;
+	}
+
+	Tile* tile = editor.selection.getSelectedTile();
+	if (!tile) {
+		return;
+	}
+
+	Item* wallItem = nullptr;
+	ItemVector selected_items = tile->getSelectedItems();
+	if (selected_items.size() == 1 && selected_items.front()->isWall()) {
+		wallItem = selected_items.front();
+	} else {
+		wallItem = tile->getWall();
+	}
+
+	if (!wallItem) {
+		return;
+	}
+
+	WallBrush* sourceBrush = wallItem->getWallBrush();
+	if (!sourceBrush || sourceBrush->isWallDecoration() || !sourceBrush->visibleInPalette()) {
+		return;
+	}
+
+	ReplaceWallDialog dialog(this, editor, tile->getPosition(), sourceBrush);
+	dialog.ShowModal();
+}
+
+void MapCanvas::OnReplaceGround(wxCommandEvent& WXUNUSED(event)) {
+	if (editor.selection.size() != 1) {
+		return;
+	}
+
+	Tile* tile = editor.selection.getSelectedTile();
+	if (!tile) {
+		return;
+	}
+
+	GroundBrush* sourceBrush = tile->getGroundBrush();
+	if (!sourceBrush || !sourceBrush->visibleInPalette()) {
+		return;
+	}
+
+	ReplaceGroundDialog dialog(this, editor, tile->getPosition(), sourceBrush);
+	dialog.ShowModal();
+}
+
 void MapCanvas::OnProperties(wxCommandEvent& WXUNUSED(event)) {
 	if (editor.selection.size() != 1) {
 		return;
@@ -2844,6 +2898,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 				if (hasWall) {
 					Append(MAP_POPUP_MENU_SELECT_WALL_BRUSH, "Select Wallbrush", "Uses the current item as a wallbrush");
+					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls with another wall brush");
 				}
 
 				if (hasCarpet) {
@@ -2864,6 +2919,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 				if (tile->hasGround() && tile->getGroundBrush() && tile->getGroundBrush()->visibleInPalette()) {
 					Append(MAP_POPUP_MENU_SELECT_GROUND_BRUSH, "Select Groundbrush", "Uses the current item as a groundbrush");
+					Append(MAP_POPUP_MENU_REPLACE_GROUND, "Replace &Ground...", "Replace all connected ground with another ground brush");
 				}
 
 
@@ -2886,9 +2942,11 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 				Append(MAP_POPUP_MENU_SELECT_RAW_BRUSH, "Select RAW", "Uses the top item as a RAW brush");
 				if (hasWall) {
 					Append(MAP_POPUP_MENU_SELECT_WALL_BRUSH, "Select Wallbrush", "Uses the current item as a wallbrush");
+					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls with another wall brush");
 				}
 				if (tile->hasGround() && tile->getGroundBrush() && tile->getGroundBrush()->visibleInPalette()) {
 					Append(MAP_POPUP_MENU_SELECT_GROUND_BRUSH, "Select Groundbrush", "Uses the current tile as a groundbrush");
+					Append(MAP_POPUP_MENU_REPLACE_GROUND, "Replace &Ground...", "Replace all connected ground with another ground brush");
 				}
 
 

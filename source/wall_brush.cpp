@@ -392,6 +392,69 @@ bool hasMatchingWallBrushAtTile(BaseMap* map, WallBrush* wall_brush, uint32_t x,
 	return false;
 }
 
+bool WallBrush::tileHasConnectableWall(Tile* tile, WallBrush* sourceBrush) {
+	if (!tile || !sourceBrush) {
+		return false;
+	}
+
+	for (Item* item : tile->items) {
+		if (!item->isWall()) {
+			continue;
+		}
+		WallBrush* wb = item->getWallBrush();
+		if (!wb || wb->isWallDecoration()) {
+			continue;
+		}
+		if (wb == sourceBrush || sourceBrush->friendOf(wb) || wb->friendOf(sourceBrush)) {
+			if (!g_items[item->getID()].wall_hate_me) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void WallBrush::collectConnectedTiles(BaseMap* map, const Position& start, WallBrush* sourceBrush, PositionVector& out) {
+	out.clear();
+	if (!map || !start.isValid() || !sourceBrush) {
+		return;
+	}
+
+	Tile* startTile = map->getTile(start);
+	if (!tileHasConnectableWall(startTile, sourceBrush)) {
+		return;
+	}
+
+	std::set<Position> visited;
+	std::deque<Position> queue;
+	queue.push_back(start);
+	visited.insert(start);
+
+	static const int dx[] = { 0, -1, 1, 0 };
+	static const int dy[] = { -1, 0, 0, 1 };
+
+	while (!queue.empty()) {
+		const Position pos = queue.front();
+		queue.pop_front();
+		out.push_back(pos);
+
+		for (int i = 0; i < 4; ++i) {
+			const Position neighbor(pos.x + dx[i], pos.y + dy[i], pos.z);
+			if (!neighbor.isValid() || visited.count(neighbor) != 0) {
+				continue;
+			}
+			if (!hasMatchingWallBrushAtTile(map, sourceBrush, neighbor.x, neighbor.y, neighbor.z)) {
+				continue;
+			}
+			if (!tileHasConnectableWall(map->getTile(neighbor), sourceBrush)) {
+				continue;
+			}
+			visited.insert(neighbor);
+			queue.push_back(neighbor);
+		}
+	}
+}
+
 void WallBrush::doWalls(BaseMap* map, Tile* tile) {
 	ASSERT(tile);
 
