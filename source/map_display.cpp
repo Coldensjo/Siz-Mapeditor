@@ -21,6 +21,7 @@
 #include <time.h>
 #include <limits>
 #include <algorithm>
+#include <map>
 #include <wx/wfstream.h>
 #include <wx/textdlg.h>
 #include <wx/msgdlg.h>
@@ -46,6 +47,7 @@
 #include "wall_creator_window.h"
 #include "replace_wall_window.h"
 #include "replace_ground_window.h"
+#include "find_item_window.h"
 
 #include "doodad_brush.h"
 #include "house_exit_brush.h"
@@ -147,6 +149,161 @@ bool extractWallSquare(Selection& selection, uint16_t pieceIds[4]) {
 	return true;
 }
 
+void getVisibleMapBounds(const MapCanvas& canvas, int& start_x, int& start_y, int& end_x, int& end_y, int& start_z, int& end_z) {
+	int view_scroll_x = 0;
+	int view_scroll_y = 0;
+	int screensize_x = 0;
+	int screensize_y = 0;
+	canvas.GetViewBox(&view_scroll_x, &view_scroll_y, &screensize_x, &screensize_y);
+
+	const double zoom = canvas.GetZoom();
+	const int current_floor = canvas.GetFloor();
+	const int tile_size = std::max(1, int(TileSize / zoom));
+
+	if (g_settings.getBoolean(Config::SHOW_ALL_FLOORS)) {
+		if (current_floor <= GROUND_LAYER) {
+			start_z = GROUND_LAYER;
+		} else {
+			start_z = std::min(MAP_MAX_LAYER, current_floor + 2);
+		}
+	} else {
+		start_z = current_floor;
+	}
+	end_z = current_floor;
+
+	start_x = view_scroll_x / TileSize;
+	start_y = view_scroll_y / TileSize;
+	if (current_floor > GROUND_LAYER) {
+		start_x -= 2;
+		start_y -= 2;
+	}
+	end_x = start_x + screensize_x / tile_size + 2;
+	end_y = start_y + screensize_y / tile_size + 2;
+
+	const int floor_expansion = start_z - end_z;
+	start_x -= floor_expansion;
+	start_y -= floor_expansion;
+	end_x += floor_expansion;
+	end_y += floor_expansion;
+}
+
+bool isItemDrawnInView(const Item* item, double zoom) {
+	if (!item) {
+		return false;
+	}
+
+	const ItemType& it = g_items.getItemType(item->getID());
+	if (it.isMetaItem()) {
+		return false;
+	}
+	if (!g_settings.getBoolean(Config::SHOW_ITEMS) && it.pickupable && !item->isGroundTile()) {
+		return false;
+	}
+	if (g_settings.getBoolean(Config::HIDE_ITEMS_WHEN_ZOOMED) && zoom > 10.0 && !item->isGroundTile()) {
+		return false;
+	}
+	return true;
+}
+
+void selectVisibleItemsById(MapCanvas& canvas, Editor& editor, uint16_t itemId) {
+	int start_x = 0;
+	int start_y = 0;
+	int end_x = 0;
+	int end_y = 0;
+	int start_z = 0;
+	int end_z = 0;
+	getVisibleMapBounds(canvas, start_x, start_y, end_x, end_y, start_z, end_z);
+
+	const double zoom = canvas.GetZoom();
+
+	editor.selection.start();
+	editor.selection.clear();
+	editor.selection.commit();
+
+	for (int map_z = start_z; map_z >= end_z; --map_z) {
+		for (int map_x = start_x; map_x <= end_x; ++map_x) {
+			for (int map_y = start_y; map_y <= end_y; ++map_y) {
+				Tile* tile = editor.map.getTile(map_x, map_y, map_z);
+				if (!tile) {
+					continue;
+				}
+
+				auto trySelect = [&](Item* item) {
+					if (item && item->getID() == itemId && isItemDrawnInView(item, zoom)) {
+						editor.selection.add(tile, item);
+					}
+				};
+
+				trySelect(tile->ground);
+				for (Item* item : tile->items) {
+					trySelect(item);
+				}
+			}
+		}
+	}
+
+	editor.selection.finish();
+	editor.selection.updateSelectionCount();
+}
+
+bool selectionHasSelectedItems(Selection& selection) {
+	for (Tile* tile : selection.getTiles()) {
+		if (tile->ground && tile->ground->isSelected()) {
+			return true;
+		}
+		for (Item* item : tile->items) {
+			if (item->isSelected()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void replaceSelectedItemsWith(Editor& editor, uint16_t withId) {
+	std::map<Tile*, std::vector<Item*>> itemsByTile;
+	for (Tile* tile : editor.selection.getTiles()) {
+		if (tile->ground && tile->ground->isSelected()) {
+			itemsByTile[tile].push_back(tile->ground);
+		}
+		for (Item* item : tile->items) {
+			if (item->isSelected()) {
+				itemsByTile[tile].push_back(item);
+			}
+		}
+	}
+
+	Action* action = editor.actionQueue->createAction(ACTION_REPLACE_ITEMS);
+	for (const auto& entry : itemsByTile) {
+		Tile* origTile = entry.first;
+		Tile* new_tile = origTile->deepCopy(editor.map);
+		bool changed = false;
+
+		for (Item* origItem : entry.second) {
+			const int index = origTile->getIndexOf(origItem);
+			if (index == wxNOT_FOUND) {
+				continue;
+			}
+			Item* item = new_tile->getItemAt(index);
+			if (!item || item->getID() == withId) {
+				continue;
+			}
+			transformItem(item, withId, new_tile);
+			changed = true;
+		}
+
+		if (changed) {
+			action->addChange(newd Change(new_tile));
+		}
+	}
+
+	if (action->size() > 0) {
+		editor.addAction(action);
+	} else {
+		delete action;
+	}
+}
+
 } // namespace
 
 BEGIN_EVENT_TABLE(MapCanvas, wxGLCanvas)
@@ -208,6 +365,7 @@ EVT_MENU(MAP_POPUP_MENU_MOVE_TO_TILESET, MapCanvas::OnSelectMoveTo)
 EVT_MENU(	MAP_POPUP_MENU_CREATE_WALL, MapCanvas::OnCreateWall)
 EVT_MENU(MAP_POPUP_MENU_REPLACE_WALL, MapCanvas::OnReplaceWall)
 EVT_MENU(MAP_POPUP_MENU_REPLACE_GROUND, MapCanvas::OnReplaceGround)
+EVT_MENU(MAP_POPUP_MENU_REPLACE_WITH_SEARCH, MapCanvas::OnReplaceWithSearchItem)
 // ----
 EVT_MENU(MAP_POPUP_MENU_PROPERTIES, MapCanvas::OnProperties)
 // ----
@@ -720,11 +878,22 @@ void MapCanvas::OnMouseLeftClick(wxMouseEvent& event) {
 }
 
 void MapCanvas::OnMouseLeftDoubleClick(wxMouseEvent& event) {
-	if (g_settings.getInteger(Config::DOUBLECLICK_PROPERTIES)) {
-		int mouse_map_x, mouse_map_y;
-		ScreenToMap(event.GetX(), event.GetY(), &mouse_map_x, &mouse_map_y);
-		Tile* tile = editor.map.getTile(mouse_map_x, mouse_map_y, floor);
+	int mouse_map_x, mouse_map_y;
+	ScreenToMap(event.GetX(), event.GetY(), &mouse_map_x, &mouse_map_y);
+	Tile* tile = editor.map.getTile(mouse_map_x, mouse_map_y, floor);
 
+	if (event.AltDown() && tile) {
+		if (Item* item = tile->getTopItem()) {
+			if (g_gui.IsDrawingMode()) {
+				g_gui.SetSelectionMode();
+			}
+			selectVisibleItemsById(*this, editor, item->getID());
+			g_gui.RefreshView();
+		}
+		return;
+	}
+
+	if (g_settings.getInteger(Config::DOUBLECLICK_PROPERTIES)) {
 		if (tile && tile->size() > 0) {
 			Tile* new_tile = tile->deepCopy(editor.map);
 			wxDialog* w = nullptr;
@@ -2627,6 +2796,28 @@ void MapCanvas::OnReplaceGround(wxCommandEvent& WXUNUSED(event)) {
 	dialog.ShowModal();
 }
 
+void MapCanvas::OnReplaceWithSearchItem(wxCommandEvent& WXUNUSED(event)) {
+	if (!selectionHasSelectedItems(editor.selection)) {
+		return;
+	}
+
+	FindItemDialog dialog(g_gui.root, "Replace With Item");
+	dialog.setSearchMode((FindItemDialog::SearchMode)g_settings.getInteger(Config::FIND_ITEM_MODE));
+	if (dialog.ShowModal() != wxID_OK) {
+		dialog.Destroy();
+		return;
+	}
+
+	const uint16_t withId = dialog.getResultID();
+	if (withId != 0) {
+		replaceSelectedItemsWith(editor, withId);
+		g_settings.setInteger(Config::FIND_ITEM_MODE, (int)dialog.getSearchMode());
+		g_gui.RefreshView();
+	}
+
+	dialog.Destroy();
+}
+
 void MapCanvas::OnProperties(wxCommandEvent& WXUNUSED(event)) {
 	if (editor.selection.size() != 1) {
 		return;
@@ -2761,8 +2952,11 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 	// Clear the menu of all items
 	while (GetMenuItemCount() != 0) {
 		wxMenuItem* m_item = FindItemByPosition(0);
-		// If you add a submenu, this won't delete it.
+		wxMenu* submenu = m_item->GetSubMenu();
 		Delete(m_item);
+		if (submenu) {
+			delete submenu;
+		}
 	}
 
 	const std::vector<const MapComment*> tileComments = editor.map.getComments().atPosition(cursorTile.x, cursorTile.y, cursorTile.z);
@@ -2800,6 +2994,14 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 	wxMenuItem* deleteItem = Append(MAP_POPUP_MENU_DELETE, "&Delete\tDEL", "Removes all seleceted items");
 	deleteItem->Enable(anything_selected);
+
+	const bool has_selected_items = selectionHasSelectedItems(editor.selection);
+	const bool allow_replace = has_selected_items && !editor.IsLiveClient();
+	if (allow_replace) {
+		wxMenu* replaceMenu = newd wxMenu;
+		replaceMenu->Append(MAP_POPUP_MENU_REPLACE_WITH_SEARCH, "Search for &Item...", "Replace selected items with another item");
+		AppendSubMenu(replaceMenu, "Replace &With", "Replace selected items with another item");
+	}
 
 	uint16_t wallPieces[4];
 	if (extractWallSquare(editor.selection, wallPieces)) {
@@ -2898,7 +3100,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 				if (hasWall) {
 					Append(MAP_POPUP_MENU_SELECT_WALL_BRUSH, "Select Wallbrush", "Uses the current item as a wallbrush");
-					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls with another wall brush");
+					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls, doors, and windows with another wall brush");
 				}
 
 				if (hasCarpet) {
@@ -2942,7 +3144,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 				Append(MAP_POPUP_MENU_SELECT_RAW_BRUSH, "Select RAW", "Uses the top item as a RAW brush");
 				if (hasWall) {
 					Append(MAP_POPUP_MENU_SELECT_WALL_BRUSH, "Select Wallbrush", "Uses the current item as a wallbrush");
-					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls with another wall brush");
+					Append(MAP_POPUP_MENU_REPLACE_WALL, "Replace &Wall...", "Replace all connected walls, doors, and windows with another wall brush");
 				}
 				if (tile->hasGround() && tile->getGroundBrush() && tile->getGroundBrush()->visibleInPalette()) {
 					Append(MAP_POPUP_MENU_SELECT_GROUND_BRUSH, "Select Groundbrush", "Uses the current tile as a groundbrush");

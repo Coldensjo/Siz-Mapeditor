@@ -99,6 +99,7 @@ public:
 	void OnCreateWall(wxCommandEvent& event);
 	void OnReplaceWall(wxCommandEvent& event);
 	void OnReplaceGround(wxCommandEvent& event);
+	void OnReplaceWithSearchItem(wxCommandEvent& event);
 	// ---
 	void OnProperties(wxCommandEvent& event);
 

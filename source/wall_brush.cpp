@@ -735,6 +735,46 @@ bool WallBrush::hasWall(Item* item) {
 	return WALL_UNDEFINED;
 }
 
+uint16_t WallBrush::findMatchingDoorItem(BorderType alignment, ::DoorType doorType, bool open, bool prefLocked) const {
+	if (alignment < 0 || alignment >= 17 || doorType == WALL_UNDEFINED) {
+		return 0;
+	}
+
+	uint16_t discarded_id = 0;
+	bool close_match = false;
+	const WallBrush* try_brush = this;
+
+	do {
+		for (const DoorType& dt : try_brush->door_items[int(alignment)]) {
+			if (dt.type != doorType) {
+				continue;
+			}
+
+			ItemType& it = g_items[dt.id];
+			if (it.id == 0) {
+				continue;
+			}
+
+			if (it.isOpen == open) {
+				if (open || dt.locked == prefLocked) {
+					return dt.id;
+				}
+				discarded_id = dt.id;
+				close_match = true;
+			} else {
+				discarded_id = dt.id;
+				close_match = true;
+			}
+			if (!close_match && discarded_id == 0) {
+				discarded_id = dt.id;
+			}
+		}
+		try_brush = try_brush->redirect_to;
+	} while (try_brush != this && try_brush != nullptr);
+
+	return discarded_id;
+}
+
 //=============================================================================
 // Wall Decoration brush
 

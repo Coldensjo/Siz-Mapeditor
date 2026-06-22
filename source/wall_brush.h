@@ -59,6 +59,7 @@ public:
 	// If the specified wall item is part of this wall
 	bool hasWall(Item* item);
 	::DoorType getDoorTypeFromID(uint16_t id);
+	uint16_t findMatchingDoorItem(BorderType alignment, ::DoorType doorType, bool open, bool prefLocked) const;
 
 	virtual bool canSmear() const {
 		return false;
