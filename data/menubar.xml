@@ -191,6 +191,7 @@
 		<item name="Highlight Locked Doors" hotkey="X" action="HIGHLIGHT_LOCKED_DOORS" help="Highlight doors that require key to open." />
 		<item name="Show Wall Hooks" hotkey="K" action="SHOW_WALL_HOOKS" help="Show indicators for wall hooks." />
 		<item name="Show fishable water" action="SHOW_FISHABLE_WATER" help="Show indicators for fishing spots." />
+		<item name="Show borders" action="SHOW_BORDERS" help="Show ground border items on the map." />
 	</menu>
 	<menu name="Navigate">
 		<item name="Go to Previous Position..." hotkey="P" action="GOTO_PREVIOUS_POSITION" help="Go to the previous screen center position." />
