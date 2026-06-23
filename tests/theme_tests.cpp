@@ -1,5 +1,9 @@
 #include "../source/theme.h"
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include <cassert>
 
 int main()
