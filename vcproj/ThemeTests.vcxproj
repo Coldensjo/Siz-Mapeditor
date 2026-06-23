@@ -41,11 +41,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>ThemeTests_x64</TargetName>
-    <IntDir>Project\$(Platform)\$(Configuration)\ThemeTests\</IntDir>
+    <OutDir>$(MSBuildThisFileDirectory)..\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\ThemeTests\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>ThemeTests_x64</TargetName>
-    <IntDir>Project\$(Platform)\$(Configuration)\ThemeTests\</IntDir>
+    <OutDir>$(MSBuildThisFileDirectory)..\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\ThemeTests\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
@@ -91,6 +93,9 @@
     <ClCompile Include="..\source\theme.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="RunThemeTests" DependsOnTargets="Build">
+    <Exec Command="&quot;$(TargetPath)&quot;" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
