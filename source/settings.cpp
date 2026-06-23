@@ -367,6 +367,7 @@ void Settings::IO(IOMode mode) {
 	String(PALETTE_DOODAD_STYLE, "actual icons");
 	String(PALETTE_ITEM_STYLE, "listbox");
 	String(PALETTE_RAW_STYLE, "listbox");
+	Int(UI_THEME, 0);
 
 	section("Network");
 	String(LIVE_HOST, "127.0.0.1");

@@ -213,6 +213,7 @@ namespace Config {
 		LIVE_CURSOR_ALPHA,
 
 		MAP_VIEW_POSITIONS,
+		UI_THEME,
 
 		LAST,
 	};
