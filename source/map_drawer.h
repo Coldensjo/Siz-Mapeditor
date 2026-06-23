@@ -119,6 +119,7 @@ struct DrawingOptions {
 	bool show_preview;
 	bool show_hooks;
 	bool show_fishable_water;
+	bool show_borders;
 	bool hide_items_when_zoomed;
 	bool show_towns;
 	bool always_show_zones;

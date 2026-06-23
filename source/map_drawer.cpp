@@ -83,6 +83,19 @@ bool isRampWarningItemId(uint32_t id) {
 	}
 }
 
+bool isInvalidItemSetWarningItemId(uint32_t id) {
+	switch (id) {
+		case 4542:
+		case 4543:
+		case 4544:
+		case 4545:
+		case 4608:
+			return true;
+		default:
+			return false;
+	}
+}
+
 bool isNonWalkableItem(const Item* item) {
 	if (!item) {
 		return false;
@@ -104,6 +117,41 @@ int getItemStackSize(const Tile* tile) {
 	}
 	size += static_cast<int>(tile->items.size());
 	return size;
+}
+
+bool tileHasInvalidItemSet(const Tile* tile) {
+	if (!tile) {
+		return false;
+	}
+
+	uint8_t found = 0;
+	const int stackSize = getItemStackSize(tile);
+	for (int i = 0; i < stackSize; ++i) {
+		Item* item = tile->getItemAt(i);
+		if (!item || !isInvalidItemSetWarningItemId(item->getID())) {
+			continue;
+		}
+
+		switch (item->getID()) {
+			case 4542:
+				found |= 1;
+				break;
+			case 4543:
+				found |= 2;
+				break;
+			case 4544:
+				found |= 4;
+				break;
+			case 4545:
+				found |= 8;
+				break;
+			case 4608:
+				found |= 16;
+				break;
+		}
+	}
+
+	return found == 31;
 }
 
 bool tileHasInvalidRamp(const Tile* tile, const BaseMap& map) {
@@ -323,6 +371,7 @@ void DrawingOptions::SetDefault() {
 	show_preview = false;
 	show_hooks = false;
 	show_fishable_water = false;
+	show_borders = true;
 	hide_items_when_zoomed = true;
 
 	show_towns = false;
@@ -367,6 +416,7 @@ void DrawingOptions::SetIngame() {
 	show_preview = false;
 	show_hooks = false;
 	show_fishable_water = false;
+	show_borders = true;
 	hide_items_when_zoomed = false;
 
 	show_towns = false;
@@ -723,6 +773,9 @@ void MapDrawer::DrawMap() {
 						if (zoom <= 10.0 || !options.hide_items_when_zoomed) {
 							ItemVector::iterator it;
 							for (it = tile->items.begin(); it != tile->items.end(); it++) {
+								if ((*it)->isBorder() && !options.show_borders) {
+									continue;
+								}
 								if ((*it)->isBorder()) {
 									BlitItem(draw_x, draw_y, tile, *it, true, 160, r, g, b);
 								} else {
@@ -1755,9 +1808,13 @@ void MapDrawer::DrawRampWarningIcons() {
 		return;
 	}
 
+	const GLboolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
 	glEnable(GL_TEXTURE_2D);
 	for (const MapRampWarningMarker& marker : ramp_warning_markers) {
 		BlitSpriteType(marker.draw_x, marker.draw_y, SPRITE_WARNING_SIGN, 255, 255, 64, 220);
+	}
+	if (!textureWasEnabled) {
+		glDisable(GL_TEXTURE_2D);
 	}
 }
 
@@ -2867,6 +2924,9 @@ void MapDrawer::DrawTile(TileLocation* location) {
 		if (zoom < 10.0 || !options.hide_items_when_zoomed) {
 			// items on tile
 			for (ItemVector::iterator it = tile->items.begin(); it != tile->items.end(); it++) {
+				if ((*it)->isBorder() && !options.show_borders) {
+					continue;
+				}
 				// item tooltip
 				if (options.show_tooltips && map_z == floor) {
 					WriteTooltip(*it, tileTooltip, tile->isHouseTile());
@@ -2929,6 +2989,11 @@ void MapDrawer::DrawTile(TileLocation* location) {
 				ramp_warning_markers.push_back(MapRampWarningMarker {
 					draw_x,
 					draw_y - TileSize / 2,
+				});
+			} else if (!options.ingame && tileHasInvalidItemSet(tile)) {
+				ramp_warning_markers.push_back(MapRampWarningMarker {
+					draw_x,
+					draw_y,
 				});
 			}
 
