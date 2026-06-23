@@ -147,6 +147,16 @@ void LiveServer::acceptClient() {
 				std::cout.flush();
 			}
 
+			// Enable TCP keepalive so the OS probes idle connections and reports
+			// an error when a peer dies silently (sleep, Wi-Fi drop, power loss)
+			// without sending FIN/RST. Without this the server's pending header
+			// read blocks forever and the peer lingers as a ghost -- a reconnect
+			// from the same user then shows up as a duplicate. no_delay matches the
+			// client side and avoids Nagle-batching the small live packets.
+			net_error_code optionError;
+			newSocket->set_option(asio::socket_base::keep_alive(true), optionError);
+			newSocket->set_option(asio::ip::tcp::no_delay(true), optionError);
+
 			LivePeer* peer = newd LivePeer(this, std::move(*newSocket));
 			peer->log = log;
 			peer->receiveHeader();

@@ -67,13 +67,20 @@ void LivePeer::close() {
 bool LivePeer::handleError(const net_error_code& error) {
 	if (error == asio::error::eof || error == asio::error::connection_reset) {
 		livePeerLog(log, wxString() + getHostName() + ": disconnected.");
-		close();
-		return true;
 	} else if (error == asio::error::connection_aborted) {
 		livePeerLog(log, name + " have left the server.");
-		return true;
+	} else {
+		// Any other socket error (keepalive timeout, network drop, host
+		// unreachable, ...) also means the peer is gone. These do NOT report as
+		// eof/connection_reset, so they must still tear the connection down --
+		// otherwise the peer lingers in the server's client map with its client
+		// id still allocated, and a reconnect from the same user shows up as a
+		// duplicate.
+		livePeerLog(log, wxString() + getHostName() + ": " + error.message());
 	}
-	return false;
+	// Always remove the peer; every error path here is terminal for the socket.
+	close();
+	return true;
 }
 
 std::string LivePeer::getHostName() const {
@@ -97,6 +104,7 @@ void LivePeer::receiveHeader() {
 				}
 			} else if (bytesReceived < 4) {
 				livePeerLog(log, wxString() + getHostName() + ": Could not receive header[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
+				close();
 			} else {
 				const uint32_t packetSize = readMessage.read<uint32_t>();
 				receive(packetSize);
@@ -115,6 +123,7 @@ void LivePeer::receive(uint32_t packetSize) {
 				}
 			} else if (bytesReceived < readMessage.buffer.size() - 4) {
 				livePeerLog(log, wxString() + getHostName() + ": Could not receive packet[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
+				close();
 			} else {
 				NetworkMessage packet = std::move(readMessage);
 				if (connected) {
