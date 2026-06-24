@@ -17,30 +17,76 @@
 
 #include "main.h"
 
-#include <wx/collpane.h>
-
 #include "settings.h"
 #include "client_version.h"
 #include "editor.h"
 #include "theme.h"
-
 #include "gui.h"
-
 #include "preferences.h"
+
+namespace {
+
+wxTextCtrl* AddFileRow(wxWindow* parent, wxSizer* sizer, const wxString& initialPath, const wxString& wildcard, const wxString& tooltip) {
+	auto* rowSizer = newd wxBoxSizer(wxHORIZONTAL);
+	auto* pathCtrl = newd wxTextCtrl(parent, wxID_ANY, initialPath);
+	auto* browseBtn = newd wxButton(parent, wxID_ANY, "...", wxDefaultPosition, FROM_DIP(parent, wxSize(28, -1)));
+	rowSizer->Add(pathCtrl, 1, wxEXPAND);
+	rowSizer->Add(browseBtn, 0, wxLEFT, 5);
+	sizer->Add(rowSizer, wxSizerFlags(0).Border(wxLEFT | wxRIGHT | wxTOP | wxEXPAND, 25));
+
+	pathCtrl->SetToolTip(tooltip);
+
+	browseBtn->Bind(wxEVT_BUTTON, [parent, pathCtrl, wildcard](wxCommandEvent&) {
+		wxFileDialog dlg(parent, "Select file", "", pathCtrl->GetValue(), wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+		if (dlg.ShowModal() == wxID_OK) {
+			pathCtrl->SetValue(dlg.GetPath());
+		}
+	});
+
+	return pathCtrl;
+}
+
+wxString NormalizeDirectoryPath(wxString dir) {
+	if (dir.Length() > 0 && dir.Last() != '/' && dir.Last() != '\\') {
+		dir.Append(FileName::GetPathSeparator());
+	}
+	return dir;
+}
+
+wxBoxSizer* CreateBrowsePathRow(wxWindow* parent, wxTextCtrl** pathOut, const wxString& initialPath, const wxString& tooltip) {
+	auto* rowSizer = newd wxBoxSizer(wxHORIZONTAL);
+	*pathOut = newd wxTextCtrl(parent, wxID_ANY, initialPath);
+	auto* browseBtn = newd wxButton(parent, wxID_ANY, "...", wxDefaultPosition, FROM_DIP(parent, wxSize(28, -1)));
+	rowSizer->Add(*pathOut, 1, wxEXPAND);
+	rowSizer->Add(browseBtn, 0, wxLEFT, 5);
+	(*pathOut)->SetToolTip(tooltip);
+
+	browseBtn->Bind(wxEVT_BUTTON, [parent, pathOut](wxCommandEvent&) {
+		wxDirDialog dlg(parent, "Select directory", (*pathOut)->GetValue());
+		if (dlg.ShowModal() == wxID_OK) {
+			(*pathOut)->SetValue(dlg.GetPath());
+		}
+	});
+
+	return rowSizer;
+}
+
+} // namespace
 
 BEGIN_EVENT_TABLE(PreferencesWindow, wxDialog)
 EVT_BUTTON(wxID_OK, PreferencesWindow::OnClickOK)
 EVT_BUTTON(wxID_CANCEL, PreferencesWindow::OnClickCancel)
 EVT_BUTTON(wxID_APPLY, PreferencesWindow::OnClickApply)
-EVT_COLLAPSIBLEPANE_CHANGED(wxID_ANY, PreferencesWindow::OnCollapsiblePane)
+EVT_NOTEBOOK_PAGE_CHANGED(wxID_ANY, PreferencesWindow::OnNotebookPageChanged)
 END_EVENT_TABLE()
 
-PreferencesWindow::PreferencesWindow(wxWindow* parent, bool clientVersionSelected = false) : wxDialog(parent, wxID_ANY, "Preferences", wxDefaultPosition, wxSize(400, 400), wxCAPTION | wxCLOSE_BOX) {
+PreferencesWindow::PreferencesWindow(wxWindow* parent, bool clientVersionSelected) :
+	wxDialog(parent, wxID_ANY, "Preferences", wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER) {
+	Freeze();
+
 	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
 
 	book = newd wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_TOP);
-	// book->SetPadding(4);
-
 	book->AddPage(CreateGeneralPage(), "General", true);
 	book->AddPage(CreateEditorPage(), "Editor");
 	book->AddPage(CreateGraphicsPage(), "Graphics");
@@ -55,20 +101,30 @@ PreferencesWindow::PreferencesWindow(wxWindow* parent, bool clientVersionSelecte
 	subsizer->Add(newd wxButton(this, wxID_APPLY, "Apply"), wxSizerFlags(1).Center());
 	sizer->Add(subsizer, 0, wxCENTER | wxLEFT | wxBOTTOM | wxRIGHT, 10);
 
-	SetSizerAndFit(sizer);
+	SetSizer(sizer);
+	SetMinSize(FROM_DIP(this, wxSize(420, 480)));
+	Layout();
 	Centre(wxBOTH);
-	// FindWindowById(PANE_ADVANCED_GRAPHICS, this)->GetParent()->Fit();
+
+	if (clientVersionSelected) {
+		EnsureClientVersionListBuilt();
+	}
+
+	Thaw();
 }
 
-PreferencesWindow::~PreferencesWindow() {
-	////
+void PreferencesWindow::OnNotebookPageChanged(wxBookCtrlEvent& event) {
+	if (event.GetSelection() == CLIENT_PAGE_INDEX) {
+		EnsureClientVersionListBuilt();
+	}
+	event.Skip();
 }
 
 wxNotebookPage* PreferencesWindow::CreateGeneralPage() {
 	wxNotebookPage* general_page = newd wxPanel(book, wxID_ANY);
 
 	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
-	wxStaticText* tmptext;
+	wxStaticText* tmptext = nullptr;
 
 	show_welcome_dialog_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Show welcome dialog on startup");
 	show_welcome_dialog_chkbox->SetValue(g_settings.getInteger(Config::WELCOME_DIALOG) == 1);
@@ -76,24 +132,22 @@ wxNotebookPage* PreferencesWindow::CreateGeneralPage() {
 	sizer->Add(show_welcome_dialog_chkbox, 0, wxLEFT | wxTOP, 5);
 
 	open_map_on_startup_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Always open this map on startup");
-	bool open_map_on_startup_enabled = g_settings.getInteger(Config::OPEN_MAP_ON_STARTUP) == 1;
+	const bool open_map_on_startup_enabled = g_settings.getInteger(Config::OPEN_MAP_ON_STARTUP) == 1;
 	open_map_on_startup_chkbox->SetValue(open_map_on_startup_enabled);
 	open_map_on_startup_chkbox->SetToolTip("Automatically open the selected map when starting the editor.");
 	sizer->Add(open_map_on_startup_chkbox, 0, wxLEFT | wxTOP, 5);
 
-	wxString map_wildcard = g_settings.getInteger(Config::USE_OTGZ) != 0 ? "(*.otbm;*.otgz)|*.otbm;*.otgz" : "(*.otbm)|*.otbm|Compressed OpenTibia Binary Map (*.otgz)|*.otgz";
-	open_map_on_startup_picker = newd wxFilePickerCtrl(
+	const wxString map_wildcard = g_settings.getInteger(Config::USE_OTGZ) != 0 ?
+		"(*.otbm;*.otgz)|*.otbm;*.otgz" :
+		"(*.otbm)|*.otbm|Compressed OpenTibia Binary Map (*.otgz)|*.otgz";
+	open_map_on_startup_path = AddFileRow(
 		general_page,
-		wxID_ANY,
+		sizer,
 		wxstr(g_settings.getString(Config::OPEN_MAP_ON_STARTUP_PATH)),
-		"Select map to open on startup",
 		map_wildcard,
-		wxDefaultPosition,
-		wxDefaultSize,
-		wxFLP_USE_TEXTCTRL | wxFLP_OPEN
+		"Map file to open automatically when the editor starts."
 	);
-	open_map_on_startup_picker->Enable(open_map_on_startup_enabled);
-	sizer->Add(open_map_on_startup_picker, 0, wxLEFT | wxRIGHT | wxTOP | wxEXPAND, 25);
+	open_map_on_startup_path->Enable(open_map_on_startup_enabled);
 
 	if (open_map_on_startup_enabled) {
 		show_welcome_dialog_chkbox->SetValue(false);
@@ -101,8 +155,8 @@ wxNotebookPage* PreferencesWindow::CreateGeneralPage() {
 	}
 
 	open_map_on_startup_chkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
-		bool enabled = event.IsChecked();
-		open_map_on_startup_picker->Enable(enabled);
+		const bool enabled = event.IsChecked();
+		open_map_on_startup_path->Enable(enabled);
 		if (enabled) {
 			show_welcome_dialog_chkbox->SetValue(false);
 			show_welcome_dialog_chkbox->Enable(false);
@@ -163,21 +217,22 @@ wxNotebookPage* PreferencesWindow::CreateGeneralPage() {
 	sizer->Add(grid_sizer, 0, wxALL, 5);
 	sizer->AddSpacer(10);
 
-	wxString position_choices[] = { "  {x = 0, y = 0, z = 0}",
-									R"(  {"x":0,"y":0,"z":0})",
-									"  x, y, z",
-									"  (x, y, z)",
-									"  Position(x, y, z)",
-									"  x=\"x\" y=\"y\" z=\"z\"",
-									"  centerx=\"x\" centery=\"y\" centerz=\"z\"" };
-	int radio_choices = sizeof(position_choices) / sizeof(wxString);
+	wxString position_choices[] = {
+		"  {x = 0, y = 0, z = 0}",
+		R"(  {"x":0,"y":0,"z":0})",
+		"  x, y, z",
+		"  (x, y, z)",
+		"  Position(x, y, z)",
+		"  x=\"x\" y=\"y\" z=\"z\"",
+		"  centerx=\"x\" centery=\"y\" centerz=\"z\""
+	};
+	const int radio_choices = sizeof(position_choices) / sizeof(wxString);
 	position_format = new wxRadioBox(general_page, wxID_ANY, "Copy Position Format", wxDefaultPosition, wxDefaultSize, radio_choices, position_choices, 1, wxRA_SPECIFY_COLS);
 	position_format->SetSelection(g_settings.getInteger(Config::COPY_POSITION_FORMAT));
 	sizer->Add(position_format, 0, wxALL | wxEXPAND, 5);
-	SetWindowToolTip(tmptext, position_format, "The position format when copying from the map.");
+	SetWindowToolTip(position_format, "The position format when copying from the map.");
 
-	general_page->SetSizerAndFit(sizer);
-
+	general_page->SetSizer(sizer);
 	return general_page;
 }
 
@@ -243,13 +298,12 @@ wxNotebookPage* PreferencesWindow::CreateEditorPage() {
 	live_allow_clipboard_chkbox->SetToolTip("When connected to a live map server, enable cut, copy, and paste.\nCan also be set in editor.cfg as LIVE_ALLOW_CLIPBOARD=1 under [Network].");
 	sizer->Add(live_allow_clipboard_chkbox, 0, wxLEFT | wxTOP, 5);
 
-	editor_page->SetSizerAndFit(sizer);
-
+	editor_page->SetSizer(sizer);
 	return editor_page;
 }
 
 wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
-	wxWindow* tmp;
+	wxWindow* tmp = nullptr;
 	wxNotebookPage* graphics_page = newd wxPanel(book, wxID_ANY);
 
 	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
@@ -284,37 +338,25 @@ wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
 	auto* subsizer = newd wxFlexGridSizer(2, 10, 10);
 	subsizer->AddGrowableCol(1);
 
-	// Icon background color
 	icon_background_choice = newd wxChoice(graphics_page, wxID_ANY);
 	icon_background_choice->Append("Transparent background");
 	icon_background_choice->Append("Black background");
 	icon_background_choice->Append("Gray background");
 	icon_background_choice->Append("White background");
-	if (g_settings.getInteger(Config::ICON_BACKGROUND) == 255) {
-		icon_background_choice->SetSelection(3);
-	} else if (g_settings.getInteger(Config::ICON_BACKGROUND) == 88) {
-		icon_background_choice->SetSelection(2);
-	} else if (g_settings.getInteger(Config::ICON_BACKGROUND) == 0) {
-		icon_background_choice->SetSelection(1);
-	} else {
-		icon_background_choice->SetSelection(0);
-	}
+	SetIconBackgroundSelection(IconBackgroundSelection());
 
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Icon background color: "), 0);
 	subsizer->Add(icon_background_choice, 0);
 	SetWindowToolTip(icon_background_choice, tmp, "This will change the background color on icons in all windows.");
 
-	// Cursor colors
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Cursor color: "), 0);
 	subsizer->Add(cursor_color_pick = newd wxColourPickerCtrl(graphics_page, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_RED), g_settings.getInteger(Config::CURSOR_GREEN), g_settings.getInteger(Config::CURSOR_BLUE), g_settings.getInteger(Config::CURSOR_ALPHA))), 0);
-	SetWindowToolTip(icon_background_choice, tmp, "The color of the main cursor on the map (while in drawing mode).");
+	SetWindowToolTip(cursor_color_pick, tmp, "The color of the main cursor on the map (while in drawing mode).");
 
-	// Alternate cursor color
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Secondary cursor color: "), 0);
 	subsizer->Add(cursor_alt_color_pick = newd wxColourPickerCtrl(graphics_page, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_ALT_RED), g_settings.getInteger(Config::CURSOR_ALT_GREEN), g_settings.getInteger(Config::CURSOR_ALT_BLUE), g_settings.getInteger(Config::CURSOR_ALT_ALPHA))), 0);
-	SetWindowToolTip(icon_background_choice, tmp, "The color of the secondary cursor on the map (for houses and flags).");
+	SetWindowToolTip(cursor_alt_color_pick, tmp, "The color of the secondary cursor on the map (for houses and flags).");
 
-	// Crosshair color
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Crosshair color: "), 0);
 	mouse_crosshair_color_pick = newd wxColourPickerCtrl(
 		graphics_page,
@@ -332,7 +374,6 @@ wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
 		mouse_crosshair_color_pick->Enable(event.IsChecked());
 	});
 
-	// Viewport background color
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Viewport background color: "), 0);
 	viewport_background_color_pick = newd wxColourPickerCtrl(
 		graphics_page,
@@ -346,27 +387,21 @@ wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
 	subsizer->Add(viewport_background_color_pick, 0);
 	SetWindowToolTip(viewport_background_color_pick, tmp, "Sets the solid colour behind the map view to reduce eye strain or improve contrast with tiles.");
 
-	// Screenshot dir
 	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Screenshot directory: "), 0);
-	screenshot_directory_picker = newd wxDirPickerCtrl(graphics_page, wxID_ANY);
-	subsizer->Add(screenshot_directory_picker, 1, wxEXPAND);
-	wxString ss = wxstr(g_settings.getString(Config::SCREENSHOT_DIRECTORY));
-	screenshot_directory_picker->SetPath(ss);
-	SetWindowToolTip(screenshot_directory_picker, "Screenshot taken in the editor will be saved to this directory.");
+	subsizer->Add(CreateBrowsePathRow(graphics_page, &screenshot_directory_path, wxstr(g_settings.getString(Config::SCREENSHOT_DIRECTORY)), "Screenshots taken in the editor will be saved to this directory."), 1, wxEXPAND);
+	SetWindowToolTip(screenshot_directory_path, tmp, "Screenshots taken in the editor will be saved to this directory.");
 
-	// Screenshot format
 	screenshot_format_choice = newd wxChoice(graphics_page, wxID_ANY);
 	screenshot_format_choice->Append("PNG");
 	screenshot_format_choice->Append("JPG");
 	screenshot_format_choice->Append("TGA");
 	screenshot_format_choice->Append("BMP");
-	if (g_settings.getString(Config::SCREENSHOT_FORMAT) == "png") {
-		screenshot_format_choice->SetSelection(0);
-	} else if (g_settings.getString(Config::SCREENSHOT_FORMAT) == "jpg") {
+	const std::string screenshot_format = g_settings.getString(Config::SCREENSHOT_FORMAT);
+	if (screenshot_format == "jpg") {
 		screenshot_format_choice->SetSelection(1);
-	} else if (g_settings.getString(Config::SCREENSHOT_FORMAT) == "tga") {
+	} else if (screenshot_format == "tga") {
 		screenshot_format_choice->SetSelection(2);
-	} else if (g_settings.getString(Config::SCREENSHOT_FORMAT) == "bmp") {
+	} else if (screenshot_format == "bmp") {
 		screenshot_format_choice->SetSelection(3);
 	} else {
 		screenshot_format_choice->SetSelection(0);
@@ -376,65 +411,13 @@ wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
 	SetWindowToolTip(screenshot_format_choice, tmp, "This will affect the screenshot format used by the editor.\nTo take a screenshot, press F11.");
 
 	sizer->Add(subsizer, 1, wxEXPAND | wxALL, 5);
-
-	// Advanced g_settings
-	/*
-	wxCollapsiblePane* pane = newd wxCollapsiblePane(graphics_page, PANE_ADVANCED_GRAPHICS, "Advanced g_settings");
-	{
-		wxSizer* pane_sizer = newd wxBoxSizer(wxVERTICAL);
-
-		pane_sizer->Add(texture_managment_chkbox = newd wxCheckBox(pane->GetPane(), wxID_ANY, "Use texture managment"));
-		if(g_settings.getInteger(Config::TEXTURE_MANAGEMENT)) {
-			texture_managment_chkbox->SetValue(true);
-		}
-		pane_sizer->AddSpacer(8);
-
-		wxFlexGridSizer* pane_grid_sizer = newd wxFlexGridSizer(2, 10, 10);
-		pane_grid_sizer->AddGrowableCol(1);
-
-		pane_grid_sizer->Add(tmp = newd wxStaticText(pane->GetPane(), wxID_ANY, "Texture clean interval: "), 0);
-		clean_interval_spin = newd wxSpinCtrl(pane->GetPane(), wxID_ANY, i2ws(g_settings.getInteger(Config::TEXTURE_CLEAN_PULSE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0x1000000);
-		pane_grid_sizer->Add(clean_interval_spin, 0);
-		SetWindowToolTip(clean_interval_spin, tmp, "This controls how often the editor tries to free hardware texture resources.");
-
-		pane_grid_sizer->Add(tmp = newd wxStaticText(pane->GetPane(), wxID_ANY, "Texture longevity: "), 0);
-		texture_longevity_spin = newd wxSpinCtrl(pane->GetPane(), wxID_ANY, i2ws(g_settings.getInteger(Config::TEXTURE_LONGEVITY)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0x1000000);
-		pane_grid_sizer->Add(texture_longevity_spin, 0);
-		SetWindowToolTip(texture_longevity_spin, tmp, "This controls for how long (in seconds) that the editor will keep textures in memory before it cleans them up.");
-
-		pane_grid_sizer->Add(tmp = newd wxStaticText(pane->GetPane(), wxID_ANY, "Texture clean threshold: "), 0);
-		texture_threshold_spin = newd wxSpinCtrl(pane->GetPane(), wxID_ANY, i2ws(g_settings.getInteger(Config::TEXTURE_CLEAN_THRESHOLD)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 100, 0x1000000);
-		pane_grid_sizer->Add(texture_threshold_spin, 0);
-		SetWindowToolTip(texture_threshold_spin, tmp, "This controls how many textures the editor will hold in memory before it attempts to clean up old textures. However, an infinite amount MIGHT be loaded.");
-
-		pane_grid_sizer->Add(tmp = newd wxStaticText(pane->GetPane(), wxID_ANY, "Software clean threshold: "), 0);
-		software_threshold_spin = newd wxSpinCtrl(pane->GetPane(), wxID_ANY, i2ws(g_settings.getInteger(Config::SOFTWARE_CLEAN_THRESHOLD)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 100, 0x1000000);
-		pane_grid_sizer->Add(software_threshold_spin, 0);
-		SetWindowToolTip(software_threshold_spin, tmp, "This controls how many GUI sprites (icons) the editor will hold in memory at the same time.");
-
-		pane_grid_sizer->Add(tmp = newd wxStaticText(pane->GetPane(), wxID_ANY, "Software clean amount: "), 0);
-		software_clean_amount_spin = newd wxSpinCtrl(pane->GetPane(), wxID_ANY, i2ws(g_settings.getInteger(Config::SOFTWARE_CLEAN_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 0x1000000);
-		pane_grid_sizer->Add(software_clean_amount_spin, 0);
-		SetWindowToolTip(software_clean_amount_spin, tmp, "How many sprites the editor will free at once when the limit is exceeded.");
-
-		pane_sizer->Add(pane_grid_sizer, 0, wxEXPAND);
-
-		pane->GetPane()->SetSizerAndFit(pane_sizer);
-
-		pane->Collapse();
-	}
-
-	sizer->Add(pane, 0);
-	*/
-
-	graphics_page->SetSizerAndFit(sizer);
-
+	graphics_page->SetSizer(sizer);
 	return graphics_page;
 }
 
 wxChoice* PreferencesWindow::AddPaletteStyleChoice(wxWindow* parent, wxSizer* sizer, const wxString& short_description, const wxString& description, const std::string& setting) {
-	wxStaticText* text;
-	sizer->Add(text = newd wxStaticText(parent, wxID_ANY, short_description), 0);
+	wxStaticText* text = newd wxStaticText(parent, wxID_ANY, short_description);
+	sizer->Add(text, 0);
 
 	wxChoice* choice = newd wxChoice(parent, wxID_ANY);
 	sizer->Add(choice, 0);
@@ -461,15 +444,26 @@ wxChoice* PreferencesWindow::AddPaletteStyleChoice(wxWindow* parent, wxSizer* si
 }
 
 void PreferencesWindow::SetPaletteStyleChoice(wxChoice* ctrl, int key) {
-	if (ctrl->GetSelection() == 0) {
-		g_settings.setString(key, "large icons");
-	} else if (ctrl->GetSelection() == 1) {
-		g_settings.setString(key, "small icons");
-	} else if (ctrl->GetSelection() == 2) {
-		g_settings.setString(key, "listbox");
-	} else if (ctrl->GetSelection() == 3) {
-		g_settings.setString(key, "actual icons");
+	switch (ctrl->GetSelection()) {
+		case 0: g_settings.setString(key, "large icons"); break;
+		case 1: g_settings.setString(key, "small icons"); break;
+		case 2: g_settings.setString(key, "listbox"); break;
+		case 3: g_settings.setString(key, "actual icons"); break;
+		default: break;
 	}
+}
+
+int PreferencesWindow::IconBackgroundSelection() const {
+	switch (g_settings.getInteger(Config::ICON_BACKGROUND)) {
+		case 255: return 3;
+		case 88: return 2;
+		case 0: return 1;
+		default: return 0;
+	}
+}
+
+void PreferencesWindow::SetIconBackgroundSelection(int selection) {
+	icon_background_choice->SetSelection(selection);
 }
 
 wxNotebookPage* PreferencesWindow::CreateUIPage() {
@@ -512,7 +506,6 @@ wxNotebookPage* PreferencesWindow::CreateUIPage() {
 	);
 
 	sizer->Add(subsizer, 0, wxALL, 6);
-
 	sizer->AddSpacer(10);
 
 	large_terrain_tools_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large terrain palette tool && size icons");
@@ -577,138 +570,153 @@ wxNotebookPage* PreferencesWindow::CreateUIPage() {
 
 	sizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Scroll speed: "), 0, wxLEFT | wxTOP, 5);
 
-	auto true_scrollspeed = int(std::abs(g_settings.getFloat(Config::SCROLL_SPEED)) * 10);
+	const auto true_scrollspeed = int(std::abs(g_settings.getFloat(Config::SCROLL_SPEED)) * 10);
 	scroll_speed_slider = newd wxSlider(ui_page, wxID_ANY, true_scrollspeed, 1, max(true_scrollspeed, 100));
 	scroll_speed_slider->SetToolTip("This controls how fast the map will scroll when you hold down the center mouse button and move it around.");
 	sizer->Add(scroll_speed_slider, 0, wxEXPAND, 5);
 
 	sizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Zoom speed: "), 0, wxLEFT | wxTOP, 5);
 
-	auto true_zoomspeed = int(g_settings.getFloat(Config::ZOOM_SPEED) * 10);
+	const auto true_zoomspeed = int(g_settings.getFloat(Config::ZOOM_SPEED) * 10);
 	zoom_speed_slider = newd wxSlider(ui_page, wxID_ANY, true_zoomspeed, 1, max(true_zoomspeed, 100));
 	zoom_speed_slider->SetToolTip("This controls how fast you will zoom when you scroll the center mouse button.");
 	sizer->Add(zoom_speed_slider, 0, wxEXPAND, 5);
 
-	ui_page->SetSizerAndFit(sizer);
-
+	ui_page->SetSizer(sizer);
 	return ui_page;
 }
 
 wxNotebookPage* PreferencesWindow::CreateClientPage() {
 	wxNotebookPage* client_page = newd wxPanel(book, wxID_ANY);
 
-	// Refresh g_settings
-	ClientVersion::saveVersions();
-	ClientVersionList versions = ClientVersion::getAllVisible();
-
 	wxSizer* topsizer = newd wxBoxSizer(wxVERTICAL);
 
 	auto* options_sizer = newd wxFlexGridSizer(2, 10, 10);
 	options_sizer->AddGrowableCol(1);
 
-	// Default client version choice control
 	default_version_choice = newd wxChoice(client_page, wxID_ANY);
 	wxStaticText* default_client_tooltip = newd wxStaticText(client_page, wxID_ANY, "Default client version:");
 	options_sizer->Add(default_client_tooltip, 0, wxLEFT | wxTOP, 5);
 	options_sizer->Add(default_version_choice, 0, wxTOP, 5);
 	SetWindowToolTip(default_client_tooltip, default_version_choice, "This will decide what client version will be used when new maps are created.");
 
-	// Check file sigs checkbox
+	{
+		wxArrayString version_names;
+		const ClientVersionList versions = ClientVersion::getAllVisible();
+		int default_selection = 0;
+		const int default_version_id = g_settings.getInteger(Config::DEFAULT_CLIENT_VERSION);
+		for (size_t i = 0; i < versions.size(); ++i) {
+			version_names.Add(wxstr(versions[i]->getName()));
+			if (versions[i]->getID() == default_version_id) {
+				default_selection = static_cast<int>(i);
+			}
+		}
+		default_version_choice->Append(version_names);
+		if (!version_names.IsEmpty()) {
+			default_version_choice->SetSelection(default_selection);
+		}
+	}
+
 	check_sigs_chkbox = newd wxCheckBox(client_page, wxID_ANY, "Check file signatures");
 	check_sigs_chkbox->SetValue(g_settings.getBoolean(Config::CHECK_SIGNATURES));
 	check_sigs_chkbox->SetToolTip("When this option is not checked, the editor will load any OTB/DAT/SPR combination without complaints. This may cause graphics bugs.");
 	options_sizer->Add(check_sigs_chkbox, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 
-	// Add the grid sizer
 	topsizer->Add(options_sizer, wxSizerFlags(0).Expand());
 	topsizer->AddSpacer(10);
 
-	wxScrolledWindow* client_list_window = newd wxScrolledWindow(client_page, wxID_ANY, wxDefaultPosition, wxDefaultSize);
-	client_list_window->SetMinSize(FROM_DIP(this, wxSize(450, 450)));
-	auto* client_list_sizer = newd wxFlexGridSizer(2, 10, 10);
+	client_list_window = newd wxScrolledWindow(client_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+	client_list_window->SetMinSize(FROM_DIP(this, wxSize(450, 300)));
+	client_list_sizer = newd wxFlexGridSizer(2, 10, 10);
 	client_list_sizer->AddGrowableCol(1);
+	client_list_window->SetSizer(client_list_sizer);
+	client_list_window->SetScrollRate(5, 5);
+
+	topsizer->Add(client_list_window, 1, wxEXPAND | wxALL, 5);
+	client_page->SetSizer(topsizer);
+	return client_page;
+}
+
+void PreferencesWindow::EnsureClientVersionListBuilt() {
+	if (client_list_built) {
+		return;
+	}
+
+	wxBusyCursor busy;
+	client_list_window->Freeze();
 
 	version_dir_pickers.clear();
 	version_items_dir_pickers.clear();
 	version_monsters_dir_pickers.clear();
 	version_npcs_dir_pickers.clear();
 
+	const ClientVersionList versions = ClientVersion::getAllVisible();
 	int version_counter = 0;
-	for (auto version : versions) {
-		if (!version->isVisible()) {
-			continue;
-		}
 
-		default_version_choice->Append(wxstr(version->getName()));
+	for (ClientVersion* version : versions) {
+		wxString client_tooltip;
+		client_tooltip << "The editor will look for " << wxstr(version->getName()) << " DAT & SPR here.";
+		auto* version_label = newd wxStaticText(client_list_window, wxID_ANY, wxstr(version->getName()));
+		version_label->SetToolTip(client_tooltip);
+		client_list_sizer->Add(version_label, wxSizerFlags(0).Expand());
 
-		wxStaticText* tmp_text = newd wxStaticText(client_list_window, wxID_ANY, wxString(version->getName()));
-		client_list_sizer->Add(tmp_text, wxSizerFlags(0).Expand());
-
-		wxDirPickerCtrl* dir_picker = newd wxDirPickerCtrl(client_list_window, wxID_ANY, version->getClientPath().GetFullPath());
-		version_dir_pickers.push_back(dir_picker);
-		client_list_sizer->Add(dir_picker, wxSizerFlags(0).Border(wxRIGHT, 10).Expand());
-
-		wxString tooltip;
-		tooltip << "The editor will look for " << wxstr(version->getName()) << " DAT & SPR here.";
-		tmp_text->SetToolTip(tooltip);
-		dir_picker->SetToolTip(tooltip);
-
-		wxStaticText* items_text = newd wxStaticText(client_list_window, wxID_ANY, "Items directory:");
-		client_list_sizer->Add(items_text, wxSizerFlags(0).Border(wxLEFT, 20));
-
-		FileName version_items_path = version->hasCustomItemsPath() ? version->getCustomItemsPath() : version->getDataPath();
-		wxDirPickerCtrl* items_dir_picker = newd wxDirPickerCtrl(client_list_window, wxID_ANY, version_items_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
-		version_items_dir_pickers.push_back(items_dir_picker);
-		client_list_sizer->Add(items_dir_picker, wxSizerFlags(0).Border(wxRIGHT, 10).Expand());
+		wxTextCtrl* client_path = nullptr;
+		client_list_sizer->Add(
+			CreateBrowsePathRow(client_list_window, &client_path, version->getClientPath().GetFullPath(), client_tooltip),
+			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
+		);
+		version_dir_pickers.push_back(client_path);
 
 		wxString items_tooltip;
 		items_tooltip << "The editor will load items.otb and items.xml for " << wxstr(version->getName()) << " from this folder.";
-		items_text->SetToolTip(items_tooltip);
-		items_dir_picker->SetToolTip(items_tooltip);
+		auto* items_label = newd wxStaticText(client_list_window, wxID_ANY, "Items directory:");
+		items_label->SetToolTip(items_tooltip);
+		client_list_sizer->Add(items_label, wxSizerFlags(0).Border(wxLEFT, 20));
 
-		wxStaticText* monsters_text = newd wxStaticText(client_list_window, wxID_ANY, "Monsters directory:");
-		client_list_sizer->Add(monsters_text, wxSizerFlags(0).Border(wxLEFT, 20));
-
-		FileName version_monsters_path = version->hasCustomMonstersPath() ? version->getCustomMonstersPath() : FileName();
-		wxDirPickerCtrl* monsters_dir_picker = newd wxDirPickerCtrl(client_list_window, wxID_ANY, version_monsters_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
-		version_monsters_dir_pickers.push_back(monsters_dir_picker);
-		client_list_sizer->Add(monsters_dir_picker, wxSizerFlags(0).Border(wxRIGHT, 10).Expand());
+		const FileName version_items_path = version->hasCustomItemsPath() ? version->getCustomItemsPath() : version->getDataPath();
+		wxTextCtrl* items_path = nullptr;
+		client_list_sizer->Add(
+			CreateBrowsePathRow(client_list_window, &items_path, version_items_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), items_tooltip),
+			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
+		);
+		version_items_dir_pickers.push_back(items_path);
 
 		wxString monsters_tooltip;
 		monsters_tooltip << "The editor will load monster XML files for " << wxstr(version->getName()) << " from this folder.";
-		monsters_text->SetToolTip(monsters_tooltip);
-		monsters_dir_picker->SetToolTip(monsters_tooltip);
+		auto* monsters_label = newd wxStaticText(client_list_window, wxID_ANY, "Monsters directory:");
+		monsters_label->SetToolTip(monsters_tooltip);
+		client_list_sizer->Add(monsters_label, wxSizerFlags(0).Border(wxLEFT, 20));
 
-		wxStaticText* npcs_text = newd wxStaticText(client_list_window, wxID_ANY, "NPC directory:");
-		client_list_sizer->Add(npcs_text, wxSizerFlags(0).Border(wxLEFT, 20));
-
-		FileName version_npcs_path = version->hasCustomNpcsPath() ? version->getCustomNpcsPath() : FileName();
-		wxDirPickerCtrl* npcs_dir_picker = newd wxDirPickerCtrl(client_list_window, wxID_ANY, version_npcs_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
-		version_npcs_dir_pickers.push_back(npcs_dir_picker);
-		client_list_sizer->Add(npcs_dir_picker, wxSizerFlags(0).Border(wxRIGHT, 10).Expand());
+		const FileName version_monsters_path = version->hasCustomMonstersPath() ? version->getCustomMonstersPath() : FileName();
+		wxTextCtrl* monsters_path = nullptr;
+		client_list_sizer->Add(
+			CreateBrowsePathRow(client_list_window, &monsters_path, version_monsters_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), monsters_tooltip),
+			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
+		);
+		version_monsters_dir_pickers.push_back(monsters_path);
 
 		wxString npcs_tooltip;
 		npcs_tooltip << "The editor will load NPC XML files for " << wxstr(version->getName()) << " from this folder.";
-		npcs_text->SetToolTip(npcs_tooltip);
-		npcs_dir_picker->SetToolTip(npcs_tooltip);
+		auto* npcs_label = newd wxStaticText(client_list_window, wxID_ANY, "NPC directory:");
+		npcs_label->SetToolTip(npcs_tooltip);
+		client_list_sizer->Add(npcs_label, wxSizerFlags(0).Border(wxLEFT, 20));
 
-		if (version->getID() == g_settings.getInteger(Config::DEFAULT_CLIENT_VERSION)) {
-			default_version_choice->SetSelection(version_counter);
-		}
+		const FileName version_npcs_path = version->hasCustomNpcsPath() ? version->getCustomNpcsPath() : FileName();
+		wxTextCtrl* npcs_path = nullptr;
+		client_list_sizer->Add(
+			CreateBrowsePathRow(client_list_window, &npcs_path, version_npcs_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), npcs_tooltip),
+			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
+		);
+		version_npcs_dir_pickers.push_back(npcs_path);
 
-		version_counter++;
+		++version_counter;
 	}
-	// Set the sizers
-	client_list_window->SetSizer(client_list_sizer);
+
 	client_list_window->FitInside();
-	client_list_window->SetScrollRate(5, 5);
-	topsizer->Add(client_list_window, 0, wxALL, 5);
-	client_page->SetSizerAndFit(topsizer);
-
-	return client_page;
+	client_list_window->Layout();
+	client_list_window->Thaw();
+	client_list_built = true;
 }
-
-// Event handlers!
 
 void PreferencesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 	if (Apply()) {
@@ -724,13 +732,6 @@ void PreferencesWindow::OnClickApply(wxCommandEvent& WXUNUSED(event)) {
 	Apply();
 }
 
-void PreferencesWindow::OnCollapsiblePane(wxCollapsiblePaneEvent& event) {
-	auto* win = (wxWindow*)event.GetEventObject();
-	win->GetParent()->Fit();
-}
-
-// Stuff
-
 bool PreferencesWindow::Apply() {
 	const ThemeMode themeMode = ThemeManager::ModeFromChoice(theme_choice->GetSelection());
 	if (!ThemeManager::Get().Apply(themeMode, g_gui.root)) {
@@ -742,9 +743,8 @@ bool PreferencesWindow::Apply() {
 	bool must_restart = false;
 	bool palette_update_needed = false;
 
-	// General
-	wxString open_map_path = open_map_on_startup_picker->GetPath();
-	bool open_map_on_startup_enabled = open_map_on_startup_chkbox->GetValue() && !open_map_path.empty();
+	const wxString open_map_path = open_map_on_startup_path->GetValue();
+	const bool open_map_on_startup_enabled = open_map_on_startup_chkbox->GetValue() && !open_map_path.empty();
 
 	g_settings.setString(Config::OPEN_MAP_ON_STARTUP_PATH, nstr(open_map_path));
 	g_settings.setInteger(Config::OPEN_MAP_ON_STARTUP, open_map_on_startup_enabled ? 1 : 0);
@@ -769,7 +769,6 @@ bool PreferencesWindow::Apply() {
 	}
 	g_settings.setInteger(Config::SHOW_TILESET_EDITOR, enable_tileset_editing_chkbox->GetValue());
 
-	// Editor
 	g_settings.setInteger(Config::GROUP_ACTIONS, group_actions_chkbox->GetValue());
 	g_settings.setInteger(Config::WARN_FOR_DUPLICATE_ID, duplicate_id_warn_chkbox->GetValue());
 	g_settings.setInteger(Config::HOUSE_BRUSH_REMOVE_ITEMS, house_remove_chkbox->GetValue());
@@ -782,38 +781,25 @@ bool PreferencesWindow::Apply() {
 	g_settings.setInteger(Config::MERGE_PASTE, merge_paste_chkbox->GetValue());
 	g_settings.setInteger(Config::LIVE_ALLOW_CLIPBOARD, live_allow_clipboard_chkbox->GetValue());
 
-	// Graphics
 	g_settings.setInteger(Config::USE_GUI_SELECTION_SHADOW, icon_selection_shadow_chkbox->GetValue());
 	if (g_settings.getBoolean(Config::USE_MEMCACHED_SPRITES) != use_memcached_chkbox->GetValue()) {
 		must_restart = true;
 	}
 	g_settings.setInteger(Config::USE_MEMCACHED_SPRITES_TO_SAVE, use_memcached_chkbox->GetValue());
-	if (icon_background_choice->GetSelection() == 0) {
-		if (g_settings.getInteger(Config::ICON_BACKGROUND) != -1) {
+
+	static const int icon_background_values[] = { -1, 0, 88, 255 };
+	const int icon_background_selection = icon_background_choice->GetSelection();
+	if (icon_background_selection >= 0 && icon_background_selection < 4) {
+		const int new_background = icon_background_values[icon_background_selection];
+		if (g_settings.getInteger(Config::ICON_BACKGROUND) != new_background) {
 			g_gui.gfx.cleanSoftwareSprites();
 		}
-		g_settings.setInteger(Config::ICON_BACKGROUND, -1);
-	} else if (icon_background_choice->GetSelection() == 1) {
-		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 0) {
-			g_gui.gfx.cleanSoftwareSprites();
-		}
-		g_settings.setInteger(Config::ICON_BACKGROUND, 0);
-	} else if (icon_background_choice->GetSelection() == 2) {
-		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 88) {
-			g_gui.gfx.cleanSoftwareSprites();
-		}
-		g_settings.setInteger(Config::ICON_BACKGROUND, 88);
-	} else if (icon_background_choice->GetSelection() == 3) {
-		if (g_settings.getInteger(Config::ICON_BACKGROUND) != 255) {
-			g_gui.gfx.cleanSoftwareSprites();
-		}
-		g_settings.setInteger(Config::ICON_BACKGROUND, 255);
+		g_settings.setInteger(Config::ICON_BACKGROUND, new_background);
 	}
 
-	// Screenshots
-	g_settings.setString(Config::SCREENSHOT_DIRECTORY, nstr(screenshot_directory_picker->GetPath()));
+	g_settings.setString(Config::SCREENSHOT_DIRECTORY, nstr(screenshot_directory_path->GetValue()));
 
-	std::string new_format = nstr(screenshot_format_choice->GetStringSelection());
+	const std::string new_format = nstr(screenshot_format_choice->GetStringSelection());
 	if (new_format == "PNG") {
 		g_settings.setString(Config::SCREENSHOT_FORMAT, "png");
 	} else if (new_format == "TGA") {
@@ -828,13 +814,11 @@ bool PreferencesWindow::Apply() {
 	g_settings.setInteger(Config::CURSOR_RED, clr.Red());
 	g_settings.setInteger(Config::CURSOR_GREEN, clr.Green());
 	g_settings.setInteger(Config::CURSOR_BLUE, clr.Blue());
-	// g_settings.setInteger(Config::CURSOR_ALPHA, clr.Alpha());
 
 	clr = cursor_alt_color_pick->GetColour();
 	g_settings.setInteger(Config::CURSOR_ALT_RED, clr.Red());
 	g_settings.setInteger(Config::CURSOR_ALT_GREEN, clr.Green());
 	g_settings.setInteger(Config::CURSOR_ALT_BLUE, clr.Blue());
-	// g_settings.setInteger(Config::CURSOR_ALT_ALPHA, clr.Alpha());
 
 	clr = mouse_crosshair_color_pick->GetColour();
 	g_settings.setInteger(Config::CURSOR_CROSSHAIR_RED, clr.Red());
@@ -849,16 +833,7 @@ bool PreferencesWindow::Apply() {
 	g_settings.setInteger(Config::HIDE_ITEMS_WHEN_ZOOMED, hide_items_when_zoomed_chkbox->GetValue());
 	g_settings.setInteger(Config::SHOW_CHUNK_BOUNDARIES, show_chunk_boundaries_chkbox->GetValue());
 	g_settings.setInteger(Config::SHOW_MOUSE_CROSSHAIR, show_mouse_crosshair_chkbox->GetValue());
-	/*
-	g_settings.setInteger(Config::TEXTURE_MANAGEMENT, texture_managment_chkbox->GetValue());
-	g_settings.setInteger(Config::TEXTURE_CLEAN_PULSE, clean_interval_spin->GetValue());
-	g_settings.setInteger(Config::TEXTURE_LONGEVITY, texture_longevity_spin->GetValue());
-	g_settings.setInteger(Config::TEXTURE_CLEAN_THRESHOLD, texture_threshold_spin->GetValue());
-	g_settings.setInteger(Config::SOFTWARE_CLEAN_THRESHOLD, software_threshold_spin->GetValue());
-	g_settings.setInteger(Config::SOFTWARE_CLEAN_SIZE, software_clean_amount_spin->GetValue());
-	*/
 
-	// Interface
 	SetPaletteStyleChoice(terrain_palette_style_choice, Config::PALETTE_TERRAIN_STYLE);
 	SetPaletteStyleChoice(doodad_palette_style_choice, Config::PALETTE_DOODAD_STYLE);
 	SetPaletteStyleChoice(item_palette_style_choice, Config::PALETTE_ITEM_STYLE);
@@ -877,72 +852,61 @@ bool PreferencesWindow::Apply() {
 	g_settings.setInteger(Config::SWITCH_MOUSEBUTTONS, switch_mousebtn_chkbox->GetValue());
 	g_settings.setInteger(Config::DOUBLECLICK_PROPERTIES, doubleclick_properties_chkbox->GetValue());
 
-	float scroll_mul = 1.0;
+	float scroll_mul = 1.0f;
 	if (inversed_scroll_chkbox->GetValue()) {
-		scroll_mul = -1.0;
+		scroll_mul = -1.0f;
 	}
 	g_settings.setFloat(Config::SCROLL_SPEED, scroll_mul * scroll_speed_slider->GetValue() / 10.f);
 	g_settings.setFloat(Config::ZOOM_SPEED, zoom_speed_slider->GetValue() / 10.f);
 
-	// Client
-	ClientVersionList versions = ClientVersion::getAllVisible();
-	int version_counter = 0;
-	for (auto version : versions) {
-		wxString dir = version_dir_pickers[version_counter]->GetPath();
-		if (dir.Length() > 0 && dir.Last() != '/' && dir.Last() != '\\') {
-			dir.Append(FileName::GetPathSeparator());
-		}
-		version->setClientPath(FileName(dir));
+	if (client_list_built) {
+		const ClientVersionList versions = ClientVersion::getAllVisible();
+		int version_counter = 0;
+		for (ClientVersion* version : versions) {
+			version->setClientPath(FileName(NormalizeDirectoryPath(version_dir_pickers[version_counter]->GetValue())));
 
-		wxString items_dir = version_items_dir_pickers[version_counter]->GetPath();
-		if (items_dir.Length() > 0 && items_dir.Last() != '/' && items_dir.Last() != '\\') {
-			items_dir.Append(FileName::GetPathSeparator());
-		}
+			const wxString items_dir = NormalizeDirectoryPath(version_items_dir_pickers[version_counter]->GetValue());
+			const wxString default_items_dir = version->getDataPath().GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+			if (items_dir.IsEmpty() || items_dir.CmpNoCase(default_items_dir) == 0) {
+				version->clearItemsPath();
+			} else {
+				FileName items_path;
+				items_path.Assign(items_dir);
+				version->setItemsPath(items_path);
+			}
 
-		wxString default_items_dir = version->getDataPath().GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
-		if (items_dir.IsEmpty() || items_dir.CmpNoCase(default_items_dir) == 0) {
-			version->clearItemsPath();
-		} else {
-			FileName items_path;
-			items_path.Assign(items_dir);
-			version->setItemsPath(items_path);
-		}
+			const wxString monsters_dir = NormalizeDirectoryPath(version_monsters_dir_pickers[version_counter]->GetValue());
+			if (monsters_dir.IsEmpty()) {
+				version->clearMonstersPath();
+			} else {
+				FileName monsters_path;
+				monsters_path.Assign(monsters_dir);
+				version->setMonstersPath(monsters_path);
+			}
 
-		wxString monsters_dir = version_monsters_dir_pickers[version_counter]->GetPath();
-		if (monsters_dir.Length() > 0 && monsters_dir.Last() != '/' && monsters_dir.Last() != '\\') {
-			monsters_dir.Append(FileName::GetPathSeparator());
-		}
+			const wxString npcs_dir = NormalizeDirectoryPath(version_npcs_dir_pickers[version_counter]->GetValue());
+			if (npcs_dir.IsEmpty()) {
+				version->clearNpcsPath();
+			} else {
+				FileName npcs_path;
+				npcs_path.Assign(npcs_dir);
+				version->setNpcsPath(npcs_path);
+			}
 
-		if (monsters_dir.IsEmpty()) {
-			version->clearMonstersPath();
-		} else {
-			FileName monsters_path;
-			monsters_path.Assign(monsters_dir);
-			version->setMonstersPath(monsters_path);
+			++version_counter;
 		}
-
-		wxString npcs_dir = version_npcs_dir_pickers[version_counter]->GetPath();
-		if (npcs_dir.Length() > 0 && npcs_dir.Last() != '/' && npcs_dir.Last() != '\\') {
-			npcs_dir.Append(FileName::GetPathSeparator());
-		}
-
-		if (npcs_dir.IsEmpty()) {
-			version->clearNpcsPath();
-		} else {
-			FileName npcs_path;
-			npcs_path.Assign(npcs_dir);
-			version->setNpcsPath(npcs_path);
-		}
-
-		if (version->getName() == default_version_choice->GetStringSelection()) {
-			g_settings.setInteger(Config::DEFAULT_CLIENT_VERSION, version->getID());
-		}
-
-		version_counter++;
 	}
+
+	const std::string selected_version_name = nstr(default_version_choice->GetStringSelection());
+	for (ClientVersion* version : ClientVersion::getAllVisible()) {
+		if (version->getName() == selected_version_name) {
+			g_settings.setInteger(Config::DEFAULT_CLIENT_VERSION, version->getID());
+			break;
+		}
+	}
+
 	g_settings.setInteger(Config::CHECK_SIGNATURES, check_sigs_chkbox->GetValue());
 
-	// Make sure to reload client paths
 	ClientVersion::saveVersions();
 	ClientVersion::loadVersions();
 
@@ -953,10 +917,8 @@ bool PreferencesWindow::Apply() {
 	}
 
 	if (!palette_update_needed) {
-		// update palette icons
 		g_gui.RebuildPalettes();
 	} else {
-		// change palette structure
 		wxString error;
 		wxArrayString warnings;
 		g_gui.LoadVersion(g_gui.GetCurrentVersionID(), error, warnings, true);

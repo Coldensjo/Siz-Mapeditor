@@ -19,118 +19,109 @@
 #define RME_PREFERENCES_WINDOW_H_
 
 #include "main.h"
-#include <wx/listbook.h>
-#include <wx/collpane.h>
 #include <wx/clrpicker.h>
-#include <wx/filepicker.h>
 
 class PreferencesWindow : public wxDialog {
 public:
-	explicit PreferencesWindow(wxWindow* parent) : PreferencesWindow(parent, false) { };
+	explicit PreferencesWindow(wxWindow* parent) : PreferencesWindow(parent, false) { }
 	PreferencesWindow(wxWindow* parent, bool clientVersionSelected);
-	virtual ~PreferencesWindow();
+	~PreferencesWindow() override = default;
 
-	void OnClickDefaults(wxCommandEvent&);
 	void OnClickApply(wxCommandEvent&);
 	void OnClickOK(wxCommandEvent&);
 	void OnClickCancel(wxCommandEvent&);
-
-	void OnCollapsiblePane(wxCollapsiblePaneEvent&);
+	void OnNotebookPageChanged(wxBookCtrlEvent&);
 
 protected:
-	void SetDefaults();
 	bool Apply();
+	void EnsureClientVersionListBuilt();
 
-	wxBookCtrl* book;
+	static constexpr int CLIENT_PAGE_INDEX = 4;
+
+	wxBookCtrl* book = nullptr;
+	bool client_list_built = false;
+	wxScrolledWindow* client_list_window = nullptr;
+	wxFlexGridSizer* client_list_sizer = nullptr;
 
 	// General
-	wxCheckBox* always_make_backup_chkbox;
-	wxCheckBox* create_on_startup_chkbox;
-	wxCheckBox* only_one_instance_chkbox;
-	wxCheckBox* show_welcome_dialog_chkbox;
-	wxCheckBox* ignore_save_prompt_chkbox;
-	wxCheckBox* auto_save_on_close_chkbox;
-	wxCheckBox* enable_tileset_editing_chkbox;
-	wxCheckBox* open_map_on_startup_chkbox;
-	wxFilePickerCtrl* open_map_on_startup_picker;
-	wxSpinCtrl* undo_size_spin;
-	wxSpinCtrl* undo_mem_size_spin;
-	wxSpinCtrl* worker_threads_spin;
-	wxSpinCtrl* replace_size_spin;
-	wxRadioBox* position_format;
+	wxCheckBox* always_make_backup_chkbox = nullptr;
+	wxCheckBox* only_one_instance_chkbox = nullptr;
+	wxCheckBox* show_welcome_dialog_chkbox = nullptr;
+	wxCheckBox* ignore_save_prompt_chkbox = nullptr;
+	wxCheckBox* auto_save_on_close_chkbox = nullptr;
+	wxCheckBox* enable_tileset_editing_chkbox = nullptr;
+	wxCheckBox* open_map_on_startup_chkbox = nullptr;
+	wxTextCtrl* open_map_on_startup_path = nullptr;
+	wxSpinCtrl* undo_size_spin = nullptr;
+	wxSpinCtrl* undo_mem_size_spin = nullptr;
+	wxSpinCtrl* worker_threads_spin = nullptr;
+	wxSpinCtrl* replace_size_spin = nullptr;
+	wxRadioBox* position_format = nullptr;
 
 	// Editor
-	wxCheckBox* group_actions_chkbox;
-	wxCheckBox* duplicate_id_warn_chkbox;
-	wxCheckBox* house_remove_chkbox;
-	wxCheckBox* auto_assign_doors_chkbox;
-	wxCheckBox* eraser_leave_unique_chkbox;
-	wxCheckBox* doodad_erase_same_chkbox;
-	wxCheckBox* auto_create_spawn_chkbox;
-	wxCheckBox* allow_multiple_orderitems_chkbox;
-	wxCheckBox* merge_move_chkbox;
-	wxCheckBox* merge_paste_chkbox;
-	wxCheckBox* live_allow_clipboard_chkbox;
+	wxCheckBox* group_actions_chkbox = nullptr;
+	wxCheckBox* duplicate_id_warn_chkbox = nullptr;
+	wxCheckBox* house_remove_chkbox = nullptr;
+	wxCheckBox* auto_assign_doors_chkbox = nullptr;
+	wxCheckBox* eraser_leave_unique_chkbox = nullptr;
+	wxCheckBox* doodad_erase_same_chkbox = nullptr;
+	wxCheckBox* auto_create_spawn_chkbox = nullptr;
+	wxCheckBox* allow_multiple_orderitems_chkbox = nullptr;
+	wxCheckBox* merge_move_chkbox = nullptr;
+	wxCheckBox* merge_paste_chkbox = nullptr;
+	wxCheckBox* live_allow_clipboard_chkbox = nullptr;
 
 	// Graphics
-	wxCheckBox* icon_selection_shadow_chkbox;
-	wxChoice* icon_background_choice;
-	wxCheckBox* use_memcached_chkbox;
-	wxDirPickerCtrl* screenshot_directory_picker;
-	wxChoice* screenshot_format_choice;
-	wxCheckBox* hide_items_when_zoomed_chkbox;
-	wxCheckBox* show_chunk_boundaries_chkbox;
-	wxCheckBox* show_mouse_crosshair_chkbox;
-	wxColourPickerCtrl* cursor_color_pick;
-	wxColourPickerCtrl* cursor_alt_color_pick;
-	wxColourPickerCtrl* mouse_crosshair_color_pick;
-	wxColourPickerCtrl* viewport_background_color_pick;
-	/*
-	wxCheckBox* texture_managment_chkbox;
-	wxSpinCtrl* clean_interval_spin;
-	wxSpinCtrl* texture_longevity_spin;
-	wxSpinCtrl* texture_threshold_spin;
-	wxSpinCtrl* software_threshold_spin;
-	wxSpinCtrl* software_clean_amount_spin;
-	*/
+	wxCheckBox* icon_selection_shadow_chkbox = nullptr;
+	wxChoice* icon_background_choice = nullptr;
+	wxCheckBox* use_memcached_chkbox = nullptr;
+	wxTextCtrl* screenshot_directory_path = nullptr;
+	wxChoice* screenshot_format_choice = nullptr;
+	wxCheckBox* hide_items_when_zoomed_chkbox = nullptr;
+	wxCheckBox* show_chunk_boundaries_chkbox = nullptr;
+	wxCheckBox* show_mouse_crosshair_chkbox = nullptr;
+	wxColourPickerCtrl* cursor_color_pick = nullptr;
+	wxColourPickerCtrl* cursor_alt_color_pick = nullptr;
+	wxColourPickerCtrl* mouse_crosshair_color_pick = nullptr;
+	wxColourPickerCtrl* viewport_background_color_pick = nullptr;
 
 	// Interface
-	wxChoice* theme_choice;
-	wxChoice* terrain_palette_style_choice;
-	wxChoice* doodad_palette_style_choice;
-	wxChoice* item_palette_style_choice;
-	wxChoice* raw_palette_style_choice;
+	wxChoice* theme_choice = nullptr;
+	wxChoice* terrain_palette_style_choice = nullptr;
+	wxChoice* doodad_palette_style_choice = nullptr;
+	wxChoice* item_palette_style_choice = nullptr;
+	wxChoice* raw_palette_style_choice = nullptr;
 
-	wxCheckBox* large_terrain_tools_chkbox;
-	wxCheckBox* show_palette_tools_chkbox;
-	wxCheckBox* show_palette_brush_size_chkbox;
-	wxCheckBox* large_doodad_sizebar_chkbox;
-	wxCheckBox* large_item_sizebar_chkbox;
-	wxCheckBox* large_house_sizebar_chkbox;
-	wxCheckBox* large_raw_sizebar_chkbox;
-	wxCheckBox* large_container_icons_chkbox;
-	wxCheckBox* large_pick_item_icons_chkbox;
-	wxCheckBox* container_default_name_search_chkbox;
+	wxCheckBox* large_terrain_tools_chkbox = nullptr;
+	wxCheckBox* show_palette_tools_chkbox = nullptr;
+	wxCheckBox* show_palette_brush_size_chkbox = nullptr;
+	wxCheckBox* large_doodad_sizebar_chkbox = nullptr;
+	wxCheckBox* large_item_sizebar_chkbox = nullptr;
+	wxCheckBox* large_house_sizebar_chkbox = nullptr;
+	wxCheckBox* large_raw_sizebar_chkbox = nullptr;
+	wxCheckBox* large_container_icons_chkbox = nullptr;
+	wxCheckBox* large_pick_item_icons_chkbox = nullptr;
+	wxCheckBox* container_default_name_search_chkbox = nullptr;
 
-	wxCheckBox* switch_mousebtn_chkbox;
-	wxCheckBox* doubleclick_properties_chkbox;
-	wxCheckBox* inversed_scroll_chkbox;
-	wxSlider* scroll_speed_slider;
-	wxSlider* zoom_speed_slider;
+	wxCheckBox* switch_mousebtn_chkbox = nullptr;
+	wxCheckBox* doubleclick_properties_chkbox = nullptr;
+	wxCheckBox* inversed_scroll_chkbox = nullptr;
+	wxSlider* scroll_speed_slider = nullptr;
+	wxSlider* zoom_speed_slider = nullptr;
 
 	// Client info
-	wxChoice* default_version_choice;
-	std::vector<wxDirPickerCtrl*> version_dir_pickers;
-	std::vector<wxDirPickerCtrl*> version_items_dir_pickers;
-	std::vector<wxDirPickerCtrl*> version_monsters_dir_pickers;
-	std::vector<wxDirPickerCtrl*> version_npcs_dir_pickers;
-	wxCheckBox* check_sigs_chkbox;
+	wxChoice* default_version_choice = nullptr;
+	std::vector<wxTextCtrl*> version_dir_pickers;
+	std::vector<wxTextCtrl*> version_items_dir_pickers;
+	std::vector<wxTextCtrl*> version_monsters_dir_pickers;
+	std::vector<wxTextCtrl*> version_npcs_dir_pickers;
+	wxCheckBox* check_sigs_chkbox = nullptr;
 
-	// Create controls
 	wxChoice* AddPaletteStyleChoice(wxWindow* parent, wxSizer* sizer, const wxString& short_description, const wxString& description, const std::string& setting);
 	void SetPaletteStyleChoice(wxChoice* ctrl, int key);
+	int IconBackgroundSelection() const;
+	void SetIconBackgroundSelection(int selection);
 
-	// Create windows
 	wxNotebookPage* CreateGeneralPage();
 	wxNotebookPage* CreateGraphicsPage();
 	wxNotebookPage* CreateUIPage();
