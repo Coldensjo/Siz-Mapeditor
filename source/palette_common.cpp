@@ -25,6 +25,7 @@
 #include "gui.h"
 #include "common_windows.h"
 #include "application.h"
+#include "theme.h"
 
 #include <cctype>
 
@@ -40,8 +41,10 @@ public:
 			wxBORDER_SIMPLE | wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxFRAME_TOOL_WINDOW) {
 		wxBoxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
 		label = newd wxStaticText(this, wxID_ANY, wxEmptyString);
-		const wxColour background(255, 255, 225);
+		const ThemePalette& palette = ThemeManager::Get().GetPalette();
+		const wxColour background = palette.control;
 		label->SetBackgroundColour(background);
+		label->SetForegroundColour(palette.text);
 		SetBackgroundColour(background);
 		sizer->Add(label, 1, wxALL, 3);
 		SetSizer(sizer);

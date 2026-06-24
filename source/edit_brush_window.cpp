@@ -13,6 +13,7 @@
 #include "materials.h"
 #include "dcbutton.h"
 #include "graphics.h"
+#include "theme.h"
 
 namespace {
 enum {
@@ -131,15 +132,7 @@ void EditBrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const 
 		DrawCompositePreview(dc, rect, entry.composite_tiles);
 	}
 
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	dc.DrawText(owner->FormatEntryLabel(entry), rect.GetX() + 40, rect.GetY() + 10);
 }
@@ -163,15 +156,7 @@ void EditCompositeTileListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n
 	const auto& tile = tiles->at(n);
 	DrawItemSprite(dc, GetTilePreviewClientId(tile), rect.GetX() + 2, rect.GetY() + 2, 32, 32);
 
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	dc.DrawText(owner->FormatCompositeTileLabel(tile), rect.GetX() + 40, rect.GetY() + 10);
 }

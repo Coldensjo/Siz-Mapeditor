@@ -11,6 +11,7 @@ int main()
 	const auto dark = ThemeManager::PaletteFor(ThemeMode::Dark);
 	assert(dark.window == wxColour(30, 30, 30));
 	assert(dark.text != dark.window);
+	assert(dark.text != dark.mutedText);
 	assert(dark.border != dark.surface);
 	assert(dark.hover != dark.selection);
 	assert(ThemeManager::NormalizeMode(-1) == ThemeMode::Dark);

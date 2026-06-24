@@ -17,6 +17,7 @@
 
 #include "main.h"
 #include "palette_button.h"
+#include "theme.h"
 #include <wx/renderer.h>
 
 BEGIN_EVENT_TABLE(PaletteButton, wxButton)
@@ -32,7 +33,7 @@ PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& la
 	const wxString& name) : wxButton(parent, id, label, pos, size, style, validator, name),
 	isPressed(false), isHovered(false) {
 	// Ensure button has a solid background color
-	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
+	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
 }
 
 wxString PaletteButton::GetLabelWithoutAmpersand() const {
@@ -78,6 +79,7 @@ int PaletteButton::GetUnderlineIndex() const {
 void PaletteButton::OnPaint(wxPaintEvent& event) {
 	// Don't call event.Skip() - we'll render everything ourselves
 	wxBufferedPaintDC dc(this);
+	const ThemePalette& palette = ThemeManager::Get().GetPalette();
 	
 	wxSize size = GetClientSize();
 	wxRect rect(0, 0, size.GetWidth(), size.GetHeight());
@@ -85,7 +87,7 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 	// First, fill the entire button area with the background color to prevent transparency
 	wxColour bgColour = GetBackgroundColour();
 	if (!bgColour.IsOk()) {
-		bgColour = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
+		bgColour = palette.control;
 	}
 	dc.SetBrush(wxBrush(bgColour));
 	dc.SetPen(wxPen(bgColour));
@@ -127,9 +129,9 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 		
 		// Set text color based on enabled state
 		if (IsEnabled()) {
-			dc.SetTextForeground(GetForegroundColour());
+			dc.SetTextForeground(palette.text);
 		} else {
-			dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT));
+			dc.SetTextForeground(palette.disabledText);
 		}
 		
 		// Draw the text
@@ -146,7 +148,7 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 			// Draw underline
 			int underlineX = textX + beforeSize.GetWidth();
 			int underlineY = textY + textSize.GetHeight() - 1;
-			dc.SetPen(wxPen(GetForegroundColour(), 1));
+			dc.SetPen(wxPen(IsEnabled() ? palette.text : palette.disabledText, 1));
 			dc.DrawLine(underlineX, underlineY, underlineX + charSize.GetWidth(), underlineY);
 		}
 	}

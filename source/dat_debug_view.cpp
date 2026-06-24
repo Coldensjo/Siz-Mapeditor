@@ -21,6 +21,7 @@
 
 #include "graphics.h"
 #include "gui.h"
+#include "theme.h"
 
 // ============================================================================
 //
@@ -77,15 +78,7 @@ void DatDebugViewListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) con
 		spr_iter->second->DrawTo(&dc, SPRITE_SIZE_32x32, rect.GetX(), rect.GetY(), rect.GetWidth(), rect.GetHeight());
 	}
 
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	dc.DrawText(wxString() << n, rect.GetX() + 40, rect.GetY() + 6);
 }

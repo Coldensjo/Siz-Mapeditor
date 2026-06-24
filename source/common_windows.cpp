@@ -26,6 +26,7 @@
 #include "item.h"
 #include "complexitem.h"
 #include "raw_brush.h"
+#include "theme.h"
 
 #include "palette_window.h"
 #include "gui.h"
@@ -1174,15 +1175,7 @@ void FindDialogListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const
 			spr->DrawTo(&dc, SPRITE_SIZE_32x32, rect.GetX(), rect.GetY(), rect.GetWidth(), rect.GetHeight());
 		}
 
-		if (IsSelected(n)) {
-			if (HasFocus()) {
-				dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-			} else {
-				dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-			}
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-		}
+		dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 		dc.DrawText(wxstr(brushlist[n]->getName()), rect.GetX() + 40, rect.GetY() + 6);
 	}

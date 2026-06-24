@@ -8,6 +8,7 @@
 #include "brush_edit.h"
 #include "brush.h"
 #include "gui.h"
+#include "theme.h"
 
 namespace {
 enum {
@@ -55,15 +56,7 @@ void BorderDialogListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) con
 	const wxRect previewRect(rect.GetX() + 2, rect.GetY() + 2, 44, 44);
 	DrawAutoBorderPreview(dc, previewRect, border);
 
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	wxString label = wxString::Format("Border %u", borderId);
 	if (border && border->group != 0) {

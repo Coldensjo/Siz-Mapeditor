@@ -31,6 +31,7 @@
 #include "graphics.h"
 #include "sprites.h"
 #include "settings.h"
+#include "theme.h"
 
 #include <algorithm>
 #include <limits>
@@ -589,7 +590,7 @@ BrushIconBox::BrushIconBox(wxWindow* parent, const TilesetCategory* _tileset, Re
 	selected_index(-1) {
 	ASSERT(tileset->getType() >= TILESET_UNKNOWN && tileset->getType() <= TILESET_HOUSE);
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
-	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
+	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
 	SetScrollRate(slot_size, slot_size);
 
 	RecalculateGrid();
@@ -751,10 +752,11 @@ int BrushIconBox::CellIndexAt(const wxPoint& unscrolled) const {
 
 void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 	const wxRect& r = cell.rect;
+	const ThemePalette& palette = ThemeManager::Get().GetPalette();
 
 	if (!cell.brush) {
 		// Separator line
-		dc.SetPen(wxPen(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT)));
+		dc.SetPen(wxPen(palette.mutedText));
 		const int y = r.GetY() + r.GetHeight() / 2;
 		dc.DrawLine(r.GetX() + 4, y, r.GetRight() - 4, y);
 		return;
@@ -762,7 +764,7 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 
 	// Background fill (honours the configurable icon background shade)
 	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
-	wxColour fill = (bgshade < 0) ? wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE) : wxColour(bgshade, bgshade, bgshade);
+	wxColour fill = (bgshade < 0) ? palette.control : wxColour(bgshade, bgshade, bgshade);
 	dc.SetBrush(wxBrush(fill));
 	dc.SetPen(*wxTRANSPARENT_PEN);
 	dc.DrawRectangle(r);
@@ -773,10 +775,10 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 	const int inset = use_actual_size ? 0 : 2;
 
 	if (!use_actual_size) {
-		dc.SetPen(selected ? wxPen(wxColor(0x40, 0x40, 0x40)) : wxPen(wxColor(0xFF, 0xFF, 0xFF)));
+		dc.SetPen(selected ? wxPen(palette.window) : wxPen(palette.surface));
 		dc.DrawLine(r.GetX(), r.GetY(), r.GetRight(), r.GetY());
 		dc.DrawLine(r.GetX(), r.GetY(), r.GetX(), r.GetBottom());
-		dc.SetPen(selected ? wxPen(wxColor(0xFF, 0xFF, 0xFF)) : wxPen(wxColor(0x80, 0x80, 0x80)));
+		dc.SetPen(selected ? wxPen(palette.surface) : wxPen(palette.border));
 		dc.DrawLine(r.GetX(), r.GetBottom(), r.GetRight(), r.GetBottom());
 		dc.DrawLine(r.GetRight(), r.GetY(), r.GetRight(), r.GetBottom());
 	}
@@ -804,7 +806,7 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 	// highlight rectangle on top rather than an (absent) bevel.
 	if (use_actual_size && selected) {
 		dc.SetBrush(*wxTRANSPARENT_BRUSH);
-		dc.SetPen(wxPen(wxColor(0x00, 0x66, 0xCC), 2));
+		dc.SetPen(wxPen(palette.selection, 2));
 		dc.DrawRectangle(r.GetX(), r.GetY(), r.GetWidth(), r.GetHeight());
 	}
 }
@@ -813,7 +815,7 @@ void BrushIconBox::OnPaint(wxPaintEvent& WXUNUSED(event)) {
 	wxAutoBufferedPaintDC dc(this);
 	DoPrepareDC(dc); // applies the scroll offset
 
-	dc.SetBackground(wxBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE)));
+	dc.SetBackground(wxBrush(ThemeManager::Get().GetPalette().control));
 	dc.Clear();
 
 	if (g_gui.gfx.isUnloaded()) {
@@ -1113,7 +1115,7 @@ void BrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
 		return;
 	}
 	if (brush->isPaletteSeparator()) {
-		dc.SetPen(wxPen(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT)));
+		dc.SetPen(wxPen(ThemeManager::Get().GetPalette().mutedText));
 		dc.DrawLine(rect.GetX() + 4, rect.GetY() + rect.GetHeight() / 2, rect.GetRight() - 4, rect.GetY() + rect.GetHeight() / 2);
 		return;
 	}
@@ -1122,15 +1124,7 @@ void BrushListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
 	if (spr) {
 		spr->DrawTo(&dc, SPRITE_SIZE_32x32, rect.GetX(), rect.GetY(), rect.GetWidth(), rect.GetHeight());
 	}
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 	dc.DrawText(wxstr(brush->getName()), rect.GetX() + 40, rect.GetY() + 6);
 }
 

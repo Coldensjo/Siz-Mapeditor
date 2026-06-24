@@ -24,6 +24,7 @@
 #include "graphics.h"
 #include "gui.h"
 #include "browse_tile_window.h"
+#include "theme.h"
 
 // ============================================================================
 //
@@ -66,15 +67,10 @@ void BrowseTileListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const
 
 	if (IsSelected(n)) {
 		item->select();
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
 	} else {
 		item->deselect();
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
 	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	wxString label;
 	label << item->getID() << " - " << item->getName();

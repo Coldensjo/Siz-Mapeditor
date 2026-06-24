@@ -23,6 +23,7 @@
 #include "artprovider.h"
 #include "items.h"
 #include "item.h"
+#include "theme.h"
 #include <wx/spinctrl.h>
 #include <wx/statbox.h>
 #include <wx/checkbox.h>
@@ -151,6 +152,7 @@ bool ReplaceItemsListBox::CanAdd(uint16_t replaceId, uint16_t replaceIdEnd, uint
 
 void ReplaceItemsListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t index) const {
 	ASSERT(index < m_items.size());
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	const ReplacingItem& item = m_items.at(index);
 	const ItemType& type1 = g_items.getItemType(item.replaceId);
@@ -194,15 +196,6 @@ void ReplaceItemsListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t index)
 		}
 	}
 
-	if (IsSelected(index)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
 }
 
 wxCoord ReplaceItemsListBox::OnMeasureItem(size_t WXUNUSED(index)) const {
@@ -365,7 +358,7 @@ bool ReplaceItemsDialog::GetReplaceItemRange(uint16_t& startId, uint16_t& endId)
 	rangeSizer->Add(toSizer, 0, wxALL | wxEXPAND, 5);
 	
 	wxStaticText* hintText = new wxStaticText(&rangeDialog, wxID_ANY, "Leave 'To' empty or set to 0 for single item");
-	hintText->SetForegroundColour(wxColor(128, 128, 128));
+	hintText->SetForegroundColour(ThemeManager::Get().GetPalette().mutedText);
 	rangeSizer->Add(hintText, 0, wxALL, 5);
 	
 	mainSizer->Add(rangeSizer, 1, wxALL | wxEXPAND, 5);

@@ -26,6 +26,7 @@
 #include "items.h"
 #include "spawn_brush.h"
 #include "materials.h"
+#include "theme.h"
 
 #include <algorithm>
 #include <cmath>
@@ -282,15 +283,7 @@ void CreatureListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t index) con
 	int slot_y = rect.GetY() + (rect.GetHeight() - CREATURE_SLOT_SIZE) / 2;
 	DrawSpritesInSlot(dc, sprites, slot_x, slot_y, CREATURE_SLOT_SIZE);
 
-	if (IsSelected(index)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColour(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColour(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColour(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	int text_width;
 	int text_height;
@@ -362,7 +355,7 @@ CreatureSpriteGrid::CreatureSpriteGrid(wxWindow* parent, wxWindowID id) :
 	cell_width(CREATURE_SLOT_SIZE + 2 * CELL_PADDING),
 	cell_height(CREATURE_SLOT_SIZE + TEXT_HEIGHT + 2 * CELL_PADDING),
 	selected_index(wxNOT_FOUND) {
-	SetBackgroundColour(*wxWHITE);
+	SetBackgroundColour(ThemeManager::Get().GetPalette().surface);
 	SetScrollRate(0, cell_height);
 }
 
@@ -521,8 +514,9 @@ void CreatureSpriteGrid::NotifySelection() {
 void CreatureSpriteGrid::OnPaint(wxPaintEvent& event) {
 	wxPaintDC dc(this);
 	DoPrepareDC(dc);
+	const ThemePalette& palette = ThemeManager::Get().GetPalette();
 
-	dc.SetBackground(*wxWHITE_BRUSH);
+	dc.SetBackground(wxBrush(palette.surface));
 	dc.Clear();
 
 	if (entries.empty() || columns <= 0) {
@@ -550,7 +544,7 @@ void CreatureSpriteGrid::OnPaint(wxPaintEvent& event) {
 
 			bool selected = (index == selected_index);
 			if (selected) {
-				dc.SetBrush(wxBrush(wxColour(0x33, 0x66, 0xCC)));
+				dc.SetBrush(wxBrush(palette.selection));
 				dc.SetPen(*wxTRANSPARENT_PEN);
 				dc.DrawRectangle(cell_x, cell_y, cell_width, cell_height);
 			}
@@ -561,7 +555,7 @@ void CreatureSpriteGrid::OnPaint(wxPaintEvent& event) {
 			int slot_y = cell_y + CELL_PADDING;
 			DrawSpritesInSlot(dc, sprites, slot_x, slot_y, CREATURE_SLOT_SIZE);
 
-			dc.SetTextForeground(selected ? wxColour(0xFF, 0xFF, 0xFF) : wxColour(0x00, 0x00, 0x00));
+			dc.SetTextForeground(palette.text);
 			wxString label = entry.name;
 			int text_width;
 			int text_height;

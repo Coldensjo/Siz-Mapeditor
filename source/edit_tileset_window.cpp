@@ -12,6 +12,7 @@
 #include "materials.h"
 #include "settings.h"
 #include "tileset_edit.h"
+#include "theme.h"
 
 namespace {
 enum {
@@ -62,19 +63,11 @@ void EditTilesetListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) cons
 	if (entry.kind != TilesetEditEntry::SEPARATOR) {
 		DrawItemSprite(dc, GetEntryPreviewClientId(entry), rect.GetX() + 2, rect.GetY() + 2, 32, 32);
 	} else {
-		dc.SetPen(wxPen(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT)));
+		dc.SetPen(wxPen(ThemeManager::Get().GetPalette().mutedText));
 		dc.DrawLine(rect.GetX() + 4, rect.GetY() + rect.GetHeight() / 2, rect.GetRight() - 4, rect.GetY() + rect.GetHeight() / 2);
 	}
 
-	if (IsSelected(n)) {
-		if (HasFocus()) {
-			dc.SetTextForeground(wxColor(0xFF, 0xFF, 0xFF));
-		} else {
-			dc.SetTextForeground(wxColor(0x00, 0x00, 0xFF));
-		}
-	} else {
-		dc.SetTextForeground(wxColor(0x00, 0x00, 0x00));
-	}
+	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
 	dc.DrawText(owner->FormatEntryLabel(entry), rect.GetX() + 40, rect.GetY() + 10);
 }
