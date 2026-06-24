@@ -22,7 +22,7 @@
 		t - terrain palette
 		u
 		v - highlight items
-		w - waypoint palette
+		w
 		x - show locked doors
 		y - show tooltips
 		z
@@ -45,21 +45,25 @@
 			<item name="Export Minimap..." action="EXPORT_MINIMAP" help="Export minimap to an image file." />
 			<item name="Export Tilesets..." action="EXPORT_TILESETS" help="Export tilesets to an xml file." />
 		</menu>
-		<menu name="Reload">
-			<item name="Reload" hotkey="F5" action="RELOAD_DATA" help="Reloads all data files." />
-		</menu>
+		<separator />
+		<item name="Reload Data" hotkey="F5" action="RELOAD_DATA" help="Reloads all data files." />
 		<separator />
 		<menu name="Recent Files" special="RECENT_FILES" />
 		<item name="Preferences" action="PREFERENCES" help="Configure the map editor." />
 		<item name="Exit" action="EXIT" help="Close the editor." />
 	</menu>
+
 	<menu name="Edit">
 		<item name="Undo" hotkey="Ctrl+Z" action="UNDO" help="Undo last action." />
 		<item name="Redo" hotkey="Ctrl+Shift+Z" action="REDO" help="Redo last undid action." />
 		<separator />
+		<item name="Cut" hotkey="Ctrl+X" action="CUT" help="Cut a part of the map." />
+		<item name="Copy" hotkey="Ctrl+C" action="COPY" help="Copy a part of the map." />
+		<item name="Paste" hotkey="Ctrl+V" action="PASTE" help="Paste a part of the map." />
+		<separator />
 		<item name="Replace Items..." hotkey="Ctrl+Shift+F" action="REPLACE_ITEMS" help="Replaces all occurrences of one item with another." />
 		<separator />
-		<menu name="Border Options">
+		<menu name="Borders">
 			<item name="Border Automagic" hotkey="A" action="AUTOMAGIC" help="Turns on all automatic border functions." />
 			<separator />
 			<item name="Borderize Selection" hotkey="Ctrl+B" action="BORDERIZE_SELECTION" help="Creates automatic borders in the entire selected area." />
@@ -67,19 +71,16 @@
 			<item name="Randomize Selection" action="RANDOMIZE_SELECTION" help="Randomizes the ground tiles of the selected area." />
 			<item name="Randomize Map" action="RANDOMIZE_MAP" help="Randomizes all tiles of the entire map." />
 		</menu>
-		<menu name="Other Options">
+		<menu name="Cleanup">
 			<item name="Remove Items by ID..." hotkey="Ctrl+Shift+R" action="MAP_REMOVE_ITEMS" help="Removes all items with the selected ID from the map." />
 			<item name="Remove all Corpses..." action="MAP_REMOVE_CORPSES" help="Removes all corpses from the map." />
 			<item name="Remove all Unreachable Tiles..." action="MAP_REMOVE_UNREACHABLE_TILES" help="Removes all tiles that cannot be reached (or seen) by the player from the map." />
 			<item name="Clear Invalid Houses" action="CLEAR_INVALID_HOUSES" help="Clears house tiles not belonging to any house." />
 			<item name="Clear Modified State" action="CLEAR_MODIFIED_STATE" help="Clears the modified state from all tiles." />
 		</menu>
-		<separator />
-		<item name="Cut" hotkey="Ctrl+X" action="CUT" help="Cut a part of the map." />
-		<item name="Copy" hotkey="Ctrl+C" action="COPY" help="Copy a part of the map." />
-		<item name="Paste" hotkey="Ctrl+V" action="PASTE" help="Paste a part of the map." />
 	</menu>
-	<menu name="Editor">
+
+	<menu name="View">
 		<item name="New View" hotkey="Ctrl+Shift+N" action="NEW_VIEW" help="Creates a new view of the current map." />
 		<item name="Enter Fullscreen" hotkey="F11" action="TOGGLE_FULLSCREEN" help="Changes between fullscreen mode and windowed mode." />
 		<item name="Take Screenshot" hotkey="F10" action="TAKE_SCREENSHOT" help="Saves the current view to the disk." />
@@ -87,112 +88,76 @@
 		<menu name="Zoom">
 			<item name="Zoom In" hotkey="Ctrl++" action="ZOOM_IN" help="Increase the zoom." />
 			<item name="Zoom Out" hotkey="Ctrl+-" action="ZOOM_OUT" help="Decrease the zoom." />
-			<item name="Zoom Normal" hotkey="Ctrl+0" action="ZOOM_NORMAL" help="Normal zoom(100%)." />
+			<item name="Zoom Normal" hotkey="Ctrl+0" action="ZOOM_NORMAL" help="Normal zoom (100%)." />
 		</menu>
-	</menu>
-	<menu name="Search">
-		<item name="Find Item..." hotkey="Ctrl+F" action="FIND_ITEM" help="Find all instances of an item type the map." />
-		<item name="Find Creature..." hotkey="Ctrl+Shift+C" action="FIND_CREATURE" help="Find all instances of a creature/monster on the map." />
-		<separator />
-		<item name="Find Unique" action="SEARCH_ON_MAP_UNIQUE" help="Find all items with an unique ID on map." />
-		<item name="Find Action" action="SEARCH_ON_MAP_ACTION" help="Find all items with an action ID on map." />
-		<item name="Find Key Hole Number" action="SEARCH_ON_MAP_KEYHOLE" help="Find all doors with a key hole number on map." />
-		<item name="Find Door Level" action="SEARCH_ON_MAP_DOOR_LEVEL" help="Find all doors with a door level on map." />
-		<item name="Find Door Quest Number" action="SEARCH_ON_MAP_DOOR_QUEST_NUMBER" help="Find all doors with a quest number on map." />
-		<item name="Find Door Quest Value" action="SEARCH_ON_MAP_DOOR_QUEST_VALUE" help="Find all doors with a quest value on map." />
-		<item name="Find Duplicate Item" action="SEARCH_ON_MAP_DUPLICATE" help="Find tiles that contain duplicate item IDs." />
-		<item name="Find Container" action="SEARCH_ON_MAP_CONTAINER" help="Find all containers on map." />
-		<item name="Find Writeable" action="SEARCH_ON_MAP_WRITEABLE" help="Find all writeable items on map." />
-		<separator />
-		<item name="Find Everything" action="SEARCH_ON_MAP_EVERYTHING" help="Find all unique/action/text/container items." />
-	</menu>
-	<menu name="Map">
-		<item name="Edit Towns" hotkey="Ctrl+T" action="EDIT_TOWNS" help="Edit towns." />
-		<!-- these were never implemented
-		<item name="Edit Items" hotkey="Ctrl+I" action="EDIT_ITEMS" help="Edit items."/>
-		<item name="Edit Monsters" action="EDIT_MONSTERS" help="Edit monsters."/>
-		-->
-		<separator />
-		<item name="Cleanup..." action="MAP_CLEANUP" help="Removes all items that do not exist in the OTB file (red tiles the server can't load)." />
-		<item name="Properties..." hotkey="Ctrl+P" action="MAP_PROPERTIES" help="Show and change the map properties." />
-		<item name="Statistics" hotkey="F8" action="MAP_STATISTICS" help="Show map statistics." />
-	</menu>
-	<menu name="Selection">
-		<item name="Replace Items on Selection" action="REPLACE_ON_SELECTION_ITEMS" help="Replace items on selected area." />
-		<item name="Find Item on Selection" action="SEARCH_ON_SELECTION_ITEM" help="Find items on selected area." />
-		<item name="Remove Item on Selection" action="REMOVE_ON_SELECTION_ITEM" help="Remove item on selected area." />
-		<item name="Export Spawn Creatures..." action="EXPORT_CREATURES_IN_SELECTION" help="Export creatures from each spawn in the selection to a text file with counts per spawn." />
-		<separator />
-		<menu name="Find on Selection">
-			<item name="Find Everything" action="SEARCH_ON_SELECTION_EVERYTHING" help="Find all unique/action/text/container items." />
-			<separator />
-			<item name="Find Unique" action="SEARCH_ON_SELECTION_UNIQUE" help="Find all items with an unique ID on selected area." />
-			<item name="Find Action" action="SEARCH_ON_SELECTION_ACTION" help="Find all items with an action ID on selected area." />
-			<item name="Find Key Hole Number" action="SEARCH_ON_SELECTION_KEYHOLE" help="Find all doors with a key hole number on selected area." />
-			<item name="Find Door Level" action="SEARCH_ON_SELECTION_DOOR_LEVEL" help="Find all doors with a door level on selected area." />
-			<item name="Find Door Quest Number" action="SEARCH_ON_SELECTION_DOOR_QUEST_NUMBER" help="Find all doors with a quest number on selected area." />
-			<item name="Find Door Quest Value" action="SEARCH_ON_SELECTION_DOOR_QUEST_VALUE" help="Find all doors with a quest value on selected area." />
-			<item name="Find Duplicate Item" action="SEARCH_ON_SELECTION_DUPLICATE" help="Find tiles that contain duplicate item IDs on selected area." />
-			<item name="Find Container" action="SEARCH_ON_SELECTION_CONTAINER" help="Find all containers on selected area." />
-			<item name="Find Writeable" action="SEARCH_ON_SELECTION_WRITEABLE" help="Find all writeable items on selected area." />
+		<menu name="Toolbars">
+			<item name="Brushes" action="VIEW_TOOLBARS_BRUSHES" help="Show or hide the Brushes toolbar." />
+			<item name="Position" action="VIEW_TOOLBARS_POSITION" help="Show or hide the Position toolbar." />
+			<item name="Sizes" action="VIEW_TOOLBARS_SIZES" help="Show or hide the Sizes toolbar." />
+			<item name="Standard" action="VIEW_TOOLBARS_STANDARD" help="Show or hide the Standard toolbar." />
+		</menu>
+		<menu name="Palette Panels">
+			<item name="Tools" action="VIEW_PALETTE_TOOLS" help="Show or hide the Tools panel in the palette." />
+			<item name="Brush Size" action="VIEW_PALETTE_BRUSH_SIZE" help="Show or hide the Brush Size panel in the palette." />
 		</menu>
 		<separator />
-		<menu name="Selection Mode">
-			<item name="Compensate Selection" action="SELECT_MODE_COMPENSATE" help="Compensate for floor difference when selecting." />
-			<separator />
-			<item name="Current Floor" action="SELECT_MODE_CURRENT" help="Select only current floor." />
-			<item name="Lower Floors" action="SELECT_MODE_LOWER" help="Select all lower floors." />
-			<item name="Visible Floors" action="SELECT_MODE_VISIBLE" help="Select only visible floors." />
+		<menu name="Transparency">
+			<item name="Ghost Loose Items" hotkey="G" action="GHOST_ITEMS" help="Ghost items (except ground)." />
+			<item name="Ghost Items on Void" action="GHOST_ITEMS_ON_VOID" help="Ghost items that are on tiles without ground." />
+			<item name="Ghost Higher Floors" hotkey="Ctrl+L" action="GHOST_HIGHER_FLOORS" help="Ghost floors above the current floor." />
 		</menu>
-		<separator />
-		<item name="Borderize Selection" action="BORDERIZE_SELECTION" help="Creates automatic borders in the entire selected area." />
-		<item name="Randomize Selection" action="RANDOMIZE_SELECTION" help="Randomizes the ground tiles of the selected area." />
 	</menu>
-	<menu name="View">
-		<!-- mapeditor view options -->
-		<item name="Show all Floors" hotkey="Ctrl+W" action="SHOW_ALL_FLOORS" help="If not checked other floors are hidden." />
-		<item name="Show as Minimap" hotkey="Shift+E" action="SHOW_AS_MINIMAP" help="Show only the tile minimap colors." />
-		<item name="Only show Colors" hotkey="Ctrl+E" action="SHOW_ONLY_COLORS" help="Show only the special tiles on the map." />
-		<item name="Only show Modified" hotkey="Ctrl+M" action="SHOW_ONLY_MODIFIED" help="Show only the tiles that have been modified since the map was opened." />
-		<item name="Always show zones" hotkey="" action="ALWAYS_SHOW_ZONES" help="Zones will be visible even on empty tiles." />
-		<item name="Extended house shader" hotkey="" action="EXT_HOUSE_SHADER" help="Draw house brush on walls and items." />
-		<item name="Show Invisible Items" hotkey="" action="SHOW_INVISIBLE_ITEMS" help="Show helper icons on invisible items." />
-		<separator />
-		<item name="Show tooltips" hotkey="Y" action="SHOW_TOOLTIPS" help="Show tooltips." />
-		<item name="Show tooltip key number" action="SHOW_TOOLTIP_KEY_NUMBER" help="Show key number in tooltips." />
-		<item name="Show tooltip door properties" action="SHOW_TOOLTIP_DOOR_PROPERTIES" help="Show door properties (key hole, level, quest) in tooltips." />
-		<item name="Show grid" hotkey="Shift+G" action="SHOW_GRID" help="Shows a grid over all items." />
-		<item name="Show tile coordinates" action="SHOW_TILE_COORDINATES" help="Display map coordinates overlay on the current floor." />
-		<item name="Show client box" hotkey="Shift+I" action="SHOW_INGAME_BOX" help="Shadows out areas not visible ingame (from the center of the screen)." />
-		<separator />
-		<item name="Ghost loose items" hotkey="G" action="GHOST_ITEMS" help="Ghost items (except ground)." />
-		<item name="Ghost items on void" action="GHOST_ITEMS_ON_VOID" help="Ghost items that are on tiles without ground." />
-		<item name="Ghost higher floors" hotkey="Ctrl+L" action="GHOST_HIGHER_FLOORS" help="Ghost floors." />
-		<item name="Show shade" hotkey="Q" action="SHOW_SHADE" help="Shade lower floors." />
-	</menu>
+
 	<menu name="Show">
-		<!-- item/zone filters -->
-		<item name="Show Animation" hotkey="L" action="SHOW_PREVIEW" help="Show item animations." />
-		<item name="Show Light" hotkey="Shift+L" action="SHOW_LIGHTS" help="Show lights." />
-		<item name="Show Light Strength" hotkey="Shift+K" action="SHOW_LIGHT_STR" help="Show indicators of light strength." />
-		<item name="Show Technical Items" hotkey="Shift+T" action="SHOW_TECHNICAL_ITEMS" help="Shows some of special items that are not visible in game." />
+		<menu name="Floors">
+			<item name="Show All Floors" hotkey="Ctrl+W" action="SHOW_ALL_FLOORS" help="If not checked, other floors are hidden." />
+			<item name="Show Shade" hotkey="Q" action="SHOW_SHADE" help="Shade lower floors." />
+		</menu>
+		<menu name="Display Mode">
+			<item name="Show as Minimap" hotkey="Shift+E" action="SHOW_AS_MINIMAP" help="Show only the tile minimap colors." />
+			<item name="Only Show Colors" hotkey="Ctrl+E" action="SHOW_ONLY_COLORS" help="Show only the special tiles on the map." />
+			<item name="Only Show Modified" hotkey="Ctrl+M" action="SHOW_ONLY_MODIFIED" help="Show only tiles modified since the map was opened." />
+		</menu>
 		<separator />
-		<item name="Show zones" hotkey="Shift+N" action="SHOW_ZONES" help="Show zones on the map." />
-		<item name="Show creatures" action="SHOW_CREATURES" help="Show creatures on the map." />
-		<item name="Show creature spawn time" action="SHOW_CREATURE_SPAWN_TIME" help="Show the spawn time values on creatures." />
-		<item name="Show spawns" hotkey="S" action="SHOW_SPAWNS" help="Show spawns on the map." />
-		<item name="Show special" hotkey="E" action="SHOW_SPECIAL" help="Show special tiles on the map, like PZ." />
-		<item name="Show houses" hotkey="Ctrl+H" action="SHOW_HOUSES" help="Show houses on the map." />
-		<item name="Show pathing" hotkey="O" action="SHOW_PATHING" help="Show blocking tiles." />
-		<item name="Show towns" hotkey="" action="SHOW_TOWNS" help="Show temple positions." />
-		<item name="Show waypoints" hotkey="Shift+W" action="SHOW_WAYPOINTS" help="Show waypoints." />
+		<menu name="Map Overlays">
+			<item name="Show Grid" hotkey="Shift+G" action="SHOW_GRID" help="Shows a grid over all items." />
+			<item name="Show Tile Coordinates" action="SHOW_TILE_COORDINATES" help="Display map coordinates overlay on the current floor." />
+			<item name="Show Client Box" hotkey="Shift+I" action="SHOW_INGAME_BOX" help="Shadows out areas not visible ingame (from the center of the screen)." />
+			<item name="Show Invisible Items" action="SHOW_INVISIBLE_ITEMS" help="Show helper icons on invisible items." />
+			<item name="Extended House Shader" action="EXT_HOUSE_SHADER" help="Draw house brush on walls and items." />
+		</menu>
+		<menu name="Tooltips">
+			<item name="Show Tooltips" hotkey="Y" action="SHOW_TOOLTIPS" help="Show tooltips." />
+			<item name="Show Tooltip Key Number" action="SHOW_TOOLTIP_KEY_NUMBER" help="Show key number in tooltips." />
+			<item name="Show Tooltip Door Properties" action="SHOW_TOOLTIP_DOOR_PROPERTIES" help="Show door properties (key hole, level, quest) in tooltips." />
+		</menu>
 		<separator />
-		<item name="Highlight Items" hotkey="V" action="HIGHLIGHT_ITEMS" help="Highlight tiles with items on them." />
-		<item name="Highlight Locked Doors" hotkey="X" action="HIGHLIGHT_LOCKED_DOORS" help="Highlight doors that require key to open." />
-		<item name="Show Wall Hooks" hotkey="K" action="SHOW_WALL_HOOKS" help="Show indicators for wall hooks." />
-		<item name="Show fishable water" action="SHOW_FISHABLE_WATER" help="Show indicators for fishing spots." />
-		<item name="Show borders" action="SHOW_BORDERS" help="Show ground border items on the map." />
+		<menu name="Lighting and Animation">
+			<item name="Show Animation" hotkey="L" action="SHOW_PREVIEW" help="Show item animations." />
+			<item name="Show Light" hotkey="Shift+L" action="SHOW_LIGHTS" help="Show lights." />
+			<item name="Show Light Strength" hotkey="Shift+K" action="SHOW_LIGHT_STR" help="Show indicators of light strength." />
+			<item name="Show Technical Items" hotkey="Shift+T" action="SHOW_TECHNICAL_ITEMS" help="Shows special items that are not visible in game." />
+		</menu>
+		<menu name="Map Markers">
+			<item name="Show Zones" hotkey="Shift+N" action="SHOW_EXTRA" help="Show zones on the map." />
+			<item name="Always Show Zones" action="ALWAYS_SHOW_ZONES" help="Zones will be visible even on empty tiles." />
+			<item name="Show Creatures" action="SHOW_CREATURES" help="Show creatures on the map." />
+			<item name="Show Creature Spawn Time" action="SHOW_CREATURE_SPAWN_TIME" help="Show the spawn time values on creatures." />
+			<item name="Show Spawns" hotkey="S" action="SHOW_SPAWNS" help="Show spawns on the map." />
+			<item name="Show Special" hotkey="E" action="SHOW_SPECIAL" help="Show special tiles on the map, like PZ." />
+			<item name="Show Houses" hotkey="Ctrl+H" action="SHOW_HOUSES" help="Show houses on the map." />
+			<item name="Show Pathing" hotkey="O" action="SHOW_PATHING" help="Show blocking tiles." />
+			<item name="Show Towns" action="SHOW_TOWNS" help="Show temple positions." />
+			<item name="Show Borders" action="SHOW_BORDERS" help="Show ground border items on the map." />
+			<item name="Show Wall Hooks" hotkey="K" action="SHOW_WALL_HOOKS" help="Show indicators for wall hooks." />
+			<item name="Show Fishable Water" action="SHOW_FISHABLE_WATER" help="Show indicators for fishing spots." />
+		</menu>
+		<menu name="Highlights">
+			<item name="Highlight Items" hotkey="V" action="HIGHLIGHT_ITEMS" help="Highlight tiles with items on them." />
+			<item name="Highlight Locked Doors" hotkey="X" action="HIGHLIGHT_LOCKED_DOORS" help="Highlight doors that require a key to open." />
+		</menu>
 	</menu>
+
 	<menu name="Navigate">
 		<item name="Go to Previous Position..." hotkey="P" action="GOTO_PREVIOUS_POSITION" help="Go to the previous screen center position." />
 		<item name="Go to Position..." hotkey="Ctrl+G" action="GOTO_POSITION" help="Go to a specific XYZ position." />
@@ -219,10 +184,63 @@
 			<item name="Floor 15" action="FLOOR_15" help="" />
 		</menu>
 	</menu>
-	<menu name="Network">
-		<item name="Connect to Server..." action="LIVE_CONNECT" help="Connect to a live map collaboration server." />
-		<item name="Disconnect" action="LIVE_DISCONNECT" help="Disconnect from the live collaboration server." />
+
+	<menu name="Search">
+		<item name="Find Item..." hotkey="Ctrl+F" action="FIND_ITEM" help="Find all instances of an item type on the map." />
+		<item name="Find Creature..." hotkey="Ctrl+Shift+C" action="FIND_CREATURE" help="Find all instances of a creature/monster on the map." />
+		<separator />
+		<item name="Find Everything" action="SEARCH_ON_MAP_EVERYTHING" help="Find all unique/action/text/container items." />
+		<separator />
+		<item name="Find Unique" action="SEARCH_ON_MAP_UNIQUE" help="Find all items with a unique ID on the map." />
+		<item name="Find Action" action="SEARCH_ON_MAP_ACTION" help="Find all items with an action ID on the map." />
+		<item name="Find Container" action="SEARCH_ON_MAP_CONTAINER" help="Find all containers on the map." />
+		<item name="Find Writeable" action="SEARCH_ON_MAP_WRITEABLE" help="Find all writeable items on the map." />
+		<item name="Find Duplicate Item" action="SEARCH_ON_MAP_DUPLICATE" help="Find tiles that contain duplicate item IDs." />
+		<separator />
+		<item name="Find Key Hole Number" action="SEARCH_ON_MAP_KEYHOLE" help="Find all doors with a key hole number on the map." />
+		<item name="Find Door Level" action="SEARCH_ON_MAP_DOOR_LEVEL" help="Find all doors with a door level on the map." />
+		<item name="Find Door Quest Number" action="SEARCH_ON_MAP_DOOR_QUEST_NUMBER" help="Find all doors with a quest number on the map." />
+		<item name="Find Door Quest Value" action="SEARCH_ON_MAP_DOOR_QUEST_VALUE" help="Find all doors with a quest value on the map." />
 	</menu>
+
+	<menu name="Map">
+		<item name="Edit Towns" hotkey="Ctrl+T" action="EDIT_TOWNS" help="Edit towns." />
+		<separator />
+		<item name="Cleanup..." action="MAP_CLEANUP" help="Removes all items that do not exist in the OTB file (red tiles the server cannot load)." />
+		<item name="Properties..." hotkey="Ctrl+P" action="MAP_PROPERTIES" help="Show and change the map properties." />
+		<item name="Statistics" hotkey="F8" action="MAP_STATISTICS" help="Show map statistics." />
+	</menu>
+
+	<menu name="Selection">
+		<item name="Replace Items on Selection" action="REPLACE_ON_SELECTION_ITEMS" help="Replace items on the selected area." />
+		<item name="Find Item on Selection" action="SEARCH_ON_SELECTION_ITEM" help="Find items on the selected area." />
+		<item name="Remove Item on Selection" action="REMOVE_ON_SELECTION_ITEM" help="Remove an item on the selected area." />
+		<item name="Export Spawn Creatures..." action="EXPORT_CREATURES_IN_SELECTION" help="Export creatures from each spawn in the selection to a text file with counts per spawn." />
+		<separator />
+		<menu name="Find on Selection">
+			<item name="Find Everything" action="SEARCH_ON_SELECTION_EVERYTHING" help="Find all unique/action/text/container items." />
+			<separator />
+			<item name="Find Unique" action="SEARCH_ON_SELECTION_UNIQUE" help="Find all items with a unique ID on the selected area." />
+			<item name="Find Action" action="SEARCH_ON_SELECTION_ACTION" help="Find all items with an action ID on the selected area." />
+			<item name="Find Container" action="SEARCH_ON_SELECTION_CONTAINER" help="Find all containers on the selected area." />
+			<item name="Find Writeable" action="SEARCH_ON_SELECTION_WRITEABLE" help="Find all writeable items on the selected area." />
+			<item name="Find Duplicate Item" action="SEARCH_ON_SELECTION_DUPLICATE" help="Find tiles that contain duplicate item IDs on the selected area." />
+			<separator />
+			<item name="Find Key Hole Number" action="SEARCH_ON_SELECTION_KEYHOLE" help="Find all doors with a key hole number on the selected area." />
+			<item name="Find Door Level" action="SEARCH_ON_SELECTION_DOOR_LEVEL" help="Find all doors with a door level on the selected area." />
+			<item name="Find Door Quest Number" action="SEARCH_ON_SELECTION_DOOR_QUEST_NUMBER" help="Find all doors with a quest number on the selected area." />
+			<item name="Find Door Quest Value" action="SEARCH_ON_SELECTION_DOOR_QUEST_VALUE" help="Find all doors with a quest value on the selected area." />
+		</menu>
+		<separator />
+		<menu name="Selection Mode">
+			<item name="Compensate Selection" action="SELECT_MODE_COMPENSATE" help="Compensate for floor difference when selecting." />
+			<separator />
+			<item name="Current Floor" action="SELECT_MODE_CURRENT" help="Select only the current floor." />
+			<item name="Lower Floors" action="SELECT_MODE_LOWER" help="Select all lower floors." />
+			<item name="Visible Floors" action="SELECT_MODE_VISIBLE" help="Select only visible floors." />
+		</menu>
+	</menu>
+
 	<menu name="Window">
 		<item name="Minimap" hotkey="M" action="WIN_MINIMAP" help="Displays the minimap window." />
 		<item name="New Palette" action="NEW_PALETTE" help="Creates a new palette." />
@@ -232,16 +250,15 @@
 			<item name="Item" hotkey="I" action="SELECT_ITEM" help="Select the Item palette." />
 			<item name="House" hotkey="H" action="SELECT_HOUSE" help="Select the House palette." />
 			<item name="Creature" hotkey="C" action="SELECT_CREATURE" help="Select the Creature palette." />
-			<item name="Waypoint" hotkey="W" action="SELECT_WAYPOINT" help="Select the Waypoint palette." />
 			<item name="RAW" hotkey="R" action="SELECT_RAW" help="Select the RAW palette." />
 		</menu>
-		<menu name="Toolbars">
-			<item name="Brushes" action="VIEW_TOOLBARS_BRUSHES" help="Show or hide the Brushes toolbar." />
-			<item name="Position" action="VIEW_TOOLBARS_POSITION" help="Show or hide the Position toolbar." />
-			<item name="Sizes" action="VIEW_TOOLBARS_SIZES" help="Show or hide the Sizes toolbar." />
-			<item name="Standard" action="VIEW_TOOLBARS_STANDARD" help="Show or hide the Standard toolbar." />
-		</menu>
 	</menu>
+
+	<menu name="Network">
+		<item name="Connect to Server..." action="LIVE_CONNECT" help="Connect to a live map collaboration server." />
+		<item name="Disconnect" action="LIVE_DISCONNECT" help="Disconnect from the live collaboration server." />
+	</menu>
+
 	<!--
 	<menu name="Debug">
 		<item name="Debug .dat" action="DEBUG_VIEW_DAT" help="View all item sprites available."/>

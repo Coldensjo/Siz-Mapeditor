@@ -212,7 +212,7 @@ Brush* BrushPalettePanel::GetSelectedBrush() const {
 	Brush* res = nullptr;
 	if (panel) {
 		for (ToolBarList::const_iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-			res = (*iter)->GetSelectedBrush();
+			res = iter->panel->GetSelectedBrush();
 			if (res) {
 				return res;
 			}
@@ -241,16 +241,16 @@ bool BrushPalettePanel::SelectBrush(const Brush* whatbrush) {
 		return false;
 	}
 
-	for (PalettePanel* toolBar : tool_bars) {
-		if (toolBar->SelectBrush(whatbrush)) {
+	for (const ToolBarEntry& toolBar : tool_bars) {
+		if (toolBar.panel->SelectBrush(whatbrush)) {
 			panel->SelectBrush(nullptr);
 			return true;
 		}
 	}
 
 	if (panel->SelectBrush(whatbrush)) {
-		for (PalettePanel* toolBar : tool_bars) {
-			toolBar->SelectBrush(nullptr);
+		for (const ToolBarEntry& toolBar : tool_bars) {
+			toolBar.panel->SelectBrush(nullptr);
 		}
 		return true;
 	}
@@ -263,8 +263,8 @@ bool BrushPalettePanel::SelectBrush(const Brush* whatbrush) {
 		panel = dynamic_cast<BrushPanel*>(choicebook->GetPage(iz));
 		if (panel && panel->SelectBrush(whatbrush)) {
 			choicebook->ChangeSelection(iz);
-			for (PalettePanel* toolBar : tool_bars) {
-				toolBar->SelectBrush(nullptr);
+			for (const ToolBarEntry& toolBar : tool_bars) {
+				toolBar.panel->SelectBrush(nullptr);
 			}
 			return true;
 		}
@@ -287,7 +287,7 @@ void BrushPalettePanel::OnSwitchingPage(wxChoicebookEvent& event) {
 	if (old_panel) {
 		old_panel->OnSwitchOut();
 		for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-			Brush* tmp = (*iter)->GetSelectedBrush();
+			Brush* tmp = iter->panel->GetSelectedBrush();
 			if (tmp) {
 				remembered_brushes[old_panel] = tmp;
 			}
@@ -299,7 +299,7 @@ void BrushPalettePanel::OnSwitchingPage(wxChoicebookEvent& event) {
 	if (panel) {
 		panel->OnSwitchIn();
 		for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-			(*iter)->SelectBrush(remembered_brushes[panel]);
+			iter->panel->SelectBrush(remembered_brushes[panel]);
 		}
 	}
 }

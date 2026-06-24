@@ -217,6 +217,28 @@ void PaletteWindow::ReloadSettings(Map* map) {
 		raw_palette->SetToolbarIconSize(g_settings.getBoolean(Config::USE_LARGE_RAW_SIZEBAR));
 	}
 	InvalidateContents();
+	UpdateToolPanelVisibility();
+}
+
+void PaletteWindow::UpdateToolPanelVisibility() {
+	auto updatePanel = [](PalettePanel* panel) {
+		if (panel) {
+			panel->UpdateToolPanelVisibility();
+		}
+	};
+
+	updatePanel(terrain_palette);
+	updatePanel(doodad_palette);
+	updatePanel(item_palette);
+	updatePanel(house_palette);
+	updatePanel(creature_palette);
+	updatePanel(raw_palette);
+
+	if (page_container) {
+		page_container->Layout();
+	}
+	Layout();
+	Fit();
 }
 
 void PaletteWindow::ShowPalettePage(PaletteType type) {

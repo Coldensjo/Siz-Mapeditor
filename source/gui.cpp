@@ -1592,6 +1592,10 @@ PaletteWindow* GUI::GetPalette() {
 	return palettes.front();
 }
 
+const GUI::PaletteList& GUI::GetPalettes() {
+	return palettes;
+}
+
 PaletteWindow* GUI::NewPalette() {
 	return CreatePalette();
 }

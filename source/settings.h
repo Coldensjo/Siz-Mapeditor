@@ -214,6 +214,8 @@ namespace Config {
 
 		MAP_VIEW_POSITIONS,
 		UI_THEME,
+		SHOW_PALETTE_TOOLS,
+		SHOW_PALETTE_BRUSH_SIZE,
 
 		LAST,
 	};

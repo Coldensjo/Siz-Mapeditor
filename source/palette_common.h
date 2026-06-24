@@ -71,6 +71,8 @@ public:
 
 	// Add a tool panel!
 	virtual void AddToolPanel(PalettePanel* panel);
+	// Show or hide Tools / Brush Size sections according to settings
+	virtual void UpdateToolPanelVisibility();
 	// Sets the style for this toolbar and child toolabrs
 	virtual void SetToolbarIconSize(bool large_icons);
 
@@ -97,7 +99,11 @@ public:
 	void RefreshOtherPalettes();
 
 protected:
-	typedef std::vector<PalettePanel*> ToolBarList;
+	struct ToolBarEntry {
+		PalettePanel* panel;
+		wxSizer* box_sizer;
+	};
+	typedef std::vector<ToolBarEntry> ToolBarList;
 	ToolBarList tool_bars;
 	wxTimer refresh_timer;
 	int last_brush_size;

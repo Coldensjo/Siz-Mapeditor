@@ -26,6 +26,7 @@
 #include "common_windows.h"
 #include "application.h"
 #include "theme.h"
+#include "settings.h"
 
 #include <cctype>
 
@@ -152,6 +153,18 @@ wxString BrushHoverIdText(const Brush* brush) {
 }
 } // namespace
 
+namespace {
+bool ShouldShowPaletteToolPanel(const wxString& name) {
+	if (name == "Tools") {
+		return g_settings.getBoolean(Config::SHOW_PALETTE_TOOLS);
+	}
+	if (name == "Brush Size") {
+		return g_settings.getBoolean(Config::SHOW_PALETTE_BRUSH_SIZE);
+	}
+	return true;
+}
+} // namespace
+
 void ShowPaletteBrushHoverTooltip(const Brush* brush, const wxPoint& screenPos) {
 	PaletteHoverTooltip* tooltip = GetPaletteHoverTooltip();
 	if (!tooltip) {
@@ -195,39 +208,50 @@ PaletteWindow* PalettePanel::GetParentPalette() const {
 
 void PalettePanel::InvalidateContents() {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->InvalidateContents();
+		iter->panel->InvalidateContents();
 	}
 }
 
 void PalettePanel::LoadCurrentContents() {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->OnSwitchIn();
+		iter->panel->OnSwitchIn();
 	}
 	Fit();
 }
 
 void PalettePanel::LoadAllContents() {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->LoadAllContents();
+		iter->panel->LoadAllContents();
 	}
 }
 
 void PalettePanel::AddToolPanel(PalettePanel* panel) {
 	wxSizer* sp_sizer = newd wxStaticBoxSizer(wxVERTICAL, this, panel->GetName());
 	sp_sizer->Add(panel, 0, wxEXPAND);
+	sp_sizer->Show(ShouldShowPaletteToolPanel(panel->GetName()));
 	GetSizer()->Add(sp_sizer, 0, wxEXPAND);
 
-	// GetSizer()->SetDimension(wxDefaultCoord, wxDefaultCoord, wxDefaultCoord, wxDefaultCoord);
-	// GetSizer()->Layout();
 	Fit();
-	//
 
-	tool_bars.push_back(panel);
+	tool_bars.push_back({ panel, sp_sizer });
+}
+
+void PalettePanel::UpdateToolPanelVisibility() {
+	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
+		if (iter->box_sizer) {
+			iter->box_sizer->Show(ShouldShowPaletteToolPanel(iter->panel->GetName()));
+		}
+	}
+	if (GetSizer()) {
+		GetSizer()->Layout();
+	}
+	Layout();
+	Fit();
 }
 
 void PalettePanel::SetToolbarIconSize(bool large_icons) {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->SetToolbarIconSize(large_icons);
+		iter->panel->SetToolbarIconSize(large_icons);
 	}
 }
 
@@ -273,13 +297,13 @@ bool PalettePanel::SelectBrush(const Brush* whatbrush) {
 
 void PalettePanel::OnUpdateBrushSize(BrushShape shape, int size) {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->OnUpdateBrushSize(shape, size);
+		iter->panel->OnUpdateBrushSize(shape, size);
 	}
 }
 
 void PalettePanel::OnSwitchIn() {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->OnSwitchIn();
+		iter->panel->OnSwitchIn();
 	}
 	g_gui.ActivatePalette(GetParentPalette());
 	g_gui.SetBrushSize(last_brush_even ? GUI::BRUSH_SIZE_2X2 : last_brush_size);
@@ -289,13 +313,13 @@ void PalettePanel::OnSwitchOut() {
 	last_brush_size = g_gui.GetBrushSize();
 	last_brush_even = g_gui.IsBrushEvenSize();
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->OnSwitchOut();
+		iter->panel->OnSwitchOut();
 	}
 }
 
 void PalettePanel::OnUpdate() {
 	for (ToolBarList::iterator iter = tool_bars.begin(); iter != tool_bars.end(); ++iter) {
-		(*iter)->OnUpdate();
+		iter->panel->OnUpdate();
 	}
 }
 

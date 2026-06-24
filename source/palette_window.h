@@ -36,6 +36,8 @@ public:
 	// Interface
 	// Reloads layout g_settings from g_settings (and using map)
 	void ReloadSettings(Map* from);
+	// Show or hide Tools / Brush Size sections according to settings
+	void UpdateToolPanelVisibility();
 	// Flushes all pages and forces them to be reloaded from the palette data again
 	void InvalidateContents();
 	// Refreshes only the page of a single tileset in the given category (if this

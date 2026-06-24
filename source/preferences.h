@@ -102,6 +102,8 @@ protected:
 	wxChoice* raw_palette_style_choice;
 
 	wxCheckBox* large_terrain_tools_chkbox;
+	wxCheckBox* show_palette_tools_chkbox;
+	wxCheckBox* show_palette_brush_size_chkbox;
 	wxCheckBox* large_doodad_sizebar_chkbox;
 	wxCheckBox* large_item_sizebar_chkbox;
 	wxCheckBox* large_house_sizebar_chkbox;

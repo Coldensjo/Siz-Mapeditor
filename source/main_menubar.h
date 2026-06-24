@@ -100,6 +100,8 @@ namespace MenuBar {
 		VIEW_TOOLBARS_POSITION,
 		VIEW_TOOLBARS_SIZES,
 		VIEW_TOOLBARS_STANDARD,
+		VIEW_PALETTE_TOOLS,
+		VIEW_PALETTE_BRUSH_SIZE,
 		NEW_VIEW,
 		TOGGLE_FULLSCREEN,
 		ZOOM_IN,
@@ -284,6 +286,7 @@ public:
 
 	// View Menu
 	void OnToolbars(wxCommandEvent& event);
+	void OnPalettePanels(wxCommandEvent& event);
 	void OnNewView(wxCommandEvent& event);
 	void OnToggleFullscreen(wxCommandEvent& event);
 	void OnZoomIn(wxCommandEvent& event);

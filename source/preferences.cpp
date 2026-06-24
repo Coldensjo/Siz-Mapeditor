@@ -519,6 +519,14 @@ wxNotebookPage* PreferencesWindow::CreateUIPage() {
 	large_terrain_tools_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_TERRAIN_TOOLBAR));
 	sizer->Add(large_terrain_tools_chkbox, 0, wxLEFT | wxTOP, 5);
 
+	show_palette_tools_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Show Tools panel in palette");
+	show_palette_tools_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_TOOLS));
+	sizer->Add(show_palette_tools_chkbox, 0, wxLEFT | wxTOP, 5);
+
+	show_palette_brush_size_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Show Brush Size panel in palette");
+	show_palette_brush_size_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_BRUSH_SIZE));
+	sizer->Add(show_palette_brush_size_chkbox, 0, wxLEFT | wxTOP, 5);
+
 	large_doodad_sizebar_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large doodad size palette icons");
 	large_doodad_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_DOODAD_SIZEBAR));
 	sizer->Add(large_doodad_sizebar_chkbox, 0, wxLEFT | wxTOP, 5);
@@ -856,6 +864,8 @@ bool PreferencesWindow::Apply() {
 	SetPaletteStyleChoice(item_palette_style_choice, Config::PALETTE_ITEM_STYLE);
 	SetPaletteStyleChoice(raw_palette_style_choice, Config::PALETTE_RAW_STYLE);
 	g_settings.setInteger(Config::USE_LARGE_TERRAIN_TOOLBAR, large_terrain_tools_chkbox->GetValue());
+	g_settings.setInteger(Config::SHOW_PALETTE_TOOLS, show_palette_tools_chkbox->GetValue());
+	g_settings.setInteger(Config::SHOW_PALETTE_BRUSH_SIZE, show_palette_brush_size_chkbox->GetValue());
 	g_settings.setInteger(Config::USE_LARGE_DOODAD_SIZEBAR, large_doodad_sizebar_chkbox->GetValue());
 	g_settings.setInteger(Config::USE_LARGE_ITEM_SIZEBAR, large_item_sizebar_chkbox->GetValue());
 	g_settings.setInteger(Config::USE_LARGE_HOUSE_SIZEBAR, large_house_sizebar_chkbox->GetValue());

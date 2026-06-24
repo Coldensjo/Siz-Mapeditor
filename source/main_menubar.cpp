@@ -138,6 +138,8 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 	MAKE_ACTION(VIEW_TOOLBARS_POSITION, wxITEM_CHECK, OnToolbars);
 	MAKE_ACTION(VIEW_TOOLBARS_SIZES, wxITEM_CHECK, OnToolbars);
 	MAKE_ACTION(VIEW_TOOLBARS_STANDARD, wxITEM_CHECK, OnToolbars);
+	MAKE_ACTION(VIEW_PALETTE_TOOLS, wxITEM_CHECK, OnPalettePanels);
+	MAKE_ACTION(VIEW_PALETTE_BRUSH_SIZE, wxITEM_CHECK, OnPalettePanels);
 	MAKE_ACTION(NEW_VIEW, wxITEM_NORMAL, OnNewView);
 	MAKE_ACTION(TOGGLE_FULLSCREEN, wxITEM_NORMAL, OnToggleFullscreen);
 
@@ -477,6 +479,8 @@ void MainMenuBar::LoadValues() {
 	CheckItem(VIEW_TOOLBARS_POSITION, g_settings.getBoolean(Config::SHOW_TOOLBAR_POSITION));
 	CheckItem(VIEW_TOOLBARS_SIZES, g_settings.getBoolean(Config::SHOW_TOOLBAR_SIZES));
 	CheckItem(VIEW_TOOLBARS_STANDARD, g_settings.getBoolean(Config::SHOW_TOOLBAR_STANDARD));
+	CheckItem(VIEW_PALETTE_TOOLS, g_settings.getBoolean(Config::SHOW_PALETTE_TOOLS));
+	CheckItem(VIEW_PALETTE_BRUSH_SIZE, g_settings.getBoolean(Config::SHOW_PALETTE_BRUSH_SIZE));
 
 	CheckItem(SELECT_MODE_COMPENSATE, g_settings.getBoolean(Config::COMPENSATED_SELECT));
 
@@ -2150,6 +2154,29 @@ void MainMenuBar::OnToolbars(wxCommandEvent& event) {
 			break;
 		default:
 			break;
+	}
+}
+
+void MainMenuBar::OnPalettePanels(wxCommandEvent& event) {
+	using namespace MenuBar;
+
+	ActionID id = static_cast<ActionID>(event.GetId() - (wxID_HIGHEST + 1));
+	switch (id) {
+		case VIEW_PALETTE_TOOLS:
+			g_settings.setInteger(Config::SHOW_PALETTE_TOOLS, event.IsChecked());
+			break;
+		case VIEW_PALETTE_BRUSH_SIZE:
+			g_settings.setInteger(Config::SHOW_PALETTE_BRUSH_SIZE, event.IsChecked());
+			break;
+		default:
+			return;
+	}
+
+	for (PaletteWindow* palette : g_gui.GetPalettes()) {
+		palette->UpdateToolPanelVisibility();
+	}
+	if (g_gui.aui_manager) {
+		g_gui.aui_manager->Update();
 	}
 }
 
