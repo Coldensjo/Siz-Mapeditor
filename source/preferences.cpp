@@ -26,39 +26,12 @@
 
 namespace {
 
-wxTextCtrl* AddFileRow(wxWindow* parent, wxSizer* sizer, const wxString& initialPath, const wxString& wildcard, const wxString& tooltip) {
-	auto* rowSizer = newd wxBoxSizer(wxHORIZONTAL);
-	auto* pathCtrl = newd wxTextCtrl(parent, wxID_ANY, initialPath);
-	auto* browseBtn = newd wxButton(parent, wxID_ANY, "...", wxDefaultPosition, FROM_DIP(parent, wxSize(28, -1)));
-	rowSizer->Add(pathCtrl, 1, wxEXPAND);
-	rowSizer->Add(browseBtn, 0, wxLEFT, 5);
-	sizer->Add(rowSizer, wxSizerFlags(0).Border(wxLEFT | wxRIGHT | wxTOP | wxEXPAND, 25));
-
-	pathCtrl->SetToolTip(tooltip);
-
-	browseBtn->Bind(wxEVT_BUTTON, [parent, pathCtrl, wildcard](wxCommandEvent&) {
-		wxFileDialog dlg(parent, "Select file", "", pathCtrl->GetValue(), wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-		if (dlg.ShowModal() == wxID_OK) {
-			pathCtrl->SetValue(dlg.GetPath());
-		}
-	});
-
-	return pathCtrl;
-}
-
-wxString NormalizeDirectoryPath(wxString dir) {
-	if (dir.Length() > 0 && dir.Last() != '/' && dir.Last() != '\\') {
-		dir.Append(FileName::GetPathSeparator());
-	}
-	return dir;
-}
-
 wxBoxSizer* CreateBrowsePathRow(wxWindow* parent, wxTextCtrl** pathOut, const wxString& initialPath, const wxString& tooltip) {
 	auto* rowSizer = newd wxBoxSizer(wxHORIZONTAL);
 	*pathOut = newd wxTextCtrl(parent, wxID_ANY, initialPath);
-	auto* browseBtn = newd wxButton(parent, wxID_ANY, "...", wxDefaultPosition, FROM_DIP(parent, wxSize(28, -1)));
+	auto* browseBtn = newd wxButton(parent, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize);
 	rowSizer->Add(*pathOut, 1, wxEXPAND);
-	rowSizer->Add(browseBtn, 0, wxLEFT, 5);
+	rowSizer->Add(browseBtn, 0, wxLEFT, 6);
 	(*pathOut)->SetToolTip(tooltip);
 
 	browseBtn->Bind(wxEVT_BUTTON, [parent, pathOut](wxCommandEvent&) {
@@ -71,6 +44,44 @@ wxBoxSizer* CreateBrowsePathRow(wxWindow* parent, wxTextCtrl** pathOut, const wx
 	return rowSizer;
 }
 
+wxBoxSizer* CreateBrowseFileRow(wxWindow* parent, wxTextCtrl** pathOut, const wxString& initialPath, const wxString& wildcard, const wxString& tooltip) {
+	auto* rowSizer = newd wxBoxSizer(wxHORIZONTAL);
+	*pathOut = newd wxTextCtrl(parent, wxID_ANY, initialPath);
+	auto* browseBtn = newd wxButton(parent, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize);
+	rowSizer->Add(*pathOut, 1, wxEXPAND);
+	rowSizer->Add(browseBtn, 0, wxLEFT, 6);
+	(*pathOut)->SetToolTip(tooltip);
+
+	browseBtn->Bind(wxEVT_BUTTON, [parent, pathOut, wildcard](wxCommandEvent&) {
+		wxFileDialog dlg(parent, "Select file", "", (*pathOut)->GetValue(), wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+		if (dlg.ShowModal() == wxID_OK) {
+			(*pathOut)->SetValue(dlg.GetPath());
+		}
+	});
+
+	return rowSizer;
+}
+
+wxString NormalizeDirectoryPath(wxString dir) {
+	if (dir.Length() > 0 && dir.Last() != '/' && dir.Last() != '\\') {
+		dir.Append(FileName::GetPathSeparator());
+	}
+	return dir;
+}
+
+void AddCheckbox(wxSizer* sizer, wxCheckBox** checkbox, wxWindow* parent, const wxString& label, bool value, const wxString& tooltip = wxEmptyString) {
+	*checkbox = newd wxCheckBox(parent, wxID_ANY, label);
+	(*checkbox)->SetValue(value);
+	if (!tooltip.empty()) {
+		(*checkbox)->SetToolTip(tooltip);
+	}
+	sizer->Add(*checkbox, 0, wxTOP | wxLEFT | wxRIGHT, 4);
+}
+
+void AddFormLabel(wxFlexGridSizer* grid, wxWindow* parent, const wxString& label) {
+	grid->Add(newd wxStaticText(parent, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+}
+
 } // namespace
 
 BEGIN_EVENT_TABLE(PreferencesWindow, wxDialog)
@@ -79,6 +90,31 @@ EVT_BUTTON(wxID_CANCEL, PreferencesWindow::OnClickCancel)
 EVT_BUTTON(wxID_APPLY, PreferencesWindow::OnClickApply)
 EVT_NOTEBOOK_PAGE_CHANGED(wxID_ANY, PreferencesWindow::OnNotebookPageChanged)
 END_EVENT_TABLE()
+
+PreferencesWindow::ScrollableTab PreferencesWindow::CreateScrollableTab() {
+	ScrollableTab tab;
+	tab.page = newd wxPanel(book, wxID_ANY);
+	auto* pageSizer = newd wxBoxSizer(wxVERTICAL);
+	tab.scroll = newd wxScrolledWindow(tab.page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+	tab.scroll->SetScrollRate(10, 10);
+	tab.content = newd wxBoxSizer(wxVERTICAL);
+	tab.scroll->SetSizer(tab.content);
+	pageSizer->Add(tab.scroll, 1, wxEXPAND);
+	tab.page->SetSizer(pageSizer);
+	return tab;
+}
+
+wxStaticBoxSizer* PreferencesWindow::AddSection(wxSizer* parent, wxWindow* window, const wxString& title) {
+	auto* section = newd wxStaticBoxSizer(wxVERTICAL, window, title);
+	parent->Add(section, 0, wxEXPAND | wxALL, 8);
+	return section;
+}
+
+wxFlexGridSizer* PreferencesWindow::CreateFormGrid(wxWindow* parent) {
+	auto* grid = newd wxFlexGridSizer(2, FROM_DIP(parent, 10), FROM_DIP(parent, 8));
+	grid->AddGrowableCol(1);
+	return grid;
+}
 
 PreferencesWindow::PreferencesWindow(wxWindow* parent, bool clientVersionSelected) :
 	wxDialog(parent, wxID_ANY, "Preferences", wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER) {
@@ -93,17 +129,19 @@ PreferencesWindow::PreferencesWindow(wxWindow* parent, bool clientVersionSelecte
 	book->AddPage(CreateUIPage(), "Interface");
 	book->AddPage(CreateClientPage(), "Client Version", clientVersionSelected);
 
-	sizer->Add(book, 1, wxEXPAND | wxALL, 10);
+	sizer->Add(book, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
 
-	wxSizer* subsizer = newd wxBoxSizer(wxHORIZONTAL);
-	subsizer->Add(newd wxButton(this, wxID_OK, "OK"), wxSizerFlags(1).Center());
-	subsizer->Add(newd wxButton(this, wxID_CANCEL, "Cancel"), wxSizerFlags(1).Border(wxALL, 5).Left().Center());
-	subsizer->Add(newd wxButton(this, wxID_APPLY, "Apply"), wxSizerFlags(1).Center());
-	sizer->Add(subsizer, 0, wxCENTER | wxLEFT | wxBOTTOM | wxRIGHT, 10);
+	auto* buttonSizer = newd wxBoxSizer(wxHORIZONTAL);
+	buttonSizer->AddStretchSpacer();
+	buttonSizer->Add(newd wxButton(this, wxID_OK, "OK"), 0, wxRIGHT, 6);
+	buttonSizer->Add(newd wxButton(this, wxID_CANCEL, "Cancel"), 0, wxRIGHT, 6);
+	buttonSizer->Add(newd wxButton(this, wxID_APPLY, "Apply"), 0);
+	buttonSizer->AddStretchSpacer();
+	sizer->Add(buttonSizer, 0, wxEXPAND | wxALL, 12);
 
 	SetSizer(sizer);
-	SetMinSize(FROM_DIP(this, wxSize(420, 480)));
-	Layout();
+	SetMinSize(FROM_DIP(this, wxSize(560, 620)));
+	SetSize(FROM_DIP(this, wxSize(580, 640)));
 	Centre(wxBOTH);
 
 	if (clientVersionSelected) {
@@ -121,306 +159,267 @@ void PreferencesWindow::OnNotebookPageChanged(wxBookCtrlEvent& event) {
 }
 
 wxNotebookPage* PreferencesWindow::CreateGeneralPage() {
-	wxNotebookPage* general_page = newd wxPanel(book, wxID_ANY);
+	const ScrollableTab tab = CreateScrollableTab();
+	wxWindow* const panel = tab.scroll;
+	wxSizer* const root = tab.content;
 
-	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
-	wxStaticText* tmptext = nullptr;
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Startup");
+		AddCheckbox(section, &show_welcome_dialog_chkbox, panel, "Show welcome dialog on startup", g_settings.getInteger(Config::WELCOME_DIALOG) == 1,
+			"Show welcome dialog when starting the editor.");
+		AddCheckbox(section, &open_map_on_startup_chkbox, panel, "Always open this map on startup", g_settings.getInteger(Config::OPEN_MAP_ON_STARTUP) == 1,
+			"Automatically open the selected map when starting the editor.");
 
-	show_welcome_dialog_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Show welcome dialog on startup");
-	show_welcome_dialog_chkbox->SetValue(g_settings.getInteger(Config::WELCOME_DIALOG) == 1);
-	show_welcome_dialog_chkbox->SetToolTip("Show welcome dialog when starting the editor.");
-	sizer->Add(show_welcome_dialog_chkbox, 0, wxLEFT | wxTOP, 5);
+		const wxString map_wildcard = g_settings.getInteger(Config::USE_OTGZ) != 0 ?
+			"(*.otbm;*.otgz)|*.otbm;*.otgz" :
+			"(*.otbm)|*.otbm|Compressed OpenTibia Binary Map (*.otgz)|*.otgz";
+		auto* mapGrid = CreateFormGrid(panel);
+		AddFormLabel(mapGrid, panel, "Startup map:");
+		mapGrid->Add(CreateBrowseFileRow(panel, &open_map_on_startup_path, wxstr(g_settings.getString(Config::OPEN_MAP_ON_STARTUP_PATH)), map_wildcard,
+			"Map file to open automatically when the editor starts."), 1, wxEXPAND);
+		section->Add(mapGrid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
 
-	open_map_on_startup_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Always open this map on startup");
-	const bool open_map_on_startup_enabled = g_settings.getInteger(Config::OPEN_MAP_ON_STARTUP) == 1;
-	open_map_on_startup_chkbox->SetValue(open_map_on_startup_enabled);
-	open_map_on_startup_chkbox->SetToolTip("Automatically open the selected map when starting the editor.");
-	sizer->Add(open_map_on_startup_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	const wxString map_wildcard = g_settings.getInteger(Config::USE_OTGZ) != 0 ?
-		"(*.otbm;*.otgz)|*.otbm;*.otgz" :
-		"(*.otbm)|*.otbm|Compressed OpenTibia Binary Map (*.otgz)|*.otgz";
-	open_map_on_startup_path = AddFileRow(
-		general_page,
-		sizer,
-		wxstr(g_settings.getString(Config::OPEN_MAP_ON_STARTUP_PATH)),
-		map_wildcard,
-		"Map file to open automatically when the editor starts."
-	);
-	open_map_on_startup_path->Enable(open_map_on_startup_enabled);
-
-	if (open_map_on_startup_enabled) {
-		show_welcome_dialog_chkbox->SetValue(false);
-		show_welcome_dialog_chkbox->Enable(false);
-	}
-
-	open_map_on_startup_chkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
-		const bool enabled = event.IsChecked();
-		open_map_on_startup_path->Enable(enabled);
-		if (enabled) {
+		const bool open_map_on_startup_enabled = open_map_on_startup_chkbox->GetValue();
+		open_map_on_startup_path->Enable(open_map_on_startup_enabled);
+		if (open_map_on_startup_enabled) {
 			show_welcome_dialog_chkbox->SetValue(false);
 			show_welcome_dialog_chkbox->Enable(false);
-		} else {
-			show_welcome_dialog_chkbox->Enable(true);
 		}
-	});
 
-	always_make_backup_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Always make map backup");
-	always_make_backup_chkbox->SetValue(g_settings.getInteger(Config::ALWAYS_MAKE_BACKUP) == 1);
-	sizer->Add(always_make_backup_chkbox, 0, wxLEFT | wxTOP, 5);
+		open_map_on_startup_chkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			const bool enabled = event.IsChecked();
+			open_map_on_startup_path->Enable(enabled);
+			if (enabled) {
+				show_welcome_dialog_chkbox->SetValue(false);
+				show_welcome_dialog_chkbox->Enable(false);
+			} else {
+				show_welcome_dialog_chkbox->Enable(true);
+			}
+		});
 
-	only_one_instance_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Open all maps in the same instance");
-	only_one_instance_chkbox->SetValue(g_settings.getInteger(Config::ONLY_ONE_INSTANCE) == 1);
-	only_one_instance_chkbox->SetToolTip("When checked, maps opened using the shell will all be opened in the same instance.");
-	sizer->Add(only_one_instance_chkbox, 0, wxLEFT | wxTOP, 5);
+		AddCheckbox(section, &enable_tileset_editing_chkbox, panel, "Enable tileset editing", g_settings.getInteger(Config::SHOW_TILESET_EDITOR) == 1,
+			"Show tileset editing options.");
+	}
 
-	ignore_save_prompt_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Skip save confirmation when closing");
-	ignore_save_prompt_chkbox->SetValue(g_settings.getBoolean(Config::IGNORE_SAVE_PROMPT));
-	ignore_save_prompt_chkbox->SetToolTip("When checked, the editor will not prompt to save changes when closing maps.");
-	sizer->Add(ignore_save_prompt_chkbox, 0, wxLEFT | wxTOP, 5);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Saving and instances");
+		AddCheckbox(section, &always_make_backup_chkbox, panel, "Always make map backup", g_settings.getInteger(Config::ALWAYS_MAKE_BACKUP) == 1);
+		AddCheckbox(section, &ignore_save_prompt_chkbox, panel, "Skip save confirmation when closing", g_settings.getBoolean(Config::IGNORE_SAVE_PROMPT),
+			"When checked, the editor will not prompt to save changes when closing maps.");
+		AddCheckbox(section, &auto_save_on_close_chkbox, panel, "Automatically save maps when closing", g_settings.getBoolean(Config::AUTO_SAVE_ON_CLOSE),
+			"When checked, the editor will save changes automatically when closing maps.");
+		AddCheckbox(section, &only_one_instance_chkbox, panel, "Open all maps in the same instance", g_settings.getInteger(Config::ONLY_ONE_INSTANCE) == 1,
+			"When checked, maps opened using the shell will all be opened in the same instance.");
+	}
 
-	auto_save_on_close_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Automatically save maps when closing");
-	auto_save_on_close_chkbox->SetValue(g_settings.getBoolean(Config::AUTO_SAVE_ON_CLOSE));
-	auto_save_on_close_chkbox->SetToolTip("When checked, the editor will save changes automatically when closing maps.");
-	sizer->Add(auto_save_on_close_chkbox, 0, wxLEFT | wxTOP, 5);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Performance");
+		wxStaticText* tmptext = nullptr;
+		auto* grid = CreateFormGrid(panel);
 
-	enable_tileset_editing_chkbox = newd wxCheckBox(general_page, wxID_ANY, "Enable tileset editing");
-	enable_tileset_editing_chkbox->SetValue(g_settings.getInteger(Config::SHOW_TILESET_EDITOR) == 1);
-	enable_tileset_editing_chkbox->SetToolTip("Show tileset editing options.");
-	sizer->Add(enable_tileset_editing_chkbox, 0, wxLEFT | wxTOP, 5);
+		grid->Add(tmptext = newd wxStaticText(panel, wxID_ANY, "Undo queue size:"), 0, wxALIGN_CENTER_VERTICAL);
+		undo_size_spin = newd wxSpinCtrl(panel, wxID_ANY, i2ws(g_settings.getInteger(Config::UNDO_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0x10000000);
+		grid->Add(undo_size_spin, 0, wxEXPAND);
+		SetWindowToolTip(tmptext, undo_size_spin, "How many actions you can undo. Higher values use more memory.");
 
-	sizer->AddSpacer(10);
+		grid->Add(tmptext = newd wxStaticText(panel, wxID_ANY, "Undo memory limit (MB):"), 0, wxALIGN_CENTER_VERTICAL);
+		undo_mem_size_spin = newd wxSpinCtrl(panel, wxID_ANY, i2ws(g_settings.getInteger(Config::UNDO_MEM_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 4096);
+		grid->Add(undo_mem_size_spin, 0, wxEXPAND);
+		SetWindowToolTip(tmptext, undo_mem_size_spin, "Approximate memory limit for the undo queue.");
 
-	auto* grid_sizer = newd wxFlexGridSizer(2, 10, 10);
-	grid_sizer->AddGrowableCol(1);
+		grid->Add(tmptext = newd wxStaticText(panel, wxID_ANY, "Worker threads:"), 0, wxALIGN_CENTER_VERTICAL);
+		worker_threads_spin = newd wxSpinCtrl(panel, wxID_ANY, i2ws(g_settings.getInteger(Config::WORKER_THREADS)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 64);
+		grid->Add(worker_threads_spin, 0, wxEXPAND);
+		SetWindowToolTip(tmptext, worker_threads_spin, "Threads used for intensive operations. Usually match your logical CPU count.");
 
-	grid_sizer->Add(tmptext = newd wxStaticText(general_page, wxID_ANY, "Undo queue size: "), 0);
-	undo_size_spin = newd wxSpinCtrl(general_page, wxID_ANY, i2ws(g_settings.getInteger(Config::UNDO_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0x10000000);
-	grid_sizer->Add(undo_size_spin, 0);
-	SetWindowToolTip(tmptext, undo_size_spin, "How many action you can undo, be aware that a high value will increase memory usage.");
+		grid->Add(tmptext = newd wxStaticText(panel, wxID_ANY, "Replace item limit:"), 0, wxALIGN_CENTER_VERTICAL);
+		replace_size_spin = newd wxSpinCtrl(panel, wxID_ANY, i2ws(g_settings.getInteger(Config::REPLACE_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100000);
+		grid->Add(replace_size_spin, 0, wxEXPAND);
+		SetWindowToolTip(tmptext, replace_size_spin, "How many items you can replace using the Replace Item tool.");
 
-	grid_sizer->Add(tmptext = newd wxStaticText(general_page, wxID_ANY, "Undo maximum memory size (MB): "), 0);
-	undo_mem_size_spin = newd wxSpinCtrl(general_page, wxID_ANY, i2ws(g_settings.getInteger(Config::UNDO_MEM_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 4096);
-	grid_sizer->Add(undo_mem_size_spin, 0);
-	SetWindowToolTip(tmptext, undo_mem_size_spin, "The approximite limit for the memory usage of the undo queue.");
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
 
-	grid_sizer->Add(tmptext = newd wxStaticText(general_page, wxID_ANY, "Worker Threads: "), 0);
-	worker_threads_spin = newd wxSpinCtrl(general_page, wxID_ANY, i2ws(g_settings.getInteger(Config::WORKER_THREADS)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 64);
-	grid_sizer->Add(worker_threads_spin, 0);
-	SetWindowToolTip(tmptext, worker_threads_spin, "How many threads the editor will use for intensive operations. This should be equivalent to the amount of logical processors in your system.");
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Clipboard");
+		auto* grid = CreateFormGrid(panel);
+		AddFormLabel(grid, panel, "Copy position format:");
+		position_format = newd wxChoice(panel, wxID_ANY);
+		position_format->Append("{x = 0, y = 0, z = 0}");
+		position_format->Append(R"({"x":0,"y":0,"z":0})");
+		position_format->Append("x, y, z");
+		position_format->Append("(x, y, z)");
+		position_format->Append("Position(x, y, z)");
+		position_format->Append("x=\"x\" y=\"y\" z=\"z\"");
+		position_format->Append("centerx=\"x\" centery=\"y\" centerz=\"z\"");
+		position_format->SetSelection(g_settings.getInteger(Config::COPY_POSITION_FORMAT));
+		grid->Add(position_format, 0, wxEXPAND);
+		SetWindowToolTip(position_format, "The position format when copying from the map.");
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
 
-	grid_sizer->Add(tmptext = newd wxStaticText(general_page, wxID_ANY, "Replace count: "), 0);
-	replace_size_spin = newd wxSpinCtrl(general_page, wxID_ANY, i2ws(g_settings.getInteger(Config::REPLACE_SIZE)), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100000);
-	grid_sizer->Add(replace_size_spin, 0);
-	SetWindowToolTip(tmptext, replace_size_spin, "How many items you can replace on the map using the Replace Item tool.");
-
-	sizer->Add(grid_sizer, 0, wxALL, 5);
-	sizer->AddSpacer(10);
-
-	wxString position_choices[] = {
-		"  {x = 0, y = 0, z = 0}",
-		R"(  {"x":0,"y":0,"z":0})",
-		"  x, y, z",
-		"  (x, y, z)",
-		"  Position(x, y, z)",
-		"  x=\"x\" y=\"y\" z=\"z\"",
-		"  centerx=\"x\" centery=\"y\" centerz=\"z\""
-	};
-	const int radio_choices = sizeof(position_choices) / sizeof(wxString);
-	position_format = new wxRadioBox(general_page, wxID_ANY, "Copy Position Format", wxDefaultPosition, wxDefaultSize, radio_choices, position_choices, 1, wxRA_SPECIFY_COLS);
-	position_format->SetSelection(g_settings.getInteger(Config::COPY_POSITION_FORMAT));
-	sizer->Add(position_format, 0, wxALL | wxEXPAND, 5);
-	SetWindowToolTip(position_format, "The position format when copying from the map.");
-
-	general_page->SetSizer(sizer);
-	return general_page;
+	tab.scroll->FitInside();
+	return tab.page;
 }
 
 wxNotebookPage* PreferencesWindow::CreateEditorPage() {
-	wxNotebookPage* editor_page = newd wxPanel(book, wxID_ANY);
+	const ScrollableTab tab = CreateScrollableTab();
+	wxWindow* const panel = tab.scroll;
+	wxSizer* const root = tab.content;
 
-	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Undo");
+		AddCheckbox(section, &group_actions_chkbox, panel, "Group same-type actions", g_settings.getBoolean(Config::GROUP_ACTIONS),
+			"Group consecutive actions of the same type (drawing, selection, etc.).");
+	}
 
-	group_actions_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Group same-type actions");
-	group_actions_chkbox->SetValue(g_settings.getBoolean(Config::GROUP_ACTIONS));
-	group_actions_chkbox->SetToolTip("This will group actions of the same type (drawing, selection..) when several take place in consecutive order.");
-	sizer->Add(group_actions_chkbox, 0, wxLEFT | wxTOP, 5);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Warnings");
+		AddCheckbox(section, &duplicate_id_warn_chkbox, panel, "Warn for duplicate IDs", g_settings.getBoolean(Config::WARN_FOR_DUPLICATE_ID),
+			"Warns for most kinds of duplicate IDs.");
+	}
 
-	duplicate_id_warn_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Warn for duplicate IDs");
-	duplicate_id_warn_chkbox->SetValue(g_settings.getBoolean(Config::WARN_FOR_DUPLICATE_ID));
-	duplicate_id_warn_chkbox->SetToolTip("Warns for most kinds of duplicate IDs.");
-	sizer->Add(duplicate_id_warn_chkbox, 0, wxLEFT | wxTOP, 5);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Brush behavior");
+		AddCheckbox(section, &house_remove_chkbox, panel, "House brush removes items", g_settings.getBoolean(Config::HOUSE_BRUSH_REMOVE_ITEMS),
+			"House brush removes items that respawn every time the map is loaded.");
+		AddCheckbox(section, &auto_assign_doors_chkbox, panel, "Auto-assign door ids", g_settings.getBoolean(Config::AUTO_ASSIGN_DOORID),
+			"Auto-assign unique door ids for doors placed with the door or house brush.\nDoes not affect RAW palette doors.");
+		AddCheckbox(section, &doodad_erase_same_chkbox, panel, "Doodad brush only erases same", g_settings.getBoolean(Config::DOODAD_BRUSH_ERASE_LIKE),
+			"Doodad brush only erases items belonging to the current brush.");
+		AddCheckbox(section, &eraser_leave_unique_chkbox, panel, "Eraser leaves unique items", g_settings.getBoolean(Config::ERASER_LEAVE_UNIQUE),
+			"Eraser leaves containers with items, unique/action id items, and special items.");
+		AddCheckbox(section, &auto_create_spawn_chkbox, panel, "Auto create spawn when placing creature", g_settings.getBoolean(Config::AUTO_CREATE_SPAWN),
+			"Place creatures without manually placing a spawn first.");
+		AddCheckbox(section, &allow_multiple_orderitems_chkbox, panel, "Prevent toporder conflict", g_settings.getBoolean(Config::RAW_LIKE_SIMONE),
+			"Prevent multiple items with the same toporder on one tile using a RAW brush.");
+	}
 
-	house_remove_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "House brush removes items");
-	house_remove_chkbox->SetValue(g_settings.getBoolean(Config::HOUSE_BRUSH_REMOVE_ITEMS));
-	house_remove_chkbox->SetToolTip("When this option is checked, the house brush will automaticly remove items that will respawn every time the map is loaded.");
-	sizer->Add(house_remove_chkbox, 0, wxLEFT | wxTOP, 5);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Selection and live editing");
+		AddCheckbox(section, &merge_move_chkbox, panel, "Use merge move", g_settings.getBoolean(Config::MERGE_MOVE),
+			"Moved tiles won't replace already placed tiles.");
+		AddCheckbox(section, &merge_paste_chkbox, panel, "Use merge paste", g_settings.getBoolean(Config::MERGE_PASTE),
+			"Pasted tiles won't replace already placed tiles.");
+		AddCheckbox(section, &live_allow_clipboard_chkbox, panel, "Allow copy and paste on live maps", g_settings.getBoolean(Config::LIVE_ALLOW_CLIPBOARD),
+			"Enable cut, copy, and paste while connected to a live map server.\nCan also be set as LIVE_ALLOW_CLIPBOARD=1 in editor.cfg.");
+	}
 
-	auto_assign_doors_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Auto-assign door ids");
-	auto_assign_doors_chkbox->SetValue(g_settings.getBoolean(Config::AUTO_ASSIGN_DOORID));
-	auto_assign_doors_chkbox->SetToolTip("This will auto-assign unique door ids to all doors placed with the door brush (or doors painted over with the house brush).\nDoes NOT affect doors placed using the RAW palette.");
-	sizer->Add(auto_assign_doors_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	doodad_erase_same_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Doodad brush only erases same");
-	doodad_erase_same_chkbox->SetValue(g_settings.getBoolean(Config::DOODAD_BRUSH_ERASE_LIKE));
-	doodad_erase_same_chkbox->SetToolTip("The doodad brush will only erase items that belongs to the current brush.");
-	sizer->Add(doodad_erase_same_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	eraser_leave_unique_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Eraser leaves unique items");
-	eraser_leave_unique_chkbox->SetValue(g_settings.getBoolean(Config::ERASER_LEAVE_UNIQUE));
-	eraser_leave_unique_chkbox->SetToolTip("The eraser will leave containers with items in them, items with unique or action id and items.");
-	sizer->Add(eraser_leave_unique_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	auto_create_spawn_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Auto create spawn when placing creature");
-	auto_create_spawn_chkbox->SetValue(g_settings.getBoolean(Config::AUTO_CREATE_SPAWN));
-	auto_create_spawn_chkbox->SetToolTip("When this option is checked, you can place creatures without placing a spawn manually, the spawn will be place automatically.");
-	sizer->Add(auto_create_spawn_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	allow_multiple_orderitems_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Prevent toporder conflict");
-	allow_multiple_orderitems_chkbox->SetValue(g_settings.getBoolean(Config::RAW_LIKE_SIMONE));
-	allow_multiple_orderitems_chkbox->SetToolTip("When this option is checked, you can not place several items with the same toporder on one tile using a RAW Brush.");
-	sizer->Add(allow_multiple_orderitems_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	sizer->AddSpacer(10);
-
-	merge_move_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Use merge move");
-	merge_move_chkbox->SetValue(g_settings.getBoolean(Config::MERGE_MOVE));
-	merge_move_chkbox->SetToolTip("Moved tiles won't replace already placed tiles.");
-	sizer->Add(merge_move_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	merge_paste_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Use merge paste");
-	merge_paste_chkbox->SetValue(g_settings.getBoolean(Config::MERGE_PASTE));
-	merge_paste_chkbox->SetToolTip("Pasted tiles won't replace already placed tiles.");
-	sizer->Add(merge_paste_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	live_allow_clipboard_chkbox = newd wxCheckBox(editor_page, wxID_ANY, "Allow copy and paste on live maps");
-	live_allow_clipboard_chkbox->SetValue(g_settings.getBoolean(Config::LIVE_ALLOW_CLIPBOARD));
-	live_allow_clipboard_chkbox->SetToolTip("When connected to a live map server, enable cut, copy, and paste.\nCan also be set in editor.cfg as LIVE_ALLOW_CLIPBOARD=1 under [Network].");
-	sizer->Add(live_allow_clipboard_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	editor_page->SetSizer(sizer);
-	return editor_page;
+	tab.scroll->FitInside();
+	return tab.page;
 }
 
 wxNotebookPage* PreferencesWindow::CreateGraphicsPage() {
-	wxWindow* tmp = nullptr;
-	wxNotebookPage* graphics_page = newd wxPanel(book, wxID_ANY);
+	const ScrollableTab tab = CreateScrollableTab();
+	wxWindow* const panel = tab.scroll;
+	wxSizer* const root = tab.content;
+	wxStaticText* tmp = nullptr;
 
-	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Map view");
+		AddCheckbox(section, &hide_items_when_zoomed_chkbox, panel, "Hide items when zoomed out", g_settings.getBoolean(Config::HIDE_ITEMS_WHEN_ZOOMED),
+			"Hide loose items when zoomed far out.");
+		AddCheckbox(section, &show_chunk_boundaries_chkbox, panel, "Show chunk boundaries overlay", g_settings.getBoolean(Config::SHOW_CHUNK_BOUNDARIES),
+			"Highlight every 256 tiles to visualize chunk boundaries.");
+		AddCheckbox(section, &show_mouse_crosshair_chkbox, panel, "Show mouse crosshair overlay", g_settings.getBoolean(Config::SHOW_MOUSE_CROSSHAIR),
+			"Draw guide lines following the cursor to help align tiles.");
+	}
 
-	hide_items_when_zoomed_chkbox = newd wxCheckBox(graphics_page, wxID_ANY, "Hide items when zoomed out");
-	hide_items_when_zoomed_chkbox->SetValue(g_settings.getBoolean(Config::HIDE_ITEMS_WHEN_ZOOMED));
-	sizer->Add(hide_items_when_zoomed_chkbox, 0, wxLEFT | wxTOP, 5);
-	SetWindowToolTip(hide_items_when_zoomed_chkbox, "When this option is checked, \"loose\" items will be hidden when you zoom very far out.");
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Colors");
+		auto* grid = CreateFormGrid(panel);
 
-	show_chunk_boundaries_chkbox = newd wxCheckBox(graphics_page, wxID_ANY, "Show chunk boundaries overlay");
-	show_chunk_boundaries_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_CHUNK_BOUNDARIES));
-	sizer->Add(show_chunk_boundaries_chkbox, 0, wxLEFT | wxTOP, 5);
-	SetWindowToolTip(show_chunk_boundaries_chkbox, "Draws a highlight every 256 tiles to visualize chunk boundaries while editing.");
+		icon_background_choice = newd wxChoice(panel, wxID_ANY);
+		icon_background_choice->Append("Transparent background");
+		icon_background_choice->Append("Black background");
+		icon_background_choice->Append("Gray background");
+		icon_background_choice->Append("White background");
+		SetIconBackgroundSelection(IconBackgroundSelection());
 
-	show_mouse_crosshair_chkbox = newd wxCheckBox(graphics_page, wxID_ANY, "Show mouse crosshair overlay");
-	show_mouse_crosshair_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_MOUSE_CROSSHAIR));
-	sizer->Add(show_mouse_crosshair_chkbox, 0, wxLEFT | wxTOP, 5);
-	SetWindowToolTip(show_mouse_crosshair_chkbox, "Draws horizontal and vertical guide lines following the cursor to help align tiles.");
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Icon background:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(icon_background_choice, 0, wxEXPAND);
+		SetWindowToolTip(icon_background_choice, tmp, "Background color for icons in palette and picker windows.");
 
-	icon_selection_shadow_chkbox = newd wxCheckBox(graphics_page, wxID_ANY, "Use icon selection shadow");
-	icon_selection_shadow_chkbox->SetValue(g_settings.getBoolean(Config::USE_GUI_SELECTION_SHADOW));
-	sizer->Add(icon_selection_shadow_chkbox, 0, wxLEFT | wxTOP, 5);
-	SetWindowToolTip(icon_selection_shadow_chkbox, "When this option is checked, selected items in the palette menu will be shaded.");
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Cursor color:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(cursor_color_pick = newd wxColourPickerCtrl(panel, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_RED), g_settings.getInteger(Config::CURSOR_GREEN), g_settings.getInteger(Config::CURSOR_BLUE), g_settings.getInteger(Config::CURSOR_ALPHA))), 0);
+		SetWindowToolTip(cursor_color_pick, tmp, "Main cursor color on the map while drawing.");
 
-	use_memcached_chkbox = newd wxCheckBox(graphics_page, wxID_ANY, "Use memcached sprites");
-	use_memcached_chkbox->SetValue(g_settings.getBoolean(Config::USE_MEMCACHED_SPRITES));
-	sizer->Add(use_memcached_chkbox, 0, wxLEFT | wxTOP, 5);
-	SetWindowToolTip(use_memcached_chkbox, "When this is checked, sprites will be loaded into memory at startup and unpacked at runtime. This is faster but consumes more memory.\nIf it is not checked, the editor will use less memory but there will be a performance decrease due to reading sprites from the disk.");
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Secondary cursor color:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(cursor_alt_color_pick = newd wxColourPickerCtrl(panel, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_ALT_RED), g_settings.getInteger(Config::CURSOR_ALT_GREEN), g_settings.getInteger(Config::CURSOR_ALT_BLUE), g_settings.getInteger(Config::CURSOR_ALT_ALPHA))), 0);
+		SetWindowToolTip(cursor_alt_color_pick, tmp, "Secondary cursor color for houses and flags.");
 
-	sizer->AddSpacer(10);
-
-	auto* subsizer = newd wxFlexGridSizer(2, 10, 10);
-	subsizer->AddGrowableCol(1);
-
-	icon_background_choice = newd wxChoice(graphics_page, wxID_ANY);
-	icon_background_choice->Append("Transparent background");
-	icon_background_choice->Append("Black background");
-	icon_background_choice->Append("Gray background");
-	icon_background_choice->Append("White background");
-	SetIconBackgroundSelection(IconBackgroundSelection());
-
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Icon background color: "), 0);
-	subsizer->Add(icon_background_choice, 0);
-	SetWindowToolTip(icon_background_choice, tmp, "This will change the background color on icons in all windows.");
-
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Cursor color: "), 0);
-	subsizer->Add(cursor_color_pick = newd wxColourPickerCtrl(graphics_page, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_RED), g_settings.getInteger(Config::CURSOR_GREEN), g_settings.getInteger(Config::CURSOR_BLUE), g_settings.getInteger(Config::CURSOR_ALPHA))), 0);
-	SetWindowToolTip(cursor_color_pick, tmp, "The color of the main cursor on the map (while in drawing mode).");
-
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Secondary cursor color: "), 0);
-	subsizer->Add(cursor_alt_color_pick = newd wxColourPickerCtrl(graphics_page, wxID_ANY, wxColor(g_settings.getInteger(Config::CURSOR_ALT_RED), g_settings.getInteger(Config::CURSOR_ALT_GREEN), g_settings.getInteger(Config::CURSOR_ALT_BLUE), g_settings.getInteger(Config::CURSOR_ALT_ALPHA))), 0);
-	SetWindowToolTip(cursor_alt_color_pick, tmp, "The color of the secondary cursor on the map (for houses and flags).");
-
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Crosshair color: "), 0);
-	mouse_crosshair_color_pick = newd wxColourPickerCtrl(
-		graphics_page,
-		wxID_ANY,
-		wxColor(
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Crosshair color:"), 0, wxALIGN_CENTER_VERTICAL);
+		mouse_crosshair_color_pick = newd wxColourPickerCtrl(panel, wxID_ANY, wxColor(
 			g_settings.getInteger(Config::CURSOR_CROSSHAIR_RED),
 			g_settings.getInteger(Config::CURSOR_CROSSHAIR_GREEN),
-			g_settings.getInteger(Config::CURSOR_CROSSHAIR_BLUE)
-		)
-	);
-	mouse_crosshair_color_pick->Enable(show_mouse_crosshair_chkbox->GetValue());
-	subsizer->Add(mouse_crosshair_color_pick, 0);
-	SetWindowToolTip(mouse_crosshair_color_pick, tmp, "The color used for the mouse crosshair overlay.");
-	show_mouse_crosshair_chkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
-		mouse_crosshair_color_pick->Enable(event.IsChecked());
-	});
+			g_settings.getInteger(Config::CURSOR_CROSSHAIR_BLUE)));
+		mouse_crosshair_color_pick->Enable(show_mouse_crosshair_chkbox->GetValue());
+		grid->Add(mouse_crosshair_color_pick, 0);
+		SetWindowToolTip(mouse_crosshair_color_pick, tmp, "Color used for the mouse crosshair overlay.");
+		show_mouse_crosshair_chkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			mouse_crosshair_color_pick->Enable(event.IsChecked());
+		});
 
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Viewport background color: "), 0);
-	viewport_background_color_pick = newd wxColourPickerCtrl(
-		graphics_page,
-		wxID_ANY,
-		wxColor(
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Viewport background:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(viewport_background_color_pick = newd wxColourPickerCtrl(panel, wxID_ANY, wxColor(
 			g_settings.getInteger(Config::VIEWPORT_BACKGROUND_RED),
 			g_settings.getInteger(Config::VIEWPORT_BACKGROUND_GREEN),
-			g_settings.getInteger(Config::VIEWPORT_BACKGROUND_BLUE)
-		)
-	);
-	subsizer->Add(viewport_background_color_pick, 0);
-	SetWindowToolTip(viewport_background_color_pick, tmp, "Sets the solid colour behind the map view to reduce eye strain or improve contrast with tiles.");
+			g_settings.getInteger(Config::VIEWPORT_BACKGROUND_BLUE))), 0);
+		SetWindowToolTip(viewport_background_color_pick, tmp, "Solid color behind the map view.");
 
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Screenshot directory: "), 0);
-	subsizer->Add(CreateBrowsePathRow(graphics_page, &screenshot_directory_path, wxstr(g_settings.getString(Config::SCREENSHOT_DIRECTORY)), "Screenshots taken in the editor will be saved to this directory."), 1, wxEXPAND);
-	SetWindowToolTip(screenshot_directory_path, tmp, "Screenshots taken in the editor will be saved to this directory.");
-
-	screenshot_format_choice = newd wxChoice(graphics_page, wxID_ANY);
-	screenshot_format_choice->Append("PNG");
-	screenshot_format_choice->Append("JPG");
-	screenshot_format_choice->Append("TGA");
-	screenshot_format_choice->Append("BMP");
-	const std::string screenshot_format = g_settings.getString(Config::SCREENSHOT_FORMAT);
-	if (screenshot_format == "jpg") {
-		screenshot_format_choice->SetSelection(1);
-	} else if (screenshot_format == "tga") {
-		screenshot_format_choice->SetSelection(2);
-	} else if (screenshot_format == "bmp") {
-		screenshot_format_choice->SetSelection(3);
-	} else {
-		screenshot_format_choice->SetSelection(0);
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
 	}
-	subsizer->Add(tmp = newd wxStaticText(graphics_page, wxID_ANY, "Screenshot format: "), 0);
-	subsizer->Add(screenshot_format_choice, 0);
-	SetWindowToolTip(screenshot_format_choice, tmp, "This will affect the screenshot format used by the editor.\nTo take a screenshot, press F11.");
 
-	sizer->Add(subsizer, 1, wxEXPAND | wxALL, 5);
-	graphics_page->SetSizer(sizer);
-	return graphics_page;
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Sprites and icons");
+		AddCheckbox(section, &icon_selection_shadow_chkbox, panel, "Use icon selection shadow", g_settings.getBoolean(Config::USE_GUI_SELECTION_SHADOW),
+			"Shade selected items in palette menus.");
+		AddCheckbox(section, &use_memcached_chkbox, panel, "Use memcached sprites", g_settings.getBoolean(Config::USE_MEMCACHED_SPRITES),
+			"Load sprites into memory at startup for faster rendering.\nUses more memory but avoids repeated disk reads.");
+	}
+
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Screenshots");
+		auto* grid = CreateFormGrid(panel);
+
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Screenshot directory:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(CreateBrowsePathRow(panel, &screenshot_directory_path, wxstr(g_settings.getString(Config::SCREENSHOT_DIRECTORY)),
+			"Screenshots taken in the editor will be saved to this directory."), 1, wxEXPAND);
+		SetWindowToolTip(screenshot_directory_path, tmp, "Screenshots taken in the editor will be saved to this directory.");
+
+		screenshot_format_choice = newd wxChoice(panel, wxID_ANY);
+		screenshot_format_choice->Append("PNG");
+		screenshot_format_choice->Append("JPG");
+		screenshot_format_choice->Append("TGA");
+		screenshot_format_choice->Append("BMP");
+		const std::string screenshot_format = g_settings.getString(Config::SCREENSHOT_FORMAT);
+		if (screenshot_format == "jpg") {
+			screenshot_format_choice->SetSelection(1);
+		} else if (screenshot_format == "tga") {
+			screenshot_format_choice->SetSelection(2);
+		} else if (screenshot_format == "bmp") {
+			screenshot_format_choice->SetSelection(3);
+		} else {
+			screenshot_format_choice->SetSelection(0);
+		}
+
+		grid->Add(tmp = newd wxStaticText(panel, wxID_ANY, "Screenshot format:"), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(screenshot_format_choice, 0, wxEXPAND);
+		SetWindowToolTip(screenshot_format_choice, tmp, "Screenshot format used by the editor. Press F11 to capture.");
+
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
+
+	tab.scroll->FitInside();
+	return tab.page;
 }
 
 wxChoice* PreferencesWindow::AddPaletteStyleChoice(wxWindow* parent, wxSizer* sizer, const wxString& short_description, const wxString& description, const std::string& setting) {
-	wxStaticText* text = newd wxStaticText(parent, wxID_ANY, short_description);
-	sizer->Add(text, 0);
+	auto* text = newd wxStaticText(parent, wxID_ANY, short_description);
+	sizer->Add(text, 0, wxALIGN_CENTER_VERTICAL);
 
-	wxChoice* choice = newd wxChoice(parent, wxID_ANY);
-	sizer->Add(choice, 0);
+	auto* choice = newd wxChoice(parent, wxID_ANY);
+	sizer->Add(choice, 0, wxEXPAND);
 
 	choice->Append("Large Icons");
 	choice->Append("Small Icons");
@@ -467,172 +466,151 @@ void PreferencesWindow::SetIconBackgroundSelection(int selection) {
 }
 
 wxNotebookPage* PreferencesWindow::CreateUIPage() {
-	wxNotebookPage* ui_page = newd wxPanel(book, wxID_ANY);
+	const ScrollableTab tab = CreateScrollableTab();
+	wxWindow* const panel = tab.scroll;
+	wxSizer* const root = tab.content;
 
-	wxSizer* sizer = newd wxBoxSizer(wxVERTICAL);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Appearance");
+		auto* grid = CreateFormGrid(panel);
+		theme_choice = newd wxChoice(panel, wxID_ANY);
+		theme_choice->Append("Dark");
+		theme_choice->Append("Light");
+		theme_choice->Append("System");
+		theme_choice->SetSelection(static_cast<int>(ThemeManager::Get().GetMode()));
+		AddFormLabel(grid, panel, "Theme:");
+		grid->Add(theme_choice, 0, wxEXPAND);
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
 
-	auto* subsizer = newd wxFlexGridSizer(2, 10, 10);
-	subsizer->AddGrowableCol(1);
-	theme_choice = newd wxChoice(ui_page, wxID_ANY);
-	theme_choice->Append("Dark");
-	theme_choice->Append("Light");
-	theme_choice->Append("System");
-	theme_choice->SetSelection(static_cast<int>(ThemeManager::Get().GetMode()));
-	subsizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Theme:"), 0);
-	subsizer->Add(theme_choice, 0);
-	terrain_palette_style_choice = AddPaletteStyleChoice(
-		ui_page, subsizer,
-		"Terrain Palette Style:",
-		"Configures the look of the terrain palette.",
-		g_settings.getString(Config::PALETTE_TERRAIN_STYLE)
-	);
-	doodad_palette_style_choice = AddPaletteStyleChoice(
-		ui_page, subsizer,
-		"Doodad Palette Style:",
-		"Configures the look of the doodad palette.",
-		g_settings.getString(Config::PALETTE_DOODAD_STYLE)
-	);
-	item_palette_style_choice = AddPaletteStyleChoice(
-		ui_page, subsizer,
-		"Item Palette Style:",
-		"Configures the look of the item palette.",
-		g_settings.getString(Config::PALETTE_ITEM_STYLE)
-	);
-	raw_palette_style_choice = AddPaletteStyleChoice(
-		ui_page, subsizer,
-		"RAW Palette Style:",
-		"Configures the look of the raw palette.",
-		g_settings.getString(Config::PALETTE_RAW_STYLE)
-	);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Palette layout");
+		auto* grid = CreateFormGrid(panel);
+		terrain_palette_style_choice = AddPaletteStyleChoice(panel, grid, "Terrain palette:", "Configures the look of the terrain palette.", g_settings.getString(Config::PALETTE_TERRAIN_STYLE));
+		doodad_palette_style_choice = AddPaletteStyleChoice(panel, grid, "Doodad palette:", "Configures the look of the doodad palette.", g_settings.getString(Config::PALETTE_DOODAD_STYLE));
+		item_palette_style_choice = AddPaletteStyleChoice(panel, grid, "Item palette:", "Configures the look of the item palette.", g_settings.getString(Config::PALETTE_ITEM_STYLE));
+		raw_palette_style_choice = AddPaletteStyleChoice(panel, grid, "RAW palette:", "Configures the look of the raw palette.", g_settings.getString(Config::PALETTE_RAW_STYLE));
+		section->Add(grid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
 
-	sizer->Add(subsizer, 0, wxALL, 6);
-	sizer->AddSpacer(10);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Palette panels and icon sizes");
+		auto* iconGrid = newd wxFlexGridSizer(2, FROM_DIP(panel, 12), FROM_DIP(panel, 4));
+		iconGrid->AddGrowableCol(0);
+		iconGrid->AddGrowableCol(1);
 
-	large_terrain_tools_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large terrain palette tool && size icons");
-	large_terrain_tools_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_TERRAIN_TOOLBAR));
-	sizer->Add(large_terrain_tools_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_terrain_tools_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large terrain tool icons");
+		large_terrain_tools_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_TERRAIN_TOOLBAR));
+		iconGrid->Add(large_terrain_tools_chkbox, 0, wxEXPAND);
 
-	show_palette_tools_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Show Tools panel in palette");
-	show_palette_tools_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_TOOLS));
-	sizer->Add(show_palette_tools_chkbox, 0, wxLEFT | wxTOP, 5);
+		show_palette_tools_chkbox = newd wxCheckBox(panel, wxID_ANY, "Show Tools panel");
+		show_palette_tools_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_TOOLS));
+		iconGrid->Add(show_palette_tools_chkbox, 0, wxEXPAND);
 
-	show_palette_brush_size_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Show Brush Size panel in palette");
-	show_palette_brush_size_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_BRUSH_SIZE));
-	sizer->Add(show_palette_brush_size_chkbox, 0, wxLEFT | wxTOP, 5);
+		show_palette_brush_size_chkbox = newd wxCheckBox(panel, wxID_ANY, "Show Brush Size panel");
+		show_palette_brush_size_chkbox->SetValue(g_settings.getBoolean(Config::SHOW_PALETTE_BRUSH_SIZE));
+		iconGrid->Add(show_palette_brush_size_chkbox, 0, wxEXPAND);
 
-	large_doodad_sizebar_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large doodad size palette icons");
-	large_doodad_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_DOODAD_SIZEBAR));
-	sizer->Add(large_doodad_sizebar_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_doodad_sizebar_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large doodad size icons");
+		large_doodad_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_DOODAD_SIZEBAR));
+		iconGrid->Add(large_doodad_sizebar_chkbox, 0, wxEXPAND);
 
-	large_item_sizebar_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large item size palette icons");
-	large_item_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_ITEM_SIZEBAR));
-	sizer->Add(large_item_sizebar_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_item_sizebar_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large item size icons");
+		large_item_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_ITEM_SIZEBAR));
+		iconGrid->Add(large_item_sizebar_chkbox, 0, wxEXPAND);
 
-	large_house_sizebar_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large house palette size icons");
-	large_house_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_HOUSE_SIZEBAR));
-	sizer->Add(large_house_sizebar_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_house_sizebar_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large house size icons");
+		large_house_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_HOUSE_SIZEBAR));
+		iconGrid->Add(large_house_sizebar_chkbox, 0, wxEXPAND);
 
-	large_raw_sizebar_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large raw palette size icons");
-	large_raw_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_RAW_SIZEBAR));
-	sizer->Add(large_raw_sizebar_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_raw_sizebar_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large raw size icons");
+		large_raw_sizebar_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_RAW_SIZEBAR));
+		iconGrid->Add(large_raw_sizebar_chkbox, 0, wxEXPAND);
 
-	large_container_icons_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large container view icons");
-	large_container_icons_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_CONTAINER_ICONS));
-	sizer->Add(large_container_icons_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_container_icons_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large container view icons");
+		large_container_icons_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_CONTAINER_ICONS));
+		iconGrid->Add(large_container_icons_chkbox, 0, wxEXPAND);
 
-	large_pick_item_icons_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use large item picker icons");
-	large_pick_item_icons_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_CHOOSE_ITEM_ICONS));
-	sizer->Add(large_pick_item_icons_chkbox, 0, wxLEFT | wxTOP, 5);
+		large_pick_item_icons_chkbox = newd wxCheckBox(panel, wxID_ANY, "Large item picker icons");
+		large_pick_item_icons_chkbox->SetValue(g_settings.getBoolean(Config::USE_LARGE_CHOOSE_ITEM_ICONS));
+		iconGrid->Add(large_pick_item_icons_chkbox, 0, wxEXPAND);
 
-	container_default_name_search_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Default to \"Find by Name\" when adding container items");
-	container_default_name_search_chkbox->SetValue(g_settings.getBoolean(Config::CONTAINER_FIND_DEFAULT_NAMES));
-	container_default_name_search_chkbox->SetToolTip("Automatically switch to the name search mode when opening the container item picker.");
-	sizer->Add(container_default_name_search_chkbox, 0, wxLEFT | wxTOP, 5);
+		section->Add(iconGrid, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+		AddCheckbox(section, &container_default_name_search_chkbox, panel, "Default to \"Find by Name\" in container picker", g_settings.getBoolean(Config::CONTAINER_FIND_DEFAULT_NAMES),
+			"Automatically switch to name search when opening the container item picker.");
+	}
 
-	sizer->AddSpacer(10);
+	{
+		wxStaticBoxSizer* const section = AddSection(root, panel, "Mouse and navigation");
+		AddCheckbox(section, &switch_mousebtn_chkbox, panel, "Switch mouse buttons", g_settings.getBoolean(Config::SWITCH_MOUSEBUTTONS),
+			"Swap right and center mouse button behavior.");
+		AddCheckbox(section, &doubleclick_properties_chkbox, panel, "Double click for properties", g_settings.getBoolean(Config::DOUBLECLICK_PROPERTIES),
+			"Double clicking a tile opens properties for the top item.");
+		AddCheckbox(section, &inversed_scroll_chkbox, panel, "Use inversed scroll", g_settings.getFloat(Config::SCROLL_SPEED) < 0,
+			"Invert map dragging with the center mouse button (RTS-style).");
 
-	switch_mousebtn_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Switch mousebuttons");
-	switch_mousebtn_chkbox->SetValue(g_settings.getBoolean(Config::SWITCH_MOUSEBUTTONS));
-	switch_mousebtn_chkbox->SetToolTip("Switches the right and center mouse button.");
-	sizer->Add(switch_mousebtn_chkbox, 0, wxLEFT | wxTOP, 5);
+		section->Add(newd wxStaticText(panel, wxID_ANY, "Scroll speed:"), 0, wxTOP | wxLEFT | wxRIGHT, 4);
+		const auto true_scrollspeed = int(std::abs(g_settings.getFloat(Config::SCROLL_SPEED)) * 10);
+		scroll_speed_slider = newd wxSlider(panel, wxID_ANY, true_scrollspeed, 1, max(true_scrollspeed, 100), wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL);
+		scroll_speed_slider->SetToolTip("How fast the map scrolls when dragging with the center mouse button.");
+		section->Add(scroll_speed_slider, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
 
-	doubleclick_properties_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Double click for properties");
-	doubleclick_properties_chkbox->SetValue(g_settings.getBoolean(Config::DOUBLECLICK_PROPERTIES));
-	doubleclick_properties_chkbox->SetToolTip("Double clicking on a tile will bring up the properties menu for the top item.");
-	sizer->Add(doubleclick_properties_chkbox, 0, wxLEFT | wxTOP, 5);
+		section->Add(newd wxStaticText(panel, wxID_ANY, "Zoom speed:"), 0, wxTOP | wxLEFT | wxRIGHT, 4);
+		const auto true_zoomspeed = int(g_settings.getFloat(Config::ZOOM_SPEED) * 10);
+		zoom_speed_slider = newd wxSlider(panel, wxID_ANY, true_zoomspeed, 1, max(true_zoomspeed, 100), wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL);
+		zoom_speed_slider->SetToolTip("How fast the map zooms when scrolling the mouse wheel.");
+		section->Add(zoom_speed_slider, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 4);
+	}
 
-	inversed_scroll_chkbox = newd wxCheckBox(ui_page, wxID_ANY, "Use inversed scroll");
-	inversed_scroll_chkbox->SetValue(g_settings.getFloat(Config::SCROLL_SPEED) < 0);
-	inversed_scroll_chkbox->SetToolTip("When this checkbox is checked, dragging the map using the center mouse button will be inversed (default RTS behaviour).");
-	sizer->Add(inversed_scroll_chkbox, 0, wxLEFT | wxTOP, 5);
-
-	sizer->AddSpacer(10);
-
-	sizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Scroll speed: "), 0, wxLEFT | wxTOP, 5);
-
-	const auto true_scrollspeed = int(std::abs(g_settings.getFloat(Config::SCROLL_SPEED)) * 10);
-	scroll_speed_slider = newd wxSlider(ui_page, wxID_ANY, true_scrollspeed, 1, max(true_scrollspeed, 100));
-	scroll_speed_slider->SetToolTip("This controls how fast the map will scroll when you hold down the center mouse button and move it around.");
-	sizer->Add(scroll_speed_slider, 0, wxEXPAND, 5);
-
-	sizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Zoom speed: "), 0, wxLEFT | wxTOP, 5);
-
-	const auto true_zoomspeed = int(g_settings.getFloat(Config::ZOOM_SPEED) * 10);
-	zoom_speed_slider = newd wxSlider(ui_page, wxID_ANY, true_zoomspeed, 1, max(true_zoomspeed, 100));
-	zoom_speed_slider->SetToolTip("This controls how fast you will zoom when you scroll the center mouse button.");
-	sizer->Add(zoom_speed_slider, 0, wxEXPAND, 5);
-
-	ui_page->SetSizer(sizer);
-	return ui_page;
+	tab.scroll->FitInside();
+	return tab.page;
 }
 
 wxNotebookPage* PreferencesWindow::CreateClientPage() {
 	wxNotebookPage* client_page = newd wxPanel(book, wxID_ANY);
-
-	wxSizer* topsizer = newd wxBoxSizer(wxVERTICAL);
-
-	auto* options_sizer = newd wxFlexGridSizer(2, 10, 10);
-	options_sizer->AddGrowableCol(1);
-
-	default_version_choice = newd wxChoice(client_page, wxID_ANY);
-	wxStaticText* default_client_tooltip = newd wxStaticText(client_page, wxID_ANY, "Default client version:");
-	options_sizer->Add(default_client_tooltip, 0, wxLEFT | wxTOP, 5);
-	options_sizer->Add(default_version_choice, 0, wxTOP, 5);
-	SetWindowToolTip(default_client_tooltip, default_version_choice, "This will decide what client version will be used when new maps are created.");
+	auto* topsizer = newd wxBoxSizer(wxVERTICAL);
 
 	{
-		wxArrayString version_names;
-		const ClientVersionList versions = ClientVersion::getAllVisible();
-		int default_selection = 0;
-		const int default_version_id = g_settings.getInteger(Config::DEFAULT_CLIENT_VERSION);
-		for (size_t i = 0; i < versions.size(); ++i) {
-			version_names.Add(wxstr(versions[i]->getName()));
-			if (versions[i]->getID() == default_version_id) {
-				default_selection = static_cast<int>(i);
+		wxStaticBoxSizer* const section = newd wxStaticBoxSizer(wxVERTICAL, client_page, "Client defaults");
+		auto* grid = CreateFormGrid(client_page);
+
+		default_version_choice = newd wxChoice(client_page, wxID_ANY);
+		wxStaticText* default_client_tooltip = newd wxStaticText(client_page, wxID_ANY, "Default client version:");
+		grid->Add(default_client_tooltip, 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(default_version_choice, 0, wxEXPAND);
+		SetWindowToolTip(default_client_tooltip, default_version_choice, "Client version used when creating new maps.");
+
+		{
+			wxArrayString version_names;
+			const ClientVersionList versions = ClientVersion::getAllVisible();
+			int default_selection = 0;
+			const int default_version_id = g_settings.getInteger(Config::DEFAULT_CLIENT_VERSION);
+			for (size_t i = 0; i < versions.size(); ++i) {
+				version_names.Add(wxstr(versions[i]->getName()));
+				if (versions[i]->getID() == default_version_id) {
+					default_selection = static_cast<int>(i);
+				}
+			}
+			default_version_choice->Append(version_names);
+			if (!version_names.IsEmpty()) {
+				default_version_choice->SetSelection(default_selection);
 			}
 		}
-		default_version_choice->Append(version_names);
-		if (!version_names.IsEmpty()) {
-			default_version_choice->SetSelection(default_selection);
-		}
+
+		section->Add(grid, 0, wxEXPAND | wxALL, 6);
+		check_sigs_chkbox = newd wxCheckBox(client_page, wxID_ANY, "Check file signatures");
+		check_sigs_chkbox->SetValue(g_settings.getBoolean(Config::CHECK_SIGNATURES));
+		check_sigs_chkbox->SetToolTip("When unchecked, the editor loads any OTB/DAT/SPR combination without validation. May cause graphics bugs.");
+		section->Add(check_sigs_chkbox, 0, wxLEFT | wxRIGHT | wxBOTTOM, 6);
+		topsizer->Add(section, 0, wxEXPAND | wxALL, 8);
 	}
 
-	check_sigs_chkbox = newd wxCheckBox(client_page, wxID_ANY, "Check file signatures");
-	check_sigs_chkbox->SetValue(g_settings.getBoolean(Config::CHECK_SIGNATURES));
-	check_sigs_chkbox->SetToolTip("When this option is not checked, the editor will load any OTB/DAT/SPR combination without complaints. This may cause graphics bugs.");
-	options_sizer->Add(check_sigs_chkbox, 0, wxLEFT | wxRIGHT | wxTOP, 5);
-
-	topsizer->Add(options_sizer, wxSizerFlags(0).Expand());
-	topsizer->AddSpacer(10);
-
 	client_list_window = newd wxScrolledWindow(client_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
-	client_list_window->SetMinSize(FROM_DIP(this, wxSize(450, 300)));
-	client_list_sizer = newd wxFlexGridSizer(2, 10, 10);
-	client_list_sizer->AddGrowableCol(1);
+	client_list_sizer = newd wxBoxSizer(wxVERTICAL);
 	client_list_window->SetSizer(client_list_sizer);
-	client_list_window->SetScrollRate(5, 5);
+	client_list_window->SetScrollRate(10, 10);
+	topsizer->Add(client_list_window, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
-	topsizer->Add(client_list_window, 1, wxEXPAND | wxALL, 5);
 	client_page->SetSizer(topsizer);
 	return client_page;
 }
@@ -651,65 +629,44 @@ void PreferencesWindow::EnsureClientVersionListBuilt() {
 	version_npcs_dir_pickers.clear();
 
 	const ClientVersionList versions = ClientVersion::getAllVisible();
-	int version_counter = 0;
 
 	for (ClientVersion* version : versions) {
+		auto* versionSection = newd wxStaticBoxSizer(wxVERTICAL, client_list_window, wxstr(version->getName()));
+		auto* grid = CreateFormGrid(client_list_window);
+
 		wxString client_tooltip;
 		client_tooltip << "The editor will look for " << wxstr(version->getName()) << " DAT & SPR here.";
-		auto* version_label = newd wxStaticText(client_list_window, wxID_ANY, wxstr(version->getName()));
-		version_label->SetToolTip(client_tooltip);
-		client_list_sizer->Add(version_label, wxSizerFlags(0).Expand());
-
+		AddFormLabel(grid, client_list_window, "Client data:");
 		wxTextCtrl* client_path = nullptr;
-		client_list_sizer->Add(
-			CreateBrowsePathRow(client_list_window, &client_path, version->getClientPath().GetFullPath(), client_tooltip),
-			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
-		);
+		grid->Add(CreateBrowsePathRow(client_list_window, &client_path, version->getClientPath().GetFullPath(), client_tooltip), 1, wxEXPAND);
 		version_dir_pickers.push_back(client_path);
 
 		wxString items_tooltip;
-		items_tooltip << "The editor will load items.otb and items.xml for " << wxstr(version->getName()) << " from this folder.";
-		auto* items_label = newd wxStaticText(client_list_window, wxID_ANY, "Items directory:");
-		items_label->SetToolTip(items_tooltip);
-		client_list_sizer->Add(items_label, wxSizerFlags(0).Border(wxLEFT, 20));
-
+		items_tooltip << "Items.otb and items.xml for " << wxstr(version->getName()) << ".";
+		AddFormLabel(grid, client_list_window, "Items:");
 		const FileName version_items_path = version->hasCustomItemsPath() ? version->getCustomItemsPath() : version->getDataPath();
 		wxTextCtrl* items_path = nullptr;
-		client_list_sizer->Add(
-			CreateBrowsePathRow(client_list_window, &items_path, version_items_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), items_tooltip),
-			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
-		);
+		grid->Add(CreateBrowsePathRow(client_list_window, &items_path, version_items_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), items_tooltip), 1, wxEXPAND);
 		version_items_dir_pickers.push_back(items_path);
 
 		wxString monsters_tooltip;
-		monsters_tooltip << "The editor will load monster XML files for " << wxstr(version->getName()) << " from this folder.";
-		auto* monsters_label = newd wxStaticText(client_list_window, wxID_ANY, "Monsters directory:");
-		monsters_label->SetToolTip(monsters_tooltip);
-		client_list_sizer->Add(monsters_label, wxSizerFlags(0).Border(wxLEFT, 20));
-
+		monsters_tooltip << "Monster XML files for " << wxstr(version->getName()) << ".";
+		AddFormLabel(grid, client_list_window, "Monsters:");
 		const FileName version_monsters_path = version->hasCustomMonstersPath() ? version->getCustomMonstersPath() : FileName();
 		wxTextCtrl* monsters_path = nullptr;
-		client_list_sizer->Add(
-			CreateBrowsePathRow(client_list_window, &monsters_path, version_monsters_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), monsters_tooltip),
-			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
-		);
+		grid->Add(CreateBrowsePathRow(client_list_window, &monsters_path, version_monsters_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), monsters_tooltip), 1, wxEXPAND);
 		version_monsters_dir_pickers.push_back(monsters_path);
 
 		wxString npcs_tooltip;
-		npcs_tooltip << "The editor will load NPC XML files for " << wxstr(version->getName()) << " from this folder.";
-		auto* npcs_label = newd wxStaticText(client_list_window, wxID_ANY, "NPC directory:");
-		npcs_label->SetToolTip(npcs_tooltip);
-		client_list_sizer->Add(npcs_label, wxSizerFlags(0).Border(wxLEFT, 20));
-
+		npcs_tooltip << "NPC XML files for " << wxstr(version->getName()) << ".";
+		AddFormLabel(grid, client_list_window, "NPCs:");
 		const FileName version_npcs_path = version->hasCustomNpcsPath() ? version->getCustomNpcsPath() : FileName();
 		wxTextCtrl* npcs_path = nullptr;
-		client_list_sizer->Add(
-			CreateBrowsePathRow(client_list_window, &npcs_path, version_npcs_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), npcs_tooltip),
-			wxSizerFlags(0).Border(wxRIGHT, 10).Expand()
-		);
+		grid->Add(CreateBrowsePathRow(client_list_window, &npcs_path, version_npcs_path.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR), npcs_tooltip), 1, wxEXPAND);
 		version_npcs_dir_pickers.push_back(npcs_path);
 
-		++version_counter;
+		versionSection->Add(grid, 0, wxEXPAND | wxALL, 6);
+		client_list_sizer->Add(versionSection, 0, wxEXPAND | wxBOTTOM, 8);
 	}
 
 	client_list_window->FitInside();

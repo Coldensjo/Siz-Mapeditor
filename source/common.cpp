@@ -183,6 +183,140 @@ std::string wstring2string(const std::wstring& widestring) {
 	return std::string((const char*)s.mb_str(wxConvUTF8));
 }
 
+namespace {
+std::string trimPositionInput(std::string input) {
+	auto notSpace = [](unsigned char c) {
+		return !std::isspace(c);
+	};
+	input.erase(input.begin(), std::find_if(input.begin(), input.end(), notSpace));
+	input.erase(std::find_if(input.rbegin(), input.rend(), notSpace).base(), input.end());
+	return input;
+}
+
+bool parseTripleMatch(const std::smatch& match, int& x, int& y, int& z) {
+	if (match.size() < 4) {
+		return false;
+	}
+
+	try {
+		x = std::stoi(match[1].str());
+		y = std::stoi(match[2].str());
+		z = std::stoi(match[3].str());
+		return true;
+	} catch (const std::exception&) {
+		return false;
+	}
+}
+
+bool extractLabeled(const std::string& input, std::initializer_list<const char*> names, int& value) {
+	for (const char* name : names) {
+		const std::string pattern = std::string(R"re(\b)re") + name + R"re(\s*[=:]\s*\"?(\d+)\"?)re";
+		std::smatch match;
+		if (std::regex_search(input, match, std::regex(pattern, std::regex::icase)) && match.size() >= 2) {
+			try {
+				value = std::stoi(match[1].str());
+				return true;
+			} catch (const std::exception&) {
+			}
+		}
+	}
+	return false;
+}
+
+bool extractJsonField(const std::string& input, const char* field, int& value) {
+	const std::string pattern = std::string(R"re(")re") + field + R"re("\s*:\s*(\d+))re";
+	std::smatch match;
+	if (std::regex_search(input, match, std::regex(pattern, std::regex::icase)) && match.size() >= 2) {
+		try {
+			value = std::stoi(match[1].str());
+			return true;
+		} catch (const std::exception&) {
+		}
+	}
+	return false;
+}
+
+bool assignPosition(Position& position, int x, int y, int z) {
+	position = Position(x, y, z);
+	return position.isValid();
+}
+} // namespace
+
+bool posFromString(const std::string& rawInput, Position& position) {
+	const std::string input = trimPositionInput(rawInput);
+	if (input.empty()) {
+		return false;
+	}
+
+	int x = -1;
+	int y = -1;
+	int z = -1;
+	std::smatch match;
+
+	// Selection range: {fromx = ..., tox = ..., fromy = ..., toy = ..., z = ...}
+	if (extractLabeled(input, {"fromx"}, x) && extractLabeled(input, {"fromy"}, y)) {
+		if (!extractLabeled(input, {"z", "fromz"}, z)) {
+			z = 0;
+		}
+		return assignPosition(position, x, y, z);
+	}
+
+	// Position(x, y, z)
+	static const std::regex positionCtor(R"(Position\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\))", std::regex::icase);
+	if (std::regex_search(input, match, positionCtor) && parseTripleMatch(match, x, y, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Labeled coordinates: {x = 0, y = 0, z = 0}, x="0" y="0" z="0", centerx="0" ...
+	if (extractLabeled(input, {"x", "centerx"}, x) && extractLabeled(input, {"y", "centery"}, y) && extractLabeled(input, {"z", "centerz"}, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// JSON: {"x":0,"y":0,"z":0}
+	if (extractJsonField(input, "x", x) && extractJsonField(input, "y", y) && extractJsonField(input, "z", z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Parenthesized: (x, y, z)
+	static const std::regex parenTriple(R"(\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\))");
+	if (std::regex_search(input, match, parenTriple) && parseTripleMatch(match, x, y, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Colon-separated: x:y:z
+	static const std::regex colonTriple(R"((?:^|[^\d])(\d+)\s*:\s*(\d+)\s*:\s*(\d+)(?:\D|$))");
+	if (std::regex_search(input, match, colonTriple) && parseTripleMatch(match, x, y, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Comma-separated: x, y, z
+	static const std::regex commaTriple(R"((?:^|[^\d])(\d+)\s*,\s*(\d+)\s*,\s*(\d+))");
+	if (std::regex_search(input, match, commaTriple) && parseTripleMatch(match, x, y, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Whitespace-separated: x y z
+	static const std::regex whitespaceTriple(R"((?:^|[^\d])(\d+)\s+(\d+)\s+(\d+)(?:\D|$))");
+	if (std::regex_search(input, match, whitespaceTriple) && parseTripleMatch(match, x, y, z)) {
+		return assignPosition(position, x, y, z);
+	}
+
+	// Fallback: exactly three numbers in the string.
+	std::vector<int> numbers;
+	static const std::regex digitToken(R"(\d+)");
+	for (std::sregex_iterator it(input.begin(), input.end(), digitToken), end; it != end; ++it) {
+		try {
+			numbers.push_back(std::stoi(it->str()));
+		} catch (const std::exception&) {
+		}
+	}
+	if (numbers.size() == 3) {
+		return assignPosition(position, numbers[0], numbers[1], numbers[2]);
+	}
+
+	return false;
+}
+
 bool posFromClipboard(Position& position, const int mapWidth /* = MAP_MAX_WIDTH */, const int mapHeight /* = MAP_MAX_HEIGHT */) {
 	if (!wxTheClipboard->Open()) {
 		return false;
@@ -195,34 +329,18 @@ bool posFromClipboard(Position& position, const int mapWidth /* = MAP_MAX_WIDTH 
 
 	wxTextDataObject data;
 	wxTheClipboard->GetData(data);
+	wxTheClipboard->Close();
 
-	std::string input = data.GetText().ToStdString();
-	if (input.empty()) {
-		wxTheClipboard->Close();
+	const std::string input = data.GetText().ToStdString();
+	if (!posFromString(input, position)) {
 		return false;
 	}
 
-	bool done = false;
-	std::smatch matches;
-	static const std::regex expression = std::regex(R"(.*?(\d+).*?(\d+).*?(\d+).*?)", std::regex_constants::ECMAScript);
-	if (std::regex_match(input, matches, expression)) {
-		try {
-			const int tmpX = std::stoi(matches.str(1));
-			const int tmpY = std::stoi(matches.str(2));
-			const int tmpZ = std::stoi(matches.str(3));
-
-			const Position pastedPos = Position(tmpX, tmpY, tmpZ);
-			if (pastedPos.isValid() && tmpX <= mapWidth && tmpY <= mapHeight) {
-				position.x = tmpX;
-				position.y = tmpY;
-				position.z = tmpZ;
-				done = true;
-			}
-		} catch (const std::out_of_range&) { }
+	if (position.x > mapWidth || position.y > mapHeight) {
+		return false;
 	}
 
-	wxTheClipboard->Close();
-	return done;
+	return true;
 }
 
 wxString b2yn(bool value) {

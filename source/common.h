@@ -71,7 +71,10 @@ int random(int low, int high);
 std::wstring string2wstring(const std::string& utf8string);
 std::string wstring2string(const std::wstring& widestring);
 
-// Gets position values from ClipBoard
+// Parses a position string copied from the map or external tools.
+bool posFromString(const std::string& input, Position& position);
+
+// Gets position values from the clipboard.
 bool posFromClipboard(Position& position, const int mapWidth = MAP_MAX_WIDTH, const int mapHeight = MAP_MAX_HEIGHT);
 
 // Returns 'yes' if the defined value is true or 'no' if it is false.

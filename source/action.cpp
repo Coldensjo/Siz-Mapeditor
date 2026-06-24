@@ -551,17 +551,14 @@ DirtyList::~DirtyList() {
 }
 
 void DirtyList::AddPosition(int x, int y, int z) {
-	uint32_t m = ((x >> 2) << 18) | ((y >> 2) << 4);
-	ValueType fi = { m, 0 };
-	SetType::iterator s = iset.find(fi);
-	if (s != iset.end()) {
-		ValueType v = *s;
-		iset.erase(s);
-		v.floors = (1 << z) | v.floors;
-		iset.insert(v);
+	const uint32_t m = ((x >> 2) << 18) | ((y >> 2) << 4);
+	ValueType probe = { m, 0 };
+	auto node = iset.extract(probe);
+	if (!node.empty()) {
+		node.value().floors |= (1u << z);
+		iset.insert(std::move(node));
 	} else {
-		ValueType v = { m, (uint32_t)(1 << z) };
-		iset.insert(v);
+		iset.insert({ m, (1u << z) });
 	}
 }
 

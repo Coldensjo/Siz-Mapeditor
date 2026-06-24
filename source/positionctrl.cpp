@@ -23,14 +23,17 @@
 PositionCtrl::PositionCtrl(wxWindow* parent, const wxString& label, int x, int y, int z, int maxx /*= MAP_MAX_WIDTH*/, int maxy /*= MAP_MAX_HEIGHT*/, int maxz /*= MAP_MAX_LAYER*/) :
 	wxStaticBoxSizer(wxHORIZONTAL, parent, label) {
 	x_field = newd NumberTextCtrl(parent, wxID_ANY, x, 0, maxx, wxTE_PROCESS_ENTER, "X", wxDefaultPosition, wxSize(60, 20));
+	x_field->Bind(wxEVT_CHAR_HOOK, &PositionCtrl::OnPasteKey, this);
 	x_field->Bind(wxEVT_TEXT_PASTE, &PositionCtrl::OnClipboardText, this);
 	Add(x_field, 2, wxEXPAND | wxLEFT | wxBOTTOM, 5);
 
 	y_field = newd NumberTextCtrl(parent, wxID_ANY, y, 0, maxy, wxTE_PROCESS_ENTER, "Y", wxDefaultPosition, wxSize(60, 20));
+	y_field->Bind(wxEVT_CHAR_HOOK, &PositionCtrl::OnPasteKey, this);
 	y_field->Bind(wxEVT_TEXT_PASTE, &PositionCtrl::OnClipboardText, this);
 	Add(y_field, 2, wxEXPAND | wxLEFT | wxBOTTOM, 5);
 
 	z_field = newd NumberTextCtrl(parent, wxID_ANY, z, 0, maxz, wxTE_PROCESS_ENTER, "Z", wxDefaultPosition, wxSize(35, 20));
+	z_field->Bind(wxEVT_CHAR_HOOK, &PositionCtrl::OnPasteKey, this);
 	z_field->Bind(wxEVT_TEXT_PASTE, &PositionCtrl::OnClipboardText, this);
 	Add(z_field, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
@@ -60,13 +63,28 @@ bool PositionCtrl::Enable(bool enable) {
 	return (x_field->Enable(enable) && y_field->Enable(enable) && z_field->Enable(enable));
 }
 
-void PositionCtrl::OnClipboardText(wxClipboardTextEvent& evt) {
+bool PositionCtrl::TryPasteFromClipboard() {
 	Position position;
-	if (posFromClipboard(position, maxWidth, maxHeight)) {
-		x_field->SetIntValue(position.x);
-		y_field->SetIntValue(position.y);
-		z_field->SetIntValue(position.z);
-	} else {
+	if (!posFromClipboard(position, maxWidth, maxHeight)) {
+		return false;
+	}
+
+	SetPosition(position);
+	return true;
+}
+
+void PositionCtrl::OnPasteKey(wxKeyEvent& evt) {
+	if ((evt.GetModifiers() & wxMOD_CONTROL) != 0 && (evt.GetKeyCode() == 'V' || evt.GetKeyCode() == 'v')) {
+		if (TryPasteFromClipboard()) {
+			return;
+		}
+	}
+
+	evt.Skip();
+}
+
+void PositionCtrl::OnClipboardText(wxClipboardTextEvent& evt) {
+	if (!TryPasteFromClipboard()) {
 		evt.Skip();
 	}
 }

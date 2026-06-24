@@ -50,6 +50,9 @@ public:
 	bool Enable(bool enable = true);
 
 	void OnClipboardText(wxClipboardTextEvent&);
+	void OnPasteKey(wxKeyEvent&);
+
+	bool TryPasteFromClipboard();
 
 protected:
 	NumberTextCtrl* x_field;

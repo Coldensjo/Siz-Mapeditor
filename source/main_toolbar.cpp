@@ -162,10 +162,13 @@ MainToolBar::MainToolBar(wxWindow* parent, wxAuiManager* manager) {
 
 	standard_toolbar->Bind(wxEVT_COMMAND_MENU_SELECTED, &MainToolBar::OnStandardButtonClick, this);
 	brushes_toolbar->Bind(wxEVT_COMMAND_MENU_SELECTED, &MainToolBar::OnBrushesButtonClick, this);
+	x_control->Bind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	x_control->Bind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	x_control->Bind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
+	y_control->Bind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	y_control->Bind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	y_control->Bind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
+	z_control->Bind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	z_control->Bind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	z_control->Bind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
 	go_button->Bind(wxEVT_BUTTON, &MainToolBar::OnPositionButtonClick, this);
@@ -177,10 +180,13 @@ MainToolBar::MainToolBar(wxWindow* parent, wxAuiManager* manager) {
 MainToolBar::~MainToolBar() {
 	standard_toolbar->Unbind(wxEVT_COMMAND_MENU_SELECTED, &MainToolBar::OnStandardButtonClick, this);
 	brushes_toolbar->Unbind(wxEVT_COMMAND_MENU_SELECTED, &MainToolBar::OnBrushesButtonClick, this);
+	x_control->Unbind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	x_control->Unbind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	x_control->Unbind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
+	y_control->Unbind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	y_control->Unbind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	y_control->Unbind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
+	z_control->Unbind(wxEVT_CHAR_HOOK, &MainToolBar::OnPastePositionKey, this);
 	z_control->Unbind(wxEVT_TEXT_PASTE, &MainToolBar::OnPastePositionText, this);
 	z_control->Unbind(wxEVT_KEY_UP, &MainToolBar::OnPositionKeyUp, this);
 	go_button->Unbind(wxEVT_BUTTON, &MainToolBar::OnPositionButtonClick, this);
@@ -553,6 +559,21 @@ void MainToolBar::OnPositionKeyUp(wxKeyEvent& event) {
 			g_gui.SetScreenCenterPosition(pos);
 		}
 	}
+	event.Skip();
+}
+
+void MainToolBar::OnPastePositionKey(wxKeyEvent& event) {
+	if ((event.GetModifiers() & wxMOD_CONTROL) != 0 && (event.GetKeyCode() == 'V' || event.GetKeyCode() == 'v')) {
+		Position position;
+		const Map& currentMap = g_gui.GetCurrentMap();
+		if (posFromClipboard(position, currentMap.getWidth(), currentMap.getHeight())) {
+			x_control->SetIntValue(position.x);
+			y_control->SetIntValue(position.y);
+			z_control->SetIntValue(position.z);
+			return;
+		}
+	}
+
 	event.Skip();
 }
 
