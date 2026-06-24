@@ -80,6 +80,7 @@ protected:
 	static PalettePanel* CreateRAWPalette(wxWindow* parent, const TilesetContainer& tilesets);
 
 	void ShowPalettePage(PaletteType type);
+	void UpdateCategoryButtonStates();
 
 	wxPanel* page_container;
 	PaletteButton* terrain_button;

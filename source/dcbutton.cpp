@@ -27,6 +27,8 @@
 BEGIN_EVENT_TABLE(DCButton, wxPanel)
 EVT_PAINT(DCButton::OnPaint)
 EVT_LEFT_DOWN(DCButton::OnClick)
+EVT_ENTER_WINDOW(DCButton::OnMouseEnter)
+EVT_LEAVE_WINDOW(DCButton::OnMouseLeave)
 END_EVENT_TABLE()
 
 IMPLEMENT_DYNAMIC_CLASS(DCButton, wxPanel)
@@ -35,6 +37,7 @@ DCButton::DCButton() :
 	wxPanel(nullptr, wxID_ANY, wxDefaultPosition, wxSize(36, 36)),
 	type(DC_BTN_NORMAL),
 	state(false),
+	isHovered(false),
 	size(RENDER_SIZE_16x16),
 	sprite(nullptr),
 	overlay(nullptr) {
@@ -57,6 +60,7 @@ DCButton::DCButton(wxWindow* parent, wxWindowID id, wxPoint pos, int type, Rende
 	wxPanel(parent, id, pos, GetDefaultButtonSize(sz)),
 	type(type),
 	state(false),
+	isHovered(false),
 	size(sz),
 	sprite(nullptr),
 	overlay(nullptr) {
@@ -132,40 +136,44 @@ void DCButton::OnPaint(wxPaintEvent& event) {
 	}
 
 	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
+	const bool selected = (type == DC_BTN_TOGGLE && GetValue());
+
 	wxColour fillColour;
-	if (bgshade < 0) {
-		fillColour = palette.control;
+	if (selected) {
+		fillColour = palette.selection;
+		if (isHovered) {
+			fillColour = fillColour.ChangeLightness(12);
+		}
+	} else if (bgshade < 0) {
+		fillColour = isHovered ? palette.hover : palette.control;
 	} else {
 		fillColour = wxColour(bgshade, bgshade, bgshade);
+		if (isHovered) {
+			fillColour = fillColour.ChangeLightness(10);
+		}
 	}
+
 	pdc.SetBrush(wxBrush(fillColour));
+	pdc.SetPen(wxPen(fillColour));
 	pdc.DrawRectangle(0, 0, size_x, size_y);
-	if (type == DC_BTN_TOGGLE && GetValue()) {
-		pdc.SetPen(shadow_pen);
+
+	if (!selected) {
+		pdc.SetPen(highlight_pen);
 		pdc.DrawLine(0, 0, size_x - 1, 0);
 		pdc.DrawLine(0, 1, 0, size_y - 1);
-		pdc.SetPen(light_shadow_pen);
+		pdc.SetPen(dark_highlight_pen);
 		pdc.DrawLine(1, 1, size_x - 2, 1);
 		pdc.DrawLine(1, 2, 1, size_y - 2);
-		pdc.SetPen(dark_highlight_pen);
+		pdc.SetPen(light_shadow_pen);
 		pdc.DrawLine(size_x - 2, 1, size_x - 2, size_y - 2);
 		pdc.DrawLine(1, size_y - 2, size_x - 1, size_y - 2);
-		pdc.SetPen(highlight_pen);
+		pdc.SetPen(shadow_pen);
 		pdc.DrawLine(size_x - 1, 0, size_x - 1, size_y - 1);
 		pdc.DrawLine(0, size_y - 1, size_y, size_y - 1);
 	} else {
-		pdc.SetPen(highlight_pen);
-		pdc.DrawLine(0, 0, size_x - 1, 0);
-		pdc.DrawLine(0, 1, 0, size_y - 1);
-		pdc.SetPen(dark_highlight_pen);
-		pdc.DrawLine(1, 1, size_x - 2, 1);
-		pdc.DrawLine(1, 2, 1, size_y - 2);
-		pdc.SetPen(light_shadow_pen);
-		pdc.DrawLine(size_x - 2, 1, size_x - 2, size_y - 2);
-		pdc.DrawLine(1, size_y - 2, size_x - 1, size_y - 2);
-		pdc.SetPen(shadow_pen);
-		pdc.DrawLine(size_x - 1, 0, size_x - 1, size_y - 1);
-		pdc.DrawLine(0, size_y - 1, size_y, size_y - 1);
+		pdc.SetPen(wxPen(palette.selection.ChangeLightness(150), 1));
+		pdc.SetBrush(*wxTRANSPARENT_BRUSH);
+		pdc.DrawRectangle(0, 0, size_x, size_y);
 	}
 
 	if (sprite) {
@@ -202,4 +210,16 @@ void DCButton::OnClick(wxMouseEvent& WXUNUSED(evt)) {
 	SetFocus();
 
 	GetEventHandler()->ProcessEvent(event);
+}
+
+void DCButton::OnMouseEnter(wxMouseEvent& event) {
+	isHovered = true;
+	Refresh();
+	event.Skip();
+}
+
+void DCButton::OnMouseLeave(wxMouseEvent& event) {
+	isHovered = false;
+	Refresh();
+	event.Skip();
 }

@@ -47,12 +47,15 @@ public:
 
 	void OnPaint(wxPaintEvent&);
 	void OnClick(wxMouseEvent&);
+	void OnMouseEnter(wxMouseEvent& event);
+	void OnMouseLeave(wxMouseEvent& event);
 
 protected:
 	void SetOverlay(Sprite* espr);
 
 	int type;
 	bool state; // pressed/unpressed
+	bool isHovered;
 	RenderSize size;
 	Sprite* sprite;
 	Sprite* overlay;

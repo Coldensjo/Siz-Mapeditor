@@ -282,9 +282,31 @@ void PaletteWindow::ShowPalettePage(PaletteType type) {
 		new_panel->Show();
 		new_panel->OnSwitchIn();
 		current_page = type;
+		UpdateCategoryButtonStates();
 		page_container->Layout();
 		Layout();
 		Refresh();
+	}
+}
+
+void PaletteWindow::UpdateCategoryButtonStates() {
+	if (terrain_button) {
+		terrain_button->SetActive(current_page == TILESET_TERRAIN);
+	}
+	if (doodad_button) {
+		doodad_button->SetActive(current_page == TILESET_DOODAD);
+	}
+	if (item_button) {
+		item_button->SetActive(current_page == TILESET_ITEM);
+	}
+	if (house_button) {
+		house_button->SetActive(current_page == TILESET_HOUSE);
+	}
+	if (creature_button) {
+		creature_button->SetActive(current_page == TILESET_CREATURE);
+	}
+	if (raw_button) {
+		raw_button->SetActive(current_page == TILESET_RAW);
 	}
 }
 

@@ -31,9 +31,21 @@ END_EVENT_TABLE()
 PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label, 
 	const wxPoint& pos, const wxSize& size, long style, const wxValidator& validator, 
 	const wxString& name) : wxButton(parent, id, label, pos, size, style, validator, name),
-	isPressed(false), isHovered(false) {
+	isPressed(false), isHovered(false), isActive(false) {
 	// Ensure button has a solid background color
 	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
+}
+
+void PaletteButton::SetActive(bool active) {
+	if (isActive == active) {
+		return;
+	}
+	isActive = active;
+	Refresh();
+}
+
+bool PaletteButton::IsActive() const {
+	return isActive;
 }
 
 wxString PaletteButton::GetLabelWithoutAmpersand() const {
@@ -84,31 +96,48 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 	wxSize size = GetClientSize();
 	wxRect rect(0, 0, size.GetWidth(), size.GetHeight());
 	
-	// First, fill the entire button area with the background color to prevent transparency
-	wxColour bgColour = GetBackgroundColour();
-	if (!bgColour.IsOk()) {
-		bgColour = palette.control;
+	wxColour fillColour = palette.control;
+	if (isActive && IsEnabled()) {
+		fillColour = palette.selection;
+		if (isPressed) {
+			fillColour = fillColour.ChangeLightness(-15);
+		} else if (isHovered) {
+			fillColour = fillColour.ChangeLightness(12);
+		}
+	} else {
+		wxColour bgColour = GetBackgroundColour();
+		if (bgColour.IsOk()) {
+			fillColour = bgColour;
+		}
 	}
-	dc.SetBrush(wxBrush(bgColour));
-	dc.SetPen(wxPen(bgColour));
+
+	dc.SetBrush(wxBrush(fillColour));
+	dc.SetPen(wxPen(fillColour));
 	dc.DrawRectangle(rect);
-	
-	// Render button using native renderer
-	int flags = 0;
-	if (!IsEnabled()) {
-		flags |= wxCONTROL_DISABLED;
+
+	if (!isActive) {
+		int flags = 0;
+		if (!IsEnabled()) {
+			flags |= wxCONTROL_DISABLED;
+		}
+		if (HasFocus()) {
+			flags |= wxCONTROL_FOCUSED;
+		}
+		if (isPressed) {
+			flags |= wxCONTROL_PRESSED;
+		}
+		if (isHovered && IsEnabled()) {
+			flags |= wxCONTROL_CURRENT;
+		}
+
+		wxRendererNative::Get().DrawPushButton(this, dc, rect, flags);
+	} else if (HasFocus() && IsEnabled()) {
+		wxRect focusRect = rect;
+		focusRect.Deflate(2);
+		dc.SetPen(wxPen(palette.text, 1, wxPENSTYLE_DOT));
+		dc.SetBrush(*wxTRANSPARENT_BRUSH);
+		dc.DrawRectangle(focusRect);
 	}
-	if (HasFocus()) {
-		flags |= wxCONTROL_FOCUSED;
-	}
-	if (isPressed) {
-		flags |= wxCONTROL_PRESSED;
-	}
-	if (isHovered && IsEnabled()) {
-		flags |= wxCONTROL_CURRENT;
-	}
-	
-	wxRendererNative::Get().DrawPushButton(this, dc, rect, flags);
 	
 	// Draw text with underline
 	wxString label = GetLabelWithoutAmpersand();
@@ -127,12 +156,9 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 			textY += 1;
 		}
 		
-		// Set text color based on enabled state
-		if (IsEnabled()) {
-			dc.SetTextForeground(palette.text);
-		} else {
-			dc.SetTextForeground(palette.disabledText);
-		}
+		const wxColour textColour = !IsEnabled() ? palette.disabledText :
+			(isActive ? wxColour(255, 255, 255) : palette.text);
+		dc.SetTextForeground(textColour);
 		
 		// Draw the text
 		dc.DrawText(label, textX, textY);
@@ -148,7 +174,7 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 			// Draw underline
 			int underlineX = textX + beforeSize.GetWidth();
 			int underlineY = textY + textSize.GetHeight() - 1;
-			dc.SetPen(wxPen(IsEnabled() ? palette.text : palette.disabledText, 1));
+			dc.SetPen(wxPen(textColour, 1));
 			dc.DrawLine(underlineX, underlineY, underlineX + charSize.GetWidth(), underlineY);
 		}
 	}

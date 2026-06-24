@@ -27,6 +27,9 @@ public:
 		long style = 0, const wxValidator& validator = wxDefaultValidator, 
 		const wxString& name = wxButtonNameStr);
 
+	void SetActive(bool active);
+	bool IsActive() const;
+
 protected:
 	void OnPaint(wxPaintEvent& event);
 	void OnMouseEnter(wxMouseEvent& event);
@@ -38,6 +41,7 @@ protected:
 
 	bool isPressed;
 	bool isHovered;
+	bool isActive;
 
 	DECLARE_EVENT_TABLE()
 };
