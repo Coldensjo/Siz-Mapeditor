@@ -18,7 +18,7 @@ Remere's Map Editor fork with a standalone **MapServer** for live collaborative 
 
 ### Start the server
 
-** copy `mapserver.cfg.example` to `mapserver.cfg` next to `MapServer_x64.exe`, edit it, then run:
+copy `mapserver.cfg.example` to `mapserver.cfg` next to `MapServer_x64.exe`, edit it, then run:
 
 ```text
 MapServer_x64.exe
@@ -55,8 +55,6 @@ Point MapServer at separate folders (see `mapserver.cfg`):
 - Assume connected mappers **can keep and reuse** those files outside the editor.
 - The cache is **plain, unencrypted** Tibia format — do not rely on hidden paths for protection.
 - If your `.spr` is valuable, consider a **stripped asset pack** (only sprites/items your map needs), legal agreements with mappers, or accepting that full client art cannot be fully protected once sent to a client machine.
-
-MapServer's `--assets` path controls **what you send**; it does not encrypt or restrict what recipients can do with downloaded files.
 
 ## License
 
