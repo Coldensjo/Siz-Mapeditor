@@ -30,6 +30,7 @@
 #include <wx/stdpaths.h>
 
 #include <iostream>
+#include <unordered_map>
 
 // Logs to both the optional GUI log tab (when hosted in the editor) and the
 // console (so the standalone server can report activity).
@@ -194,6 +195,10 @@ void LiveServer::removeClient(uint32_t id) {
 }
 
 void LiveServer::updateCursor(const Position& position) {
+	if (!shouldSendCursorUpdate(position)) {
+		return;
+	}
+
 	LiveCursor cursor;
 	cursor.id = 0;
 	cursor.pos = position;
@@ -407,10 +412,12 @@ void LiveServer::broadcastNodes(DirtyList& dirtyList) {
 		return;
 	}
 
+	std::unordered_map<LivePeer*, NetworkMessage> batched;
+
 	for (const auto& ind : dirtyList.GetPosList()) {
-		int32_t ndx = ind.pos >> 18;
-		int32_t ndy = (ind.pos >> 4) & 0x3FFF;
-		uint32_t floors = ind.floors;
+		const int32_t ndx = ind.pos >> 18;
+		const int32_t ndy = (ind.pos >> 4) & 0x3FFF;
+		const uint32_t floors = ind.floors;
 
 		QTreeNode* node = editor->getMap().getLeaf(ndx * 4, ndy * 4);
 		if (!node) {
@@ -425,13 +432,21 @@ void LiveServer::broadcastNodes(DirtyList& dirtyList) {
 				continue;
 			}
 
+			NetworkMessage& message = batched[peer];
+
 			if (node->isVisible(clientId, true)) {
-				peer->sendNode(clientId, node, ndx, ndy, floors & 0xFF00);
+				appendNode(message, clientId, node, ndx, ndy, floors & 0xFF00);
 			}
 
 			if (node->isVisible(clientId, false)) {
-				peer->sendNode(clientId, node, ndx, ndy, floors & 0x00FF);
+				appendNode(message, clientId, node, ndx, ndy, floors & 0x00FF);
 			}
+		}
+	}
+
+	for (auto& entry : batched) {
+		if (entry.second.size > 0) {
+			entry.first->send(entry.second);
 		}
 	}
 }

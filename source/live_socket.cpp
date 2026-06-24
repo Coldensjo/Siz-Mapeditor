@@ -38,11 +38,31 @@ bool isLiveMarkerVisibleOnFloor(int viewerFloor, int markerFloor) {
 	return viewerUnderground == markerUnderground;
 }
 
+namespace {
+constexpr std::chrono::milliseconds LIVE_CURSOR_SEND_INTERVAL{50};
+}
+
 LiveSocket::LiveSocket() :
 	cursors(), participants(), ownClientId(0), mapReader(nullptr, 0), mapWriter(),
 	mapVersion(MapVersion(MAP_OTBM_4, CLIENT_VERSION_NONE)), log(nullptr),
-	name("User"), password("") {
+	name("User"), password(""), lastSentCursorPos(), lastSentCursorTime {},
+	hasLastSentCursor(false) {
 	//
+}
+
+bool LiveSocket::shouldSendCursorUpdate(const Position& position) {
+	const auto now = std::chrono::steady_clock::now();
+	if (hasLastSentCursor && lastSentCursorPos == position &&
+	    now - lastSentCursorTime < LIVE_CURSOR_SEND_INTERVAL) {
+		return false;
+	}
+	if (hasLastSentCursor && now - lastSentCursorTime < LIVE_CURSOR_SEND_INTERVAL) {
+		return false;
+	}
+	lastSentCursorPos = position;
+	lastSentCursorTime = now;
+	hasLastSentCursor = true;
+	return true;
 }
 
 LiveSocket::~LiveSocket() {
@@ -157,7 +177,7 @@ void LiveSocket::receiveNode(NetworkMessage& message, Editor& editor, Action* ac
 	}
 }
 
-void LiveSocket::sendNode(uint32_t clientId, QTreeNode* node, int32_t ndx, int32_t ndy, uint32_t floorMask) {
+void LiveSocket::appendNode(NetworkMessage& message, uint32_t clientId, QTreeNode* node, int32_t ndx, int32_t ndy, uint32_t floorMask) {
 	bool underground;
 	if (floorMask & 0xFF00) {
 		if (floorMask & 0x00FF) {
@@ -173,32 +193,35 @@ void LiveSocket::sendNode(uint32_t clientId, QTreeNode* node, int32_t ndx, int32
 		node->setVisible(clientId, underground, true);
 	}
 
-	// Send message
-	NetworkMessage message;
 	message.write<uint8_t>(PACKET_NODE);
 	message.write<uint32_t>((ndx << 18) | (ndy << 4) | ((floorMask & 0xFF00) ? 1 : 0));
 
 	if (!node) {
 		message.write<uint16_t>(0);
-	} else {
-		Floor** floors = node->getFloors();
+		return;
+	}
 
-		uint16_t sendMask = 0;
-		for (uint32_t z = 0; z < 16; ++z) {
-			uint32_t bit = 1 << z;
-			if (floors[z] && testFlags(floorMask, bit)) {
-				sendMask |= bit;
-			}
-		}
+	Floor** floors = node->getFloors();
 
-		message.write<uint16_t>(sendMask);
-		for (uint32_t z = 0; z < 16; ++z) {
-			if (testFlags(sendMask, static_cast<uint64_t>(1) << z)) {
-				sendFloor(message, floors[z]);
-			}
+	uint16_t sendMask = 0;
+	for (uint32_t z = 0; z < 16; ++z) {
+		const uint32_t bit = 1u << z;
+		if (floors[z] && testFlags(floorMask, bit)) {
+			sendMask |= bit;
 		}
 	}
 
+	message.write<uint16_t>(sendMask);
+	for (uint32_t z = 0; z < 16; ++z) {
+		if (testFlags(sendMask, static_cast<uint64_t>(1) << z)) {
+			sendFloor(message, floors[z]);
+		}
+	}
+}
+
+void LiveSocket::sendNode(uint32_t clientId, QTreeNode* node, int32_t ndx, int32_t ndy, uint32_t floorMask) {
+	NetworkMessage message;
+	appendNode(message, clientId, node, ndx, ndy, floorMask);
 	send(message);
 }
 

@@ -33,6 +33,8 @@
 
 class Editor;
 class LiveLogTab;
+class LiveServer;
+class LivePeer;
 class Action;
 class QTreeNode;
 class Floor;
@@ -106,7 +108,9 @@ public:
 	virtual void send(NetworkMessage& message) = 0;
 
 	//
-	virtual 	void updateCursor(const Position& position) = 0;
+	virtual void updateCursor(const Position& position) = 0;
+
+	bool shouldSendCursorUpdate(const Position& position);
 
 	void addPing(const LivePing& ping);
 	bool hasActivePings();
@@ -122,6 +126,7 @@ public:
 protected:
 	// receive / send methods
 	void receiveNode(NetworkMessage& message, Editor& editor, Action* action, int32_t ndx, int32_t ndy, bool underground);
+	void appendNode(NetworkMessage& message, uint32_t clientId, QTreeNode* node, int32_t ndx, int32_t ndy, uint32_t floorMask);
 	void sendNode(uint32_t clientId, QTreeNode* node, int32_t ndx, int32_t ndy, uint32_t floorMask);
 
 	void receiveFloor(NetworkMessage& message, Editor& editor, Action* action, int32_t ndx, int32_t ndy, int32_t z, QTreeNode* node, Floor* floor);
@@ -164,7 +169,13 @@ protected:
 
 	LiveSessionBounds sessionBounds;
 
+	Position lastSentCursorPos;
+	std::chrono::steady_clock::time_point lastSentCursorTime {};
+	bool hasLastSentCursor = false;
+
 	friend class LiveLogTab;
+	friend class LiveServer;
+	friend class LivePeer;
 };
 
 #endif

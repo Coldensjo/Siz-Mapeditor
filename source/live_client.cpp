@@ -268,6 +268,10 @@ void LiveClient::send(NetworkMessage& message, std::function<void()> onSent) {
 }
 
 void LiveClient::updateCursor(const Position& position) {
+	if (!shouldSendCursorUpdate(position)) {
+		return;
+	}
+
 	LiveCursor cursor;
 	cursor.id = ownClientId;
 	cursor.pos = position;
@@ -342,7 +346,7 @@ void LiveClient::sendHello() {
 }
 
 void LiveClient::sendNodeRequests() {
-	tickNodeRequests();
+	tickNodeRequestsIfDue();
 
 	if (queryNodeList.empty()) {
 		return;
@@ -440,6 +444,21 @@ void LiveClient::queryNode(int32_t ndx, int32_t ndy, bool underground) {
 	nd |= (underground ? 1 : 0);
 	queryNodeList.insert(nd);
 	pendingNodeRequests[nd] = std::chrono::steady_clock::now();
+}
+
+void LiveClient::tickNodeRequestsIfDue() {
+	if (pendingNodeRequests.empty()) {
+		return;
+	}
+
+	const auto now = std::chrono::steady_clock::now();
+	constexpr auto retryInterval = std::chrono::milliseconds(500);
+	if (now - lastNodeRequestTick < retryInterval) {
+		return;
+	}
+
+	lastNodeRequestTick = now;
+	tickNodeRequests();
 }
 
 void LiveClient::tickNodeRequests() {
@@ -983,7 +1002,6 @@ void LiveClient::parseCursorUpdate(NetworkMessage& message) {
 	}
 
 	g_gui.RefreshView();
-	g_gui.UpdateMinimap();
 }
 
 void LiveClient::parsePing(NetworkMessage& message) {

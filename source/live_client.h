@@ -87,6 +87,7 @@ public:
 	// Flags a node as queried and stores it, need to call SendNodeRequest to send it to server
 	void queryNode(int32_t ndx, int32_t ndy, bool underground);
 	void tickNodeRequests();
+	void tickNodeRequestsIfDue();
 	void requestViewportRefresh();
 	bool consumeViewportRefresh();
 	void invalidateViewport(int32_t start_x, int32_t start_y, int32_t end_x, int32_t end_y);
@@ -131,6 +132,7 @@ protected:
 
 	std::set<uint32_t> queryNodeList;
 	std::map<uint32_t, std::chrono::steady_clock::time_point> pendingNodeRequests;
+	std::chrono::steady_clock::time_point lastNodeRequestTick {};
 	bool viewportRefreshPending;
 	bool hasPendingCommentList;
 	std::vector<MapComment> pendingCommentList;

@@ -44,7 +44,9 @@ LivePeer::LivePeer(LiveServer* server, asio::ip::tcp::socket socket) :
 	LiveSocket(),
 	readMessage(), server(server), socket(std::move(socket)), color(), id(0), clientId(0), connected(false),
 	assetFiles(), assetFileIndex(0), assetStream(), assetBytesRemaining(0),
-	updateFiles(), updateFileIndex(0), updateStream(), updateBytesRemaining(0) {
+	updateFiles(), updateFileIndex(0), updateStream(), updateBytesRemaining(0),
+	assetChunkBuffer(LIVE_ASSET_CHUNK_SIZE, '\0'),
+	updateChunkBuffer(LIVE_UPDATE_CHUNK_SIZE, '\0') {
 	ASSERT(server != nullptr);
 	mapVersion = server->getEditor()->getMap().getVersion();
 }
@@ -358,9 +360,8 @@ void LivePeer::sendNextAssetChunk() {
 		send(beginMessage);
 	}
 
-	std::vector<char> buffer(LIVE_ASSET_CHUNK_SIZE);
 	const size_t toRead = std::min<size_t>(LIVE_ASSET_CHUNK_SIZE, assetBytesRemaining);
-	assetStream.read(buffer.data(), static_cast<std::streamsize>(toRead));
+	assetStream.read(assetChunkBuffer.data(), static_cast<std::streamsize>(toRead));
 	const std::streamsize bytesRead = assetStream.gcount();
 	if (bytesRead <= 0) {
 		livePeerLog(log, "Failed while reading asset file for transfer.");
@@ -368,7 +369,7 @@ void LivePeer::sendNextAssetChunk() {
 		return;
 	}
 
-	std::string chunk(buffer.data(), static_cast<size_t>(bytesRead));
+	std::string chunk(assetChunkBuffer.data(), static_cast<size_t>(bytesRead));
 	assetBytesRemaining -= static_cast<uint32_t>(bytesRead);
 
 	NetworkMessage chunkMessage;
@@ -451,9 +452,8 @@ void LivePeer::sendNextUpdateChunk() {
 		send(beginMessage);
 	}
 
-	std::vector<char> buffer(LIVE_UPDATE_CHUNK_SIZE);
 	const size_t toRead = std::min<size_t>(LIVE_UPDATE_CHUNK_SIZE, updateBytesRemaining);
-	updateStream.read(buffer.data(), static_cast<std::streamsize>(toRead));
+	updateStream.read(updateChunkBuffer.data(), static_cast<std::streamsize>(toRead));
 	const std::streamsize bytesRead = updateStream.gcount();
 	if (bytesRead <= 0) {
 		livePeerLog(log, "Failed while reading update file for transfer.");
@@ -461,7 +461,7 @@ void LivePeer::sendNextUpdateChunk() {
 		return;
 	}
 
-	std::string chunk(buffer.data(), static_cast<size_t>(bytesRead));
+	std::string chunk(updateChunkBuffer.data(), static_cast<size_t>(bytesRead));
 	updateBytesRemaining -= static_cast<uint32_t>(bytesRead);
 
 	NetworkMessage chunkMessage;
@@ -533,22 +533,26 @@ void LivePeer::parseReady(NetworkMessage& message) {
 void LivePeer::parseNodeRequest(NetworkMessage& message) {
 	Map& map = server->getEditor()->getMap();
 	const LiveSessionBounds& bounds = server->getSessionBounds();
+	NetworkMessage response;
 	for (uint32_t nodes = message.read<uint32_t>(); nodes != 0; --nodes) {
-		uint32_t ind = message.read<uint32_t>();
+		const uint32_t ind = message.read<uint32_t>();
 
-		int32_t ndx = ind >> 18;
-		int32_t ndy = (ind >> 4) & 0x3FFF;
-		bool underground = ind & 1;
+		const int32_t ndx = ind >> 18;
+		const int32_t ndy = (ind >> 4) & 0x3FFF;
+		const bool underground = ind & 1;
+		const uint32_t floorMask = underground ? 0xFF00u : 0x00FFu;
 
 		if (bounds.enabled && !bounds.intersectsLeaf(ndx * 4, ndy * 4)) {
-			sendNode(clientId, nullptr, ndx, ndy, underground ? 0xFF00 : 0x00FF);
+			appendNode(response, clientId, nullptr, ndx, ndy, floorMask);
 			continue;
 		}
 
 		QTreeNode* node = map.createLeaf(ndx * 4, ndy * 4);
-		if (node) {
-			sendNode(clientId, node, ndx, ndy, underground ? 0xFF00 : 0x00FF);
-		}
+		appendNode(response, clientId, node, ndx, ndy, floorMask);
+	}
+
+	if (response.size > 0) {
+		send(response);
 	}
 }
 
@@ -561,9 +565,10 @@ void LivePeer::parseReceiveChanges(NetworkMessage& message) {
 		return;
 	}
 
-	std::vector<uint8_t> buffer(data.begin(), data.end());
-	buffer.insert(buffer.begin(), 0); // Leading byte skipped by OTBM node reader
-	mapReader.assign(buffer.data(), buffer.size());
+	changeParseBuffer.resize(data.size() + 1);
+	changeParseBuffer[0] = 0;
+	memcpy(&changeParseBuffer[1], data.data(), data.size());
+	mapReader.assign(changeParseBuffer.data(), changeParseBuffer.size());
 
 	BinaryNode* rootNode = mapReader.getRootNode();
 	if (!rootNode) {
@@ -606,7 +611,6 @@ void LivePeer::parseReceiveChanges(NetworkMessage& message) {
 
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
-		g_gui.UpdateMinimap();
 	}
 }
 
@@ -618,7 +622,6 @@ void LivePeer::parseCursorUpdate(NetworkMessage& message) {
 	server->broadcastCursor(cursor);
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
-		g_gui.UpdateMinimap();
 	}
 }
 
@@ -632,7 +635,6 @@ void LivePeer::parseColorUpdate(NetworkMessage& message) {
 	server->updateClientList();
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
-		g_gui.UpdateMinimap();
 	}
 }
 

@@ -106,10 +106,15 @@ protected:
 	std::ifstream assetStream;
 	uint32_t assetBytesRemaining;
 
+	std::vector<char> assetChunkBuffer;
+	std::vector<char> updateChunkBuffer;
+
 	std::vector<LiveUpdateFile> updateFiles;
 	size_t updateFileIndex;
 	std::ifstream updateStream;
 	uint32_t updateBytesRemaining;
+
+	std::vector<uint8_t> changeParseBuffer;
 
 	friend class LiveLogTab;
 	friend class LiveServer;
