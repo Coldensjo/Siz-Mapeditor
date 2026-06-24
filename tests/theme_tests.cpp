@@ -22,5 +22,5 @@ int main()
 	assert(ThemeManager::ModeFromChoice(1) == ThemeMode::Light);
 	assert(ThemeManager::ModeFromChoice(2) == ThemeMode::System);
 	assert(ThemeManager::ModeFromChoice(-1) == ThemeMode::Dark);
-	assert(ThemeManager::ModeFromChoice(3) == ThemeMode::Dark);
+	assert(ThemeManager::ModeFromChoice(8) == ThemeMode::Dark);
 }
