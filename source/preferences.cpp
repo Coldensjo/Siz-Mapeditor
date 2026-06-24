@@ -22,6 +22,7 @@
 #include "settings.h"
 #include "client_version.h"
 #include "editor.h"
+#include "theme.h"
 
 #include "gui.h"
 
@@ -478,6 +479,13 @@ wxNotebookPage* PreferencesWindow::CreateUIPage() {
 
 	auto* subsizer = newd wxFlexGridSizer(2, 10, 10);
 	subsizer->AddGrowableCol(1);
+	theme_choice = newd wxChoice(ui_page, wxID_ANY);
+	theme_choice->Append("Dark");
+	theme_choice->Append("Light");
+	theme_choice->Append("System");
+	theme_choice->SetSelection(static_cast<int>(ThemeManager::Get().GetMode()));
+	subsizer->Add(newd wxStaticText(ui_page, wxID_ANY, "Theme:"), 0);
+	subsizer->Add(theme_choice, 0);
 	terrain_palette_style_choice = AddPaletteStyleChoice(
 		ui_page, subsizer,
 		"Terrain Palette Style:",
@@ -715,6 +723,13 @@ void PreferencesWindow::OnCollapsiblePane(wxCollapsiblePaneEvent& event) {
 // Stuff
 
 void PreferencesWindow::Apply() {
+	const ThemeMode themeMode = ThemeManager::ModeFromChoice(theme_choice->GetSelection());
+	if (!ThemeManager::Get().Apply(themeMode, g_gui.root)) {
+		wxMessageBox("The selected theme could not be applied.", "Theme", wxOK | wxICON_ERROR, this);
+		return;
+	}
+	g_settings.setInteger(Config::UI_THEME, static_cast<int>(themeMode));
+
 	bool must_restart = false;
 	bool palette_update_needed = false;
 

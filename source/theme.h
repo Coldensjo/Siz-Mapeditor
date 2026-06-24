@@ -32,6 +32,7 @@ public:
 	static ThemeManager& Get();
 
 	static ThemeMode NormalizeMode(int mode);
+	static ThemeMode ModeFromChoice(int choice);
 	static ThemePalette PaletteFor(ThemeMode mode);
 
 	ThemeMode GetMode() const;

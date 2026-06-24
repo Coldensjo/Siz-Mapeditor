@@ -88,6 +88,10 @@ ThemeMode ThemeManager::NormalizeMode(int mode) {
 	}
 }
 
+ThemeMode ThemeManager::ModeFromChoice(int choice) {
+	return NormalizeMode(choice);
+}
+
 ThemePalette ThemeManager::PaletteFor(ThemeMode mode) {
 	if (mode == ThemeMode::System) {
 		mode = wxSystemSettings::GetAppearance().AreAppsDark() ? ThemeMode::Dark : ThemeMode::Light;

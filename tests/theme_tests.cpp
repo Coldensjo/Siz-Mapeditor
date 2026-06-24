@@ -18,4 +18,9 @@ int main()
 	assert(ThemeManager::NormalizeMode(1) == ThemeMode::Light);
 	assert(ThemeManager::NormalizeMode(2) == ThemeMode::System);
 	assert(ThemeManager::NormalizeMode(3) == ThemeMode::Dark);
+	assert(ThemeManager::ModeFromChoice(0) == ThemeMode::Dark);
+	assert(ThemeManager::ModeFromChoice(1) == ThemeMode::Light);
+	assert(ThemeManager::ModeFromChoice(2) == ThemeMode::System);
+	assert(ThemeManager::ModeFromChoice(-1) == ThemeMode::Dark);
+	assert(ThemeManager::ModeFromChoice(3) == ThemeMode::Dark);
 }
