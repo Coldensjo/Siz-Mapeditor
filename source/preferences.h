@@ -39,7 +39,7 @@ public:
 
 protected:
 	void SetDefaults();
-	void Apply();
+	bool Apply();
 
 	wxBookCtrl* book;
 

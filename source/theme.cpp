@@ -38,6 +38,8 @@ wxApp::Appearance AppearanceFor(ThemeMode mode) {
 	}
 }
 
+void ApplyPaletteToAui(wxAuiManager* manager, const ThemePalette& palette);
+
 void ApplyPaletteToWindow(wxWindow* window, const ThemePalette& palette, bool isRoot) {
 	if (dynamic_cast<MapWindow*>(window)) {
 		return;
@@ -46,8 +48,29 @@ void ApplyPaletteToWindow(wxWindow* window, const ThemePalette& palette, bool is
 	window->SetForegroundColour(palette.text);
 	window->SetBackgroundColour(isRoot ? palette.window : palette.surface);
 
+	if (wxAuiManager* manager = wxAuiManager::GetManager(window)) {
+		ApplyPaletteToAui(manager, palette);
+	}
+
+	if (auto* toolbar = dynamic_cast<wxAuiToolBar*>(window)) {
+		if (wxAuiToolBarArt* art = toolbar->GetArtProvider()) {
+			art->UpdateColoursFromSystem();
+		}
+	}
+
+	if (auto* notebook = dynamic_cast<wxAuiNotebook*>(window)) {
+		if (wxAuiTabArt* art = notebook->GetArtProvider()) {
+			art->SetColour(palette.surface);
+			art->SetActiveColour(palette.control);
+		}
+	}
+
 	for (wxWindow* child : window->GetChildren()) {
 		ApplyPaletteToWindow(child, palette, false);
+	}
+
+	if (wxAuiManager* manager = wxAuiManager::GetManager(window)) {
+		manager->Update();
 	}
 }
 
@@ -137,10 +160,6 @@ bool ThemeManager::Apply(ThemeMode newMode, wxWindow* root) {
 	}
 
 	ApplyPaletteToWindow(root, palette, true);
-	if (wxAuiManager* manager = wxAuiManager::GetManager(root)) {
-		ApplyPaletteToAui(manager, palette);
-		manager->Update();
-	}
 
 	root->Layout();
 	root->Refresh();

@@ -703,8 +703,9 @@ wxNotebookPage* PreferencesWindow::CreateClientPage() {
 // Event handlers!
 
 void PreferencesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
-	Apply();
-	EndModal(0);
+	if (Apply()) {
+		EndModal(0);
+	}
 }
 
 void PreferencesWindow::OnClickCancel(wxCommandEvent& WXUNUSED(event)) {
@@ -722,11 +723,11 @@ void PreferencesWindow::OnCollapsiblePane(wxCollapsiblePaneEvent& event) {
 
 // Stuff
 
-void PreferencesWindow::Apply() {
+bool PreferencesWindow::Apply() {
 	const ThemeMode themeMode = ThemeManager::ModeFromChoice(theme_choice->GetSelection());
 	if (!ThemeManager::Get().Apply(themeMode, g_gui.root)) {
 		wxMessageBox("The selected theme could not be applied.", "Theme", wxOK | wxICON_ERROR, this);
-		return;
+		return false;
 	}
 	g_settings.setInteger(Config::UI_THEME, static_cast<int>(themeMode));
 
@@ -952,4 +953,6 @@ void PreferencesWindow::Apply() {
 		g_gui.PopupDialog("Error", error, wxOK);
 		g_gui.ListDialog("Warnings", warnings);
 	}
+
+	return true;
 }
