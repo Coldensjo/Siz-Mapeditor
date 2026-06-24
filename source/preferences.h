@@ -33,15 +33,29 @@ public:
 	void OnNotebookPageChanged(wxBookCtrlEvent&);
 
 protected:
+	struct ScrollableTab {
+		wxPanel* page = nullptr;
+		wxScrolledWindow* scroll = nullptr;
+		wxBoxSizer* content = nullptr;
+	};
+
 	bool Apply();
 	void EnsureClientVersionListBuilt();
+	ScrollableTab CreateScrollableTab();
+	wxStaticBoxSizer* AddSection(wxSizer* parent, wxWindow* window, const wxString& title);
+	wxFlexGridSizer* CreateFormGrid(wxWindow* parent);
+
+	wxChoice* AddPaletteStyleChoice(wxWindow* parent, wxSizer* sizer, const wxString& short_description, const wxString& description, const std::string& setting);
+	void SetPaletteStyleChoice(wxChoice* ctrl, int key);
+	int IconBackgroundSelection() const;
+	void SetIconBackgroundSelection(int selection);
 
 	static constexpr int CLIENT_PAGE_INDEX = 4;
 
 	wxBookCtrl* book = nullptr;
 	bool client_list_built = false;
 	wxScrolledWindow* client_list_window = nullptr;
-	wxFlexGridSizer* client_list_sizer = nullptr;
+	wxBoxSizer* client_list_sizer = nullptr;
 
 	// General
 	wxCheckBox* always_make_backup_chkbox = nullptr;
@@ -56,7 +70,7 @@ protected:
 	wxSpinCtrl* undo_mem_size_spin = nullptr;
 	wxSpinCtrl* worker_threads_spin = nullptr;
 	wxSpinCtrl* replace_size_spin = nullptr;
-	wxRadioBox* position_format = nullptr;
+	wxChoice* position_format = nullptr;
 
 	// Editor
 	wxCheckBox* group_actions_chkbox = nullptr;
@@ -116,11 +130,6 @@ protected:
 	std::vector<wxTextCtrl*> version_monsters_dir_pickers;
 	std::vector<wxTextCtrl*> version_npcs_dir_pickers;
 	wxCheckBox* check_sigs_chkbox = nullptr;
-
-	wxChoice* AddPaletteStyleChoice(wxWindow* parent, wxSizer* sizer, const wxString& short_description, const wxString& description, const std::string& setting);
-	void SetPaletteStyleChoice(wxChoice* ctrl, int key);
-	int IconBackgroundSelection() const;
-	void SetIconBackgroundSelection(int selection);
 
 	wxNotebookPage* CreateGeneralPage();
 	wxNotebookPage* CreateGraphicsPage();
