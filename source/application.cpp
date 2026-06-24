@@ -28,6 +28,7 @@
 #include "about_window.h"
 #include "main_menubar.h"
 #include "artprovider.h"
+#include "theme.h"
 
 #include "materials.h"
 #include "map.h"
@@ -130,6 +131,9 @@ bool Application::OnInit() {
 
 	// Load some internal stuff
 	g_settings.load();
+	const ThemeMode themeMode = ThemeManager::NormalizeMode(g_settings.getInteger(Config::UI_THEME));
+	g_settings.setInteger(Config::UI_THEME, static_cast<int>(themeMode));
+	ThemeManager::Get().Apply(themeMode, nullptr);
 	g_gui.SetSpawnTime(g_settings.getInteger(Config::DEFAULT_SPAWNTIME));
 	FixVersionDiscrapencies();
 	g_gui.LoadHotkeys();

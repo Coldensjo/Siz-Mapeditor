@@ -6,6 +6,8 @@
 
 #include "theme.h"
 
+#include "map_window.h"
+
 #include <wx/settings.h>
 
 namespace {
@@ -22,6 +24,49 @@ ThemePalette DarkPalette() {
 		wxColour(62, 62, 66),
 		wxColour(120, 120, 125),
 	};
+}
+
+wxApp::Appearance AppearanceFor(ThemeMode mode) {
+	switch (mode) {
+		case ThemeMode::Light:
+			return wxApp::Appearance::Light;
+		case ThemeMode::System:
+			return wxApp::Appearance::System;
+		case ThemeMode::Dark:
+		default:
+			return wxApp::Appearance::Dark;
+	}
+}
+
+void ApplyPaletteToWindow(wxWindow* window, const ThemePalette& palette, bool isRoot) {
+	if (dynamic_cast<MapWindow*>(window)) {
+		return;
+	}
+
+	window->SetForegroundColour(palette.text);
+	window->SetBackgroundColour(isRoot ? palette.window : palette.surface);
+
+	for (wxWindow* child : window->GetChildren()) {
+		ApplyPaletteToWindow(child, palette, false);
+	}
+}
+
+void ApplyPaletteToAui(wxAuiManager* manager, const ThemePalette& palette) {
+	wxAuiDockArt* art = manager->GetArtProvider();
+	if (!art) {
+		return;
+	}
+
+	art->SetColor(wxAUI_DOCKART_BACKGROUND_COLOUR, palette.surface);
+	art->SetColor(wxAUI_DOCKART_SASH_COLOUR, palette.control);
+	art->SetColor(wxAUI_DOCKART_BORDER_COLOUR, palette.border);
+	art->SetColor(wxAUI_DOCKART_INACTIVE_CAPTION_COLOUR, palette.surface);
+	art->SetColor(wxAUI_DOCKART_INACTIVE_CAPTION_GRADIENT_COLOUR, palette.control);
+	art->SetColor(wxAUI_DOCKART_INACTIVE_CAPTION_TEXT_COLOUR, palette.mutedText);
+	art->SetColor(wxAUI_DOCKART_ACTIVE_CAPTION_COLOUR, palette.selection);
+	art->SetColor(wxAUI_DOCKART_ACTIVE_CAPTION_GRADIENT_COLOUR, palette.hover);
+	art->SetColor(wxAUI_DOCKART_ACTIVE_CAPTION_TEXT_COLOUR, palette.text);
+	art->SetColor(wxAUI_DOCKART_GRIPPER_COLOUR, palette.mutedText);
 }
 
 }
@@ -74,9 +119,27 @@ const ThemePalette& ThemeManager::GetPalette() const {
 }
 
 bool ThemeManager::Apply(ThemeMode newMode, wxWindow* root) {
-	(void)root;
-	mode = NormalizeMode(static_cast<int>(newMode));
-	palette = PaletteFor(mode);
+	const ThemeMode requestedMode = NormalizeMode(static_cast<int>(newMode));
+	if (wxTheApp && wxTheApp->SetAppearance(AppearanceFor(requestedMode)) == wxApp::AppearanceResult::Failure) {
+		return false;
+	}
+
+	const ThemePalette requestedPalette = PaletteFor(requestedMode);
+	mode = requestedMode;
+	palette = requestedPalette;
+
+	if (!root) {
+		return true;
+	}
+
+	ApplyPaletteToWindow(root, palette, true);
+	if (wxAuiManager* manager = wxAuiManager::GetManager(root)) {
+		ApplyPaletteToAui(manager, palette);
+		manager->Update();
+	}
+
+	root->Layout();
+	root->Refresh();
 	return true;
 }
 
