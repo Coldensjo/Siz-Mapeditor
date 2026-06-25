@@ -1655,7 +1655,11 @@ void Editor::destroySelection() {
 				newtile->spawn = nullptr;
 			}
 
-			if (g_settings.getInteger(Config::USE_AUTOMAGIC)) {
+			// Only re-borderize the neighbourhood when ground was actually removed.
+			// Deleting plain items must not re-borderize (causes inverted borders).
+			bool ground_removed = tile->ground && tile->ground->isSelected();
+
+			if (ground_removed && g_settings.getInteger(Config::USE_AUTOMAGIC)) {
 				for (int y = -1; y <= 1; y++) {
 					for (int x = -1; x <= 1; x++) {
 						tilestoborder.push_back(
