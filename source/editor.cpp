@@ -1418,7 +1418,9 @@ void Editor::moveSelection(Position offset) {
 	batchAction->addAndCommitAction(action);
 
 	// Remove old borders (and create some newd?)
-	if (g_settings.getInteger(Config::USE_AUTOMAGIC) && g_settings.getInteger(Config::BORDERIZE_DRAG) && selection.size() < size_t(g_settings.getInteger(Config::BORDERIZE_DRAG_THRESHOLD))) {
+	// Only touch borders when ground was actually moved; dragging plain items must not
+	// re-borderize the source/destination neighbourhood (causes inverted borders).
+	if (doborders && g_settings.getInteger(Config::USE_AUTOMAGIC) && g_settings.getInteger(Config::BORDERIZE_DRAG) && selection.size() < size_t(g_settings.getInteger(Config::BORDERIZE_DRAG_THRESHOLD))) {
 		action = actionQueue->createAction(batchAction);
 		TileList borderize_tiles;
 		// Go through all modified (selected) tiles (might be slow)
@@ -1525,7 +1527,9 @@ void Editor::moveSelection(Position offset) {
 	batchAction->addAndCommitAction(action);
 
 	// Create borders
-	if (g_settings.getInteger(Config::USE_AUTOMAGIC) && g_settings.getInteger(Config::BORDERIZE_DRAG) && selection.size() < size_t(g_settings.getInteger(Config::BORDERIZE_DRAG_THRESHOLD))) {
+	// Only touch borders when ground was actually moved; dragging plain items must not
+	// re-borderize the destination neighbourhood (causes inverted borders).
+	if (doborders && g_settings.getInteger(Config::USE_AUTOMAGIC) && g_settings.getInteger(Config::BORDERIZE_DRAG) && selection.size() < size_t(g_settings.getInteger(Config::BORDERIZE_DRAG_THRESHOLD))) {
 		action = actionQueue->createAction(batchAction);
 		TileList borderize_tiles;
 		// Go through all modified (selected) tiles (might be slow)
