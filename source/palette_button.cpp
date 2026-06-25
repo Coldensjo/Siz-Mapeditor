@@ -28,12 +28,19 @@ BEGIN_EVENT_TABLE(PaletteButton, wxButton)
 	EVT_LEFT_UP(PaletteButton::OnMouseUp)
 END_EVENT_TABLE()
 
-PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label, 
-	const wxPoint& pos, const wxSize& size, long style, const wxValidator& validator, 
-	const wxString& name) : wxButton(parent, id, label, pos, size, style, validator, name),
-	isPressed(false), isHovered(false), isActive(false) {
-	// Ensure button has a solid background color
+PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label,
+	const wxBitmap& buttonIcon, const wxPoint& pos, const wxSize& size, long style,
+	const wxValidator& validator, const wxString& name)
+	: wxButton(parent, id, label, pos, size, style, validator, name),
+	  isPressed(false),
+	  isHovered(false),
+	  isActive(false),
+	  icon(buttonIcon) {
 	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
+	if (icon.IsOk()) {
+		SetMinSize(wxSize(36, 36));
+		SetToolTip(GetLabelWithoutAmpersand());
+	}
 }
 
 void PaletteButton::SetActive(bool active) {
@@ -139,10 +146,21 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 		dc.DrawRectangle(focusRect);
 	}
 	
+	if (icon.IsOk()) {
+		int iconX = (size.GetWidth() - icon.GetWidth()) / 2;
+		int iconY = (size.GetHeight() - icon.GetHeight()) / 2;
+		if (isPressed) {
+			iconX += 1;
+			iconY += 1;
+		}
+		dc.DrawBitmap(icon, iconX, iconY, true);
+		return;
+	}
+
 	// Draw text with underline
 	wxString label = GetLabelWithoutAmpersand();
 	int underlineIndex = GetUnderlineIndex();
-	
+
 	if (!label.IsEmpty()) {
 		// Get text metrics
 		wxSize textSize = dc.GetTextExtent(label);

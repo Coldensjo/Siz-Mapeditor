@@ -31,6 +31,20 @@
 #include "house_brush.h"
 #include "map.h"
 
+namespace {
+
+wxBitmap LoadPaletteCategoryIcon(const char* filename) {
+	wxFileName path(g_gui.GetExecDirectory(), wxString::FromUTF8(filename));
+	path.AppendDir("icons");
+	wxImage image;
+	if (!image.LoadFile(path.GetFullPath(), wxBITMAP_TYPE_PNG)) {
+		return wxNullBitmap;
+	}
+	return wxBitmap(image);
+}
+
+} // namespace
+
 // ============================================================================
 // Palette window
 
@@ -76,12 +90,12 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 	raw_palette = static_cast<BrushPalettePanel*>(CreateRAWPalette(page_container, tilesets));
 
 	// Create buttons
-	terrain_button = newd PaletteButton(this, PALETTE_BUTTON_TERRAIN, "&Terrain");
-	doodad_button = newd PaletteButton(this, PALETTE_BUTTON_DOODAD, "&Doodad");
-	item_button = newd PaletteButton(this, PALETTE_BUTTON_ITEM, "&Item");
-	house_button = newd PaletteButton(this, PALETTE_BUTTON_HOUSE, "&House");
-	creature_button = newd PaletteButton(this, PALETTE_BUTTON_CREATURE, "&Creature");
-	raw_button = newd PaletteButton(this, PALETTE_BUTTON_RAW, "&RAW");
+	terrain_button = newd PaletteButton(this, PALETTE_BUTTON_TERRAIN, "&Terrain", LoadPaletteCategoryIcon("terrain.png"));
+	doodad_button = newd PaletteButton(this, PALETTE_BUTTON_DOODAD, "&Doodad", LoadPaletteCategoryIcon("doodad.png"));
+	item_button = newd PaletteButton(this, PALETTE_BUTTON_ITEM, "&Item", LoadPaletteCategoryIcon("item.png"));
+	house_button = newd PaletteButton(this, PALETTE_BUTTON_HOUSE, "&House", LoadPaletteCategoryIcon("house.png"));
+	creature_button = newd PaletteButton(this, PALETTE_BUTTON_CREATURE, "&Creature", LoadPaletteCategoryIcon("creature.png"));
+	raw_button = newd PaletteButton(this, PALETTE_BUTTON_RAW, "&RAW", LoadPaletteCategoryIcon("raw.png"));
 
 	// Setup sizers
 	wxBoxSizer* main_sizer = newd wxBoxSizer(wxHORIZONTAL);
@@ -89,12 +103,12 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 	wxBoxSizer* page_sizer = newd wxBoxSizer(wxVERTICAL);
 
 	// Add buttons to button sizer
-	button_sizer->Add(terrain_button, 0, wxEXPAND | wxALL, 2);
-	button_sizer->Add(doodad_button, 0, wxEXPAND | wxALL, 2);
-	button_sizer->Add(item_button, 0, wxEXPAND | wxALL, 2);
-	button_sizer->Add(house_button, 0, wxEXPAND | wxALL, 2);
-	button_sizer->Add(creature_button, 0, wxEXPAND | wxALL, 2);
-	button_sizer->Add(raw_button, 0, wxEXPAND | wxALL, 2);
+	button_sizer->Add(terrain_button, 0, wxALL, 2);
+	button_sizer->Add(doodad_button, 0, wxALL, 2);
+	button_sizer->Add(item_button, 0, wxALL, 2);
+	button_sizer->Add(house_button, 0, wxALL, 2);
+	button_sizer->Add(creature_button, 0, wxALL, 2);
+	button_sizer->Add(raw_button, 0, wxALL, 2);
 
 	// Add palette panels to page sizer (initially hidden)
 	page_sizer->Add(terrain_palette, 1, wxEXPAND);

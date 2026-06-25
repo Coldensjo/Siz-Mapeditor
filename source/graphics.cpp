@@ -1134,6 +1134,44 @@ wxMemoryDC* GameSprite::getDC(SpriteSize size) {
 	return dc[size];
 }
 
+wxImage GameSprite::getCreatureImage(int dir, int addon, int pattern_z, const Outfit& outfit) {
+	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
+
+	const int image_size = std::max<int>(width, height) * SPRITE_PIXELS;
+	wxImage image(image_size, image_size);
+	if (bgshade < 0) {
+		unsigned char* data = image.GetData();
+		const int bytes = image_size * image_size * 3;
+		for (int i = 0; i < bytes; i += 3) {
+			data[i] = 0xFF;
+			data[i + 1] = 0x00;
+			data[i + 2] = 0xFF;
+		}
+		image.SetMaskColour(0xFF, 0x00, 0xFF);
+	} else {
+		image.Clear(bgshade);
+	}
+
+	for (uint8_t w = 0; w < width; w++) {
+		for (uint8_t h = 0; h < height; h++) {
+			const int i = getIndex(w, h, 0, dir, addon, pattern_z, 0);
+			uint8_t* data = nullptr;
+			if (layers > 1) {
+				data = getTemplateImage(i, outfit)->getRGBData();
+			} else if (i < int(numsprites)) {
+				data = spriteList[i]->getRGBData();
+			}
+			if (data) {
+				wxImage img(SPRITE_PIXELS, SPRITE_PIXELS, data);
+				img.SetMaskColour(0xFF, 0x00, 0xFF);
+				image.Paste(img, (width - w - 1) * SPRITE_PIXELS, (height - h - 1) * SPRITE_PIXELS);
+				img.Destroy();
+			}
+		}
+	}
+	return image;
+}
+
 void GameSprite::DrawTo(wxDC* dc, SpriteSize sz, int start_x, int start_y, int width, int height) {
 	int draw_width = width;
 	int draw_height = height;

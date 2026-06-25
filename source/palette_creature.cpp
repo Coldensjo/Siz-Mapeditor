@@ -22,6 +22,7 @@
 #include "gui.h"
 #include "palette_creature.h"
 #include "creature_brush.h"
+#include "creature.h"
 #include "creatures.h"
 #include "items.h"
 #include "spawn_brush.h"
@@ -135,6 +136,86 @@ void DrawSpritesInSlot(wxDC& dc, const SpriteList& sprites, int slot_x, int slot
 		int draw_y = slot_y + (slot_size - draw_height);
 		sprite->DrawTo(&dc, SPRITE_SIZE_ACTUAL, draw_x, draw_y, draw_width, draw_height);
 	}
+}
+
+void DrawCreatureBrushInSlot(wxDC& dc, Brush* brush, int slot_x, int slot_y, int slot_size) {
+	if (!brush || !brush->isCreature()) {
+		SpriteList sprites;
+		CollectBrushSprites(brush, sprites);
+		DrawSpritesInSlot(dc, sprites, slot_x, slot_y, slot_size);
+		return;
+	}
+
+	CreatureBrush* creature_brush = dynamic_cast<CreatureBrush*>(brush);
+	if (!creature_brush) {
+		return;
+	}
+
+	CreatureType* type = creature_brush->getType();
+	if (!type) {
+		return;
+	}
+
+	const Outfit& outfit = type->outfit;
+	if (outfit.lookItem != 0) {
+		SpriteList sprites;
+		CollectBrushSprites(brush, sprites);
+		DrawSpritesInSlot(dc, sprites, slot_x, slot_y, slot_size);
+		return;
+	}
+
+	GameSprite* spr = g_gui.gfx.getCreatureSprite(outfit.lookType);
+	if (!spr || outfit.lookType == 0) {
+		return;
+	}
+
+	wxImage image;
+	int pattern_z = 0;
+	if (outfit.lookMount != 0) {
+		if (GameSprite* mount_spr = g_gui.gfx.getCreatureSprite(outfit.lookMount)) {
+			Outfit mount_outfit;
+			mount_outfit.lookType = outfit.lookMount;
+			mount_outfit.lookHead = outfit.lookMountHead;
+			mount_outfit.lookBody = outfit.lookMountBody;
+			mount_outfit.lookLegs = outfit.lookMountLegs;
+			mount_outfit.lookFeet = outfit.lookMountFeet;
+			image = mount_spr->getCreatureImage(SOUTH, 0, 0, mount_outfit);
+			pattern_z = std::min<int>(1, spr->pattern_z - 1);
+		}
+	}
+
+	for (int addon = 0; addon < spr->pattern_y; ++addon) {
+		if (addon > 0 && !(outfit.lookAddon & (1 << (addon - 1)))) {
+			continue;
+		}
+		wxImage part = spr->getCreatureImage(SOUTH, addon, pattern_z, outfit);
+		if (!image.IsOk()) {
+			image = part;
+		} else if (part.IsOk()) {
+			image.Paste(part, 0, 0);
+		}
+	}
+
+	if (!image.IsOk()) {
+		return;
+	}
+
+	int draw_width = std::max<int>(SPRITE_PIXELS, image.GetWidth());
+	int draw_height = std::max<int>(SPRITE_PIXELS, image.GetHeight());
+	int draw_height_extra = spr->getDrawHeight();
+	if (draw_height_extra > 0) {
+		draw_height = std::max(draw_height, draw_height_extra);
+	}
+	if (draw_width > slot_size || draw_height > slot_size) {
+		double scale = std::min(double(slot_size) / draw_width, double(slot_size) / draw_height);
+		draw_width = std::max<int>(1, int(std::lround(draw_width * scale)));
+		draw_height = std::max<int>(1, int(std::lround(draw_height * scale)));
+		image.Rescale(draw_width, draw_height, wxIMAGE_QUALITY_NEAREST);
+	}
+	int draw_x = slot_x + (slot_size - draw_width);
+	int draw_y = slot_y + (slot_size - draw_height);
+	wxBitmap bmp(image, -1);
+	dc.DrawBitmap(bmp, draw_x, draw_y, true);
 }
 
 } // namespace
@@ -274,14 +355,12 @@ size_t CreatureListBox::GetCount() const {
 void CreatureListBox::OnDrawItem(wxDC& dc, const wxRect& rect, size_t index) const {
 	ASSERT(index < entries.size());
 	const Entry& entry = entries[index];
-	SpriteList sprites;
-	CollectBrushSprites(entry.brush, sprites);
 
 	// Every creature is laid out within a fixed 64x64 slot so that 32x32 and
 	// 64x64 creatures line up consistently.
 	int slot_x = rect.GetX();
 	int slot_y = rect.GetY() + (rect.GetHeight() - CREATURE_SLOT_SIZE) / 2;
-	DrawSpritesInSlot(dc, sprites, slot_x, slot_y, CREATURE_SLOT_SIZE);
+	DrawCreatureBrushInSlot(dc, entry.brush, slot_x, slot_y, CREATURE_SLOT_SIZE);
 
 	dc.SetTextForeground(ThemeManager::Get().GetPalette().text);
 
@@ -549,11 +628,9 @@ void CreatureSpriteGrid::OnPaint(wxPaintEvent& event) {
 				dc.DrawRectangle(cell_x, cell_y, cell_width, cell_height);
 			}
 
-			SpriteList sprites;
-			CollectBrushSprites(entry.brush, sprites);
 			int slot_x = cell_x + (cell_width - CREATURE_SLOT_SIZE) / 2;
 			int slot_y = cell_y + CELL_PADDING;
-			DrawSpritesInSlot(dc, sprites, slot_x, slot_y, CREATURE_SLOT_SIZE);
+			DrawCreatureBrushInSlot(dc, entry.brush, slot_x, slot_y, CREATURE_SLOT_SIZE);
 
 			dc.SetTextForeground(palette.text);
 			wxString label = entry.name;

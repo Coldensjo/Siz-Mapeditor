@@ -22,9 +22,10 @@
 
 class PaletteButton : public wxButton {
 public:
-	PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label, 
-		const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, 
-		long style = 0, const wxValidator& validator = wxDefaultValidator, 
+	PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label,
+		const wxBitmap& icon = wxNullBitmap,
+		const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize,
+		long style = 0, const wxValidator& validator = wxDefaultValidator,
 		const wxString& name = wxButtonNameStr);
 
 	void SetActive(bool active);
@@ -42,6 +43,7 @@ protected:
 	bool isPressed;
 	bool isHovered;
 	bool isActive;
+	wxBitmap icon;
 
 	DECLARE_EVENT_TABLE()
 };
