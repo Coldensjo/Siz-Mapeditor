@@ -44,7 +44,15 @@ struct NetworkMessage {
 
 	template <typename T>
 	T read() {
-		T& value = *reinterpret_cast<T*>(&buffer[position]);
+		if (position + sizeof(T) > buffer.size()) {
+			// Truncated/corrupt packet: flag it so the caller can abort instead of
+			// reading out of bounds or silently consuming garbage.
+			overflow = true;
+			position = buffer.size();
+			return T {};
+		}
+		T value;
+		memcpy(&value, &buffer[position], sizeof(T));
 		position += sizeof(T);
 		return value;
 	}
@@ -59,6 +67,8 @@ struct NetworkMessage {
 	std::vector<uint8_t> buffer;
 	size_t position;
 	size_t size;
+	// Set when a read runs past the end of the buffer (truncated/corrupt packet).
+	bool overflow = false;
 };
 
 template <>

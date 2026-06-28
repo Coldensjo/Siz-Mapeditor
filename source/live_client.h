@@ -32,6 +32,7 @@
 class DirtyList;
 class MapTab;
 class LiveLogTab;
+class wxTimer;
 
 class LiveClient : public LiveSocket {
 public:
@@ -44,6 +45,9 @@ public:
 
 	void close();
 	bool handleError(const net_error_code& error);
+	// Logs the reason then tears the session down on the GUI thread (closes the
+	// socket and the live editor tab). Safe to call from the network thread.
+	void disconnectFromServer(const wxString& reason);
 
 	//
 	std::string getHostName() const;
@@ -88,6 +92,10 @@ public:
 	void queryNode(int32_t ndx, int32_t ndy, bool underground);
 	void tickNodeRequests();
 	void tickNodeRequestsIfDue();
+	// Re-requests un-answered nodes on a fixed interval, independent of the paint
+	// loop, so a lost node batch still recovers while the user is idle.
+	void onNodeRetryTick();
+	void startNodeRetryTimer();
 	void requestViewportRefresh();
 	bool consumeViewportRefresh();
 	void invalidateViewport(int32_t start_x, int32_t start_y, int32_t end_x, int32_t end_y);
@@ -133,6 +141,7 @@ protected:
 	std::set<uint32_t> queryNodeList;
 	std::map<uint32_t, std::chrono::steady_clock::time_point> pendingNodeRequests;
 	std::chrono::steady_clock::time_point lastNodeRequestTick {};
+	std::unique_ptr<wxTimer> nodeRetryTimer;
 	bool viewportRefreshPending;
 	bool hasPendingCommentList;
 	std::vector<MapComment> pendingCommentList;

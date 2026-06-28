@@ -26,6 +26,7 @@ void NetworkMessage::clear() {
 	buffer.resize(4);
 	position = 4;
 	size = 0;
+	overflow = false;
 }
 
 void NetworkMessage::expand(const size_t length) {
@@ -42,6 +43,9 @@ std::string NetworkMessage::read<std::string>() {
 		return std::string();
 	}
 	if (position + length > buffer.size()) {
+		// Truncated/corrupt packet: flag it so the caller can abort instead of
+		// silently dropping the remainder of a batched packet.
+		overflow = true;
 		position = buffer.size();
 		return std::string();
 	}

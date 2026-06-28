@@ -33,6 +33,22 @@
 #include "brush.h"
 
 #include <wx/event.h>
+#include <wx/timer.h>
+
+namespace {
+	// GUI-thread timer that drives node-request retries independently of repaints.
+	class NodeRetryTimer : public wxTimer {
+	public:
+		explicit NodeRetryTimer(LiveClient* owner) :
+			client(owner) { }
+		void Notify() override {
+			client->onNodeRetryTick();
+		}
+
+	private:
+		LiveClient* client;
+	};
+}
 
 LiveClient::LiveClient() :
 	LiveSocket(),
@@ -111,20 +127,12 @@ void LiveClient::tryConnect(asio::ip::tcp::resolver::results_type endpoints) {
 			if (handleError(error)) {
 				return;
 			}
-			logMessage("Connection failed: " + error.message());
-			wxTheApp->CallAfter([this]() {
-				close();
-				g_gui.CloseLiveEditors(this);
-			});
+			disconnectFromServer("Connection failed: " + error.message());
 		} else {
 			net_error_code optionError;
 			socket->set_option(asio::ip::tcp::no_delay(true), optionError);
 			if (optionError) {
-				logMessage("Failed to set socket options: " + optionError.message());
-				wxTheApp->CallAfter([this]() {
-					close();
-					g_gui.CloseLiveEditors(this);
-				});
+				disconnectFromServer("Failed to set socket options: " + optionError.message());
 				return;
 			}
 			logMessage("TCP connected to " + wxstr(getHostName()) + ", starting handshake...");
@@ -134,6 +142,10 @@ void LiveClient::tryConnect(asio::ip::tcp::resolver::results_type endpoints) {
 }
 
 void LiveClient::close() {
+	if (nodeRetryTimer) {
+		nodeRetryTimer->Stop();
+	}
+
 	if (resolver) {
 		resolver->cancel();
 	}
@@ -153,19 +165,33 @@ void LiveClient::close() {
 
 bool LiveClient::handleError(const net_error_code& error) {
 	if (error == asio::error::eof || error == asio::error::connection_reset) {
-		wxTheApp->CallAfter([this]() {
-			if (log) {
-				log->Message(wxString() + getHostName() + ": disconnected.");
-			}
-			close();
-			g_gui.CloseLiveEditors(this);
-		});
+		disconnectFromServer(wxString() + getHostName() + ": disconnected.");
 		return true;
 	} else if (error == asio::error::connection_aborted) {
 		logMessage("You have left the server.");
 		return true;
 	}
 	return false;
+}
+
+void LiveClient::disconnectFromServer(const wxString& reason) {
+	if (!reason.empty()) {
+		logMessage(reason);
+	}
+	// Idempotent: the read loop keeps running until close() cancels the socket, so
+	// more than one failure can race in. Mark teardown started right away so a
+	// second call (or a packet already queued on the GUI thread) doesn't schedule
+	// a second CloseLiveEditors and double-delete this client.
+	if (stopped) {
+		return;
+	}
+	stopped = true;
+	// The read/write callbacks run on the network thread, and CloseLiveEditors
+	// deletes this LiveClient, so the teardown must happen on the GUI thread.
+	wxTheApp->CallAfter([this]() {
+		close();
+		g_gui.CloseLiveEditors(this);
+	});
 }
 
 std::string LiveClient::getHostName() const {
@@ -188,10 +214,10 @@ void LiveClient::receiveHeader() {
 		[this](const net_error_code& error, size_t bytesReceived) -> void {
 			if (error) {
 				if (!handleError(error)) {
-					logMessage(wxString() + getHostName() + ": " + error.message());
+					disconnectFromServer(wxString() + getHostName() + ": " + error.message());
 				}
 			} else if (bytesReceived < 4) {
-				logMessage(wxString() + getHostName() + ": Could not receive header[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
+				disconnectFromServer(wxString() + getHostName() + ": Could not receive header[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
 			} else {
 				receive(readMessage.read<uint32_t>());
 			}
@@ -205,10 +231,10 @@ void LiveClient::receive(uint32_t packetSize) {
 		[this](const net_error_code& error, size_t bytesReceived) -> void {
 			if (error) {
 				if (!handleError(error)) {
-					logMessage(wxString() + getHostName() + ": " + error.message());
+					disconnectFromServer(wxString() + getHostName() + ": " + error.message());
 				}
 			} else if (bytesReceived < readMessage.buffer.size() - 4) {
-				logMessage(wxString() + getHostName() + ": Could not receive packet[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
+				disconnectFromServer(wxString() + getHostName() + ": Could not receive packet[size: " + std::to_string(bytesReceived) + "], disconnecting client.");
 			} else {
 				NetworkMessage packet = std::move(readMessage);
 				wxTheApp->CallAfter([this, packet = std::move(packet)]() mutable {
@@ -461,6 +487,30 @@ void LiveClient::tickNodeRequestsIfDue() {
 	tickNodeRequests();
 }
 
+void LiveClient::startNodeRetryTimer() {
+	// Runs on the GUI thread (called from parseHello). The timer fires Notify()
+	// from the wx event loop, so node retries keep flowing even when nothing is
+	// repainting the canvas.
+	if (!nodeRetryTimer) {
+		nodeRetryTimer = std::make_unique<NodeRetryTimer>(this);
+	}
+	if (!nodeRetryTimer->IsRunning()) {
+		nodeRetryTimer->Start(500);
+	}
+}
+
+void LiveClient::onNodeRetryTick() {
+	if (stopped || !editor) {
+		return;
+	}
+	if (pendingNodeRequests.empty()) {
+		return;
+	}
+	// sendNodeRequests() runs the due-retry sweep and flushes any re-queued nodes.
+	sendNodeRequests();
+	g_gui.RefreshView();
+}
+
 void LiveClient::tickNodeRequests() {
 	if (!editor) {
 		return;
@@ -534,6 +584,12 @@ void LiveClient::invalidateViewport(int32_t start_x, int32_t start_y, int32_t en
 }
 
 void LiveClient::parsePacket(NetworkMessage message) {
+	// Teardown may have started after this packet was queued on the GUI thread;
+	// don't touch editor state (or schedule another teardown) once it has.
+	if (stopped) {
+		return;
+	}
+
 	uint8_t packetType;
 	while (message.position < message.buffer.size()) {
 		packetType = message.read<uint8_t>();
@@ -608,12 +664,26 @@ void LiveClient::parsePacket(NetworkMessage message) {
 				parseItemBlockList(message);
 				break;
 			default: {
-				if (log) {
-					log->Message(wxString::Format("Unknown packet received (type 0x%02X)!", packetType));
-				}
-				close();
-				break;
+				// A bad packet type means the stream has desynced; the rest of this
+				// buffer is garbage. Tear the session down instead of looping over it
+				// and leaving a half-loaded map tab open (which looks like a hang).
+				disconnectFromServer(wxString::Format("Unknown packet received (type 0x%02X)! Disconnecting.", packetType));
+				return;
 			}
+		}
+
+		// A handler started a (deferred) teardown; stop parsing the rest of this
+		// buffer. 'this' is still valid because teardown is deferred to CallAfter.
+		if (stopped) {
+			return;
+		}
+
+		// A read ran past the end of the buffer: the packet was truncated or the
+		// stream desynced. Abort instead of silently dropping the rest (which would
+		// leave a half-loaded map), and don't trust message.position any further.
+		if (message.overflow) {
+			disconnectFromServer(wxString() + getHostName() + ": Malformed packet from server (truncated read). Disconnecting.");
+			return;
 		}
 	}
 }
@@ -669,16 +739,27 @@ void LiveClient::parseHello(NetworkMessage& message) {
 		g_gui.RefreshView();
 	}
 
+	startNodeRetryTimer();
+
 	logMessage("Connected to live map.");
 	g_gui.UpdateMenubar();
 }
 
 void LiveClient::parseKick(NetworkMessage& message) {
-	const std::string& kickMessage = message.read<std::string>();
-	close();
+	const std::string kickMessage = message.read<std::string>();
 
-	g_gui.PopupDialog("Disconnected", wxstr(kickMessage), wxOK);
-	g_gui.CloseLiveEditors(this);
+	// Defer teardown: this runs inside the parsePacket loop, and CloseLiveEditors
+	// deletes this client. Setting stopped first makes it idempotent and stops the
+	// loop from touching freed state afterwards.
+	if (stopped) {
+		return;
+	}
+	stopped = true;
+	wxTheApp->CallAfter([this, kickMessage]() {
+		close();
+		g_gui.PopupDialog("Disconnected", wxstr(kickMessage), wxOK);
+		g_gui.CloseLiveEditors(this);
+	});
 }
 
 void LiveClient::parseClientAccepted(NetworkMessage& message) {
@@ -733,9 +814,7 @@ void LiveClient::parseAssetFileBegin(NetworkMessage& message) {
 
 	wxString error;
 	if (!beginLiveAssetReceive(assetReceiveState, pendingVersionId, kind, filename, size, error)) {
-		logMessage("Asset download failed: " + error);
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Asset download failed: " + error);
 	}
 }
 
@@ -759,9 +838,7 @@ void LiveClient::parseAssetFileChunk(NetworkMessage& message) {
 
 	wxString error;
 	if (!appendLiveAssetChunk(assetReceiveState, chunk, error)) {
-		logMessage("Asset download failed: " + error);
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Asset download failed: " + error);
 	}
 }
 
@@ -772,9 +849,7 @@ void LiveClient::parseAssetFileEnd(NetworkMessage& WXUNUSED(message)) {
 
 	wxString error;
 	if (!finishLiveAssetReceive(assetReceiveState, error)) {
-		logMessage("Asset download failed: " + error);
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Asset download failed: " + error);
 	}
 }
 
@@ -808,33 +883,25 @@ void LiveClient::finishLiveVersionLoad() {
 			wxYES | wxNO
 		);
 		if (response != wxID_YES) {
-			logMessage("Live connection cancelled - open maps were kept.");
-			close();
-			g_gui.CloseLiveEditors(this);
+			disconnectFromServer("Live connection cancelled - open maps were kept.");
 			return;
 		}
 	}
 
 	if (!g_gui.CloseAllEditors()) {
-		logMessage("Could not close open maps for the live session.");
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Could not close open maps for the live session.");
 		return;
 	}
 
 	if (!applyLiveAssetCacheToVersion(pendingVersionId)) {
-		logMessage("Failed to prepare downloaded assets.");
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Failed to prepare downloaded assets.");
 		return;
 	}
 
 	wxString error;
 	wxArrayString warnings;
 	if (!g_gui.LoadVersion(pendingVersionId, error, warnings, true, false)) {
-		logMessage("Failed to load server client version: " + error);
-		close();
-		g_gui.CloseLiveEditors(this);
+		disconnectFromServer("Failed to load server client version: " + error);
 		return;
 	}
 
@@ -849,9 +916,18 @@ void LiveClient::failUpdate(const wxString& reason) {
 	receivingUpdate = false;
 	resetLiveUpdateReceiveState(updateReceiveState);
 	logMessage("Editor update failed: " + reason);
-	close();
-	g_gui.PopupDialog("Update Failed", reason, wxOK);
-	g_gui.CloseLiveEditors(this);
+
+	// Defer teardown: called from inside the parsePacket loop, and CloseLiveEditors
+	// deletes this client. stopped guards against double teardown.
+	if (stopped) {
+		return;
+	}
+	stopped = true;
+	wxTheApp->CallAfter([this, reason]() {
+		close();
+		g_gui.PopupDialog("Update Failed", reason, wxOK);
+		g_gui.CloseLiveEditors(this);
+	});
 }
 
 void LiveClient::parseUpdateAvailable(NetworkMessage& message) {
@@ -939,12 +1015,18 @@ void LiveClient::parseUpdateDone(NetworkMessage& WXUNUSED(message)) {
 	const std::vector<std::string> files = updateReceiveState.receivedFiles;
 	resetLiveUpdateReceiveState(updateReceiveState);
 
-	// Tear down the live session now (this may delete 'this').
-	close();
-	g_gui.CloseLiveEditors(this);
+	if (stopped) {
+		return;
+	}
+	stopped = true;
 
-	// Run the prompt + swap completely decoupled from the (now gone) live client.
-	wxTheApp->CallAfter([stagingDir, files]() {
+	// Defer teardown off the parsePacket loop so 'this' is not deleted mid-parse.
+	// The lambda tears down the live session and then runs the prompt + swap fully
+	// decoupled from the (now gone) live client, using only the snapshotted locals.
+	wxTheApp->CallAfter([this, stagingDir, files]() {
+		close();
+		g_gui.CloseLiveEditors(this); // deletes 'this'; nothing below touches it
+
 		if (files.empty()) {
 			g_gui.PopupDialog("Update Failed", "The server did not send any update files.", wxOK);
 			return;
