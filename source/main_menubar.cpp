@@ -547,6 +547,20 @@ void MainMenuBar::LoadValues() {
 
 void MainMenuBar::LoadRecentFiles() {
 	recentFiles.Load(g_settings.getConfigObject());
+
+	// Prune entries whose file no longer exists so the File menu / welcome
+	// screen never offers dead links. Iterate backwards since removal shifts
+	// the remaining indices.
+	bool pruned = false;
+	for (int i = int(recentFiles.GetCount()) - 1; i >= 0; --i) {
+		if (!wxFileName(recentFiles.GetHistoryFile(i)).FileExists()) {
+			recentFiles.RemoveFileFromHistory(i);
+			pruned = true;
+		}
+	}
+	if (pruned) {
+		recentFiles.Save(g_settings.getConfigObject());
+	}
 }
 
 void MainMenuBar::SaveRecentFiles() {

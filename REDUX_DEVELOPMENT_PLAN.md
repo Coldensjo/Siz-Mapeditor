@@ -45,7 +45,7 @@ Goal: close real or latent data/stability gaps. Small, surgical diffs.
 - **Risk:** Low. Currently the `local_z = -1` init already forces the first node, so this is
   defensive hardening/parity rather than a live bug. Keep it as a 1-line change.
 
-### M1-T2 — Prune stale recent-file paths on startup  ·  `TODO`
+### M1-T2 — Prune stale recent-file paths on startup  ·  `DONE`
 - **redux@ec5bde9** (recent-files portion)
 - **Goal:** silently drop recent-file entries whose file no longer exists, so the File menu /
   welcome screen never offers dead links.
