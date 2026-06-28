@@ -118,6 +118,9 @@ void ClientVersion::loadVersions() {
 		json::mValue read_obj;
 		json::read_or_throw(g_settings.getString(Config::ASSETS_DATA_DIRS), read_obj);
 		json::mArray& vers_obj = read_obj.get_array();
+		// Track whether any stored path no longer exists, so we can persist a
+		// trimmed config and stop offering dead paths.
+		bool pruned_path = false;
 		for (json::mArray::iterator ver_iter = vers_obj.begin(); ver_iter != vers_obj.end(); ++ver_iter) {
 			json::mObject& ver_obj = ver_iter->get_obj();
 			ClientVersion* version = get(ver_obj["id"].get_str());
@@ -125,7 +128,14 @@ void ClientVersion::loadVersions() {
 				continue;
 			}
 
-			version->setClientPath(wxstr(ver_obj["path"].get_str()));
+			// Only adopt the stored client path if it still exists; otherwise
+			// leave it cleared so this version is simply unavailable.
+			wxString client_dir = wxstr(ver_obj["path"].get_str());
+			if (!client_dir.empty() && !wxFileName(client_dir).DirExists()) {
+				pruned_path = true;
+			} else {
+				version->setClientPath(client_dir);
+			}
 			version->clearItemsPath();
 			version->clearMonstersPath();
 			version->clearNpcsPath();
@@ -133,29 +143,46 @@ void ClientVersion::loadVersions() {
 			if (items_iter != ver_obj.end()) {
 				wxString items_dir = wxstr(items_iter->second.get_str());
 				if (!items_dir.empty()) {
-					FileName custom_items;
-					custom_items.Assign(items_dir);
-					version->setItemsPath(custom_items);
+					if (!wxFileName(items_dir).DirExists()) {
+						pruned_path = true;
+					} else {
+						FileName custom_items;
+						custom_items.Assign(items_dir);
+						version->setItemsPath(custom_items);
+					}
 				}
 			}
 			json::mObject::iterator monsters_iter = ver_obj.find("monsters");
 			if (monsters_iter != ver_obj.end()) {
 				wxString monsters_dir = wxstr(monsters_iter->second.get_str());
 				if (!monsters_dir.empty()) {
-					FileName custom_monsters;
-					custom_monsters.Assign(monsters_dir);
-					version->setMonstersPath(custom_monsters);
+					if (!wxFileName(monsters_dir).DirExists()) {
+						pruned_path = true;
+					} else {
+						FileName custom_monsters;
+						custom_monsters.Assign(monsters_dir);
+						version->setMonstersPath(custom_monsters);
+					}
 				}
 			}
 			json::mObject::iterator npcs_iter = ver_obj.find("npcs");
 			if (npcs_iter != ver_obj.end()) {
 				wxString npcs_dir = wxstr(npcs_iter->second.get_str());
 				if (!npcs_dir.empty()) {
-					FileName custom_npcs;
-					custom_npcs.Assign(npcs_dir);
-					version->setNpcsPath(custom_npcs);
+					if (!wxFileName(npcs_dir).DirExists()) {
+						pruned_path = true;
+					} else {
+						FileName custom_npcs;
+						custom_npcs.Assign(npcs_dir);
+						version->setNpcsPath(custom_npcs);
+					}
 				}
 			}
+		}
+
+		// Persist the cleaned-up paths so dead directories aren't referenced again.
+		if (pruned_path) {
+			saveVersions();
 		}
 
 	} catch (std::runtime_error&) {

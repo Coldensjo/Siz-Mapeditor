@@ -58,7 +58,7 @@ Goal: close real or latent data/stability gaps. Small, surgical diffs.
   no error dialog fires.
 - **Risk:** Low. Read-side only; do not touch save logic.
 
-### M1-T3 — Validate client paths, drop missing ones  ·  `TODO`
+### M1-T3 — Validate client paths, drop missing ones  ·  `DONE`
 - **redux@ec5bde9** (client-path portion)
 - **Goal:** when a configured client data directory no longer exists, skip/prune it instead of
   failing or pointing at a dead path.
