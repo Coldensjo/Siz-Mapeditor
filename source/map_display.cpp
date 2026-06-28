@@ -2595,9 +2595,14 @@ void MapCanvas::OnSelectDoodadBrush(wxCommandEvent& WXUNUSED(event)) {
 		return;
 	}
 	Item* item = tile->getTopSelectedItem();
+	if (!item || !item->getDoodadBrush()) {
+		return;
+	}
 
-	if (item && item->getDoodadBrush()) {
-		DoodadBrush* doodad_brush = item->getDoodadBrush()->asDoodad();
+	// getDoodadBrush() is not necessarily an actual DoodadBrush, so asDoodad()
+	// may return nullptr. Guard against it to avoid dereferencing null.
+	DoodadBrush* doodad_brush = item->getDoodadBrush()->asDoodad();
+	if (doodad_brush) {
 		g_gui.SelectBrush(doodad_brush, TILESET_DOODAD);
 		g_gui.SetBrushVariation(doodad_brush->getVariationForItemId(item->getID()));
 	}
