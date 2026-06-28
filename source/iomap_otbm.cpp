@@ -1814,7 +1814,7 @@ bool IOMapOTBM::saveMap(Map& map, NodeFileWriteHandle& f) {
 				const Position& pos = save_tile->getPosition();
 
 				// Decide if newd node should be created
-				if (pos.x < local_x || pos.x >= local_x + 256 || pos.y < local_y || pos.y >= local_y + 256 || pos.z != local_z) {
+				if (first || pos.x < local_x || pos.x >= local_x + 256 || pos.y < local_y || pos.y >= local_y + 256 || pos.z != local_z) {
 					// End last node
 					if (!first) {
 						f.endNode();
