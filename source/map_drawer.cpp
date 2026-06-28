@@ -410,6 +410,7 @@ void DrawingOptions::SetDefault() {
 	extended_house_shader = false;
 	show_invisible_items = true;
 	show_creature_spawn_time = false;
+	show_hud = true;
 }
 
 void DrawingOptions::SetIngame() {
@@ -456,6 +457,7 @@ void DrawingOptions::SetIngame() {
 	extended_house_shader = false;
 	show_invisible_items = false;
 	show_creature_spawn_time = false;
+	show_hud = false;
 }
 
 bool DrawingOptions::isDrawLight() const noexcept {
@@ -582,6 +584,10 @@ void MapDrawer::Draw() {
 	DrawLivePings();
 	DrawLiveParticipants();
 	DrawMapComments();
+
+	if (options.show_hud) {
+		DrawHUD();
+	}
 
 	if (editor.live_client) {
 		editor.live_client->sendNodeRequests();
@@ -3208,6 +3214,69 @@ void MapDrawer::DrawTileCoordinates() {
 			}
 		}
 	}
+
+	if (texturesEnabled) {
+		glEnable(GL_TEXTURE_2D);
+	}
+}
+
+void MapDrawer::DrawHUD() {
+	// On-canvas heads-up display showing the centered map position, current
+	// floor and zoom. Drawn in screen space, top-left corner.
+	const int center_x = start_x + int(screensize_x * zoom / 64);
+	const int center_y = start_y + int(screensize_y * zoom / 64);
+	const int zoom_percent = int(100.0f / zoom + 0.5f);
+
+	const wxString lines[] = {
+		wxString::Format("X: %d  Y: %d  Z: %d", center_x, center_y, floor),
+		wxString::Format("Floor %d    Zoom %d%%", floor, zoom_percent),
+	};
+	const size_t line_count = sizeof(lines) / sizeof(lines[0]);
+
+	const float padding = 5.0f;
+	const float lineHeight = 14.0f;
+
+	float textWidth = 0.0f;
+	for (const wxString& line : lines) {
+		float width = 0.0f;
+		for (size_t i = 0; i < line.length(); ++i) {
+			width += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(line[i]));
+		}
+		textWidth = std::max(textWidth, width);
+	}
+
+	const float boxLeft = padding;
+	const float boxTop = padding;
+	const float boxWidth = textWidth + padding * 2.0f;
+	const float boxHeight = lineHeight * line_count + padding * 2.0f;
+
+	const GLboolean texturesEnabled = glIsEnabled(GL_TEXTURE_2D);
+	if (texturesEnabled) {
+		glDisable(GL_TEXTURE_2D);
+	}
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	PushScreenSpaceGL(screensize_x, screensize_y);
+
+	glColor4ub(0, 0, 0, 180);
+	glBegin(GL_QUADS);
+	glVertex2f(boxLeft, boxTop);
+	glVertex2f(boxLeft + boxWidth, boxTop);
+	glVertex2f(boxLeft + boxWidth, boxTop + boxHeight);
+	glVertex2f(boxLeft, boxTop + boxHeight);
+	glEnd();
+
+	glColor4ub(255, 255, 255, 240);
+	for (size_t i = 0; i < line_count; ++i) {
+		glRasterPos2f(boxLeft + padding, boxTop + padding + lineHeight * (i + 1) - 3.0f);
+		const wxString& line = lines[i];
+		for (size_t j = 0; j < line.length(); ++j) {
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(line[j]));
+		}
+	}
+
+	PopScreenSpaceGL();
 
 	if (texturesEnabled) {
 		glEnable(GL_TEXTURE_2D);

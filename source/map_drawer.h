@@ -127,6 +127,7 @@ struct DrawingOptions {
 	bool extended_house_shader;
 	bool show_invisible_items;
 	bool show_creature_spawn_time;
+	bool show_hud;
 };
 
 class MapCanvas;
@@ -178,6 +179,7 @@ public:
 	void DrawGrid();
 	void DrawChunkBoundaries();
 	void DrawTileCoordinates();
+	void DrawHUD();
 	void DrawMouseCrosshair();
 	void DrawTooltips();
 	void DrawLiveCursors();

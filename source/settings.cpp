@@ -238,6 +238,7 @@ void Settings::IO(IOMode mode) {
 	Int(SHOW_GRID, 0);
 	Int(SHOW_CHUNK_BOUNDARIES, 0);
 	Int(SHOW_TILE_COORDINATES, 0);
+	Int(SHOW_HUD, 1);
 	Int(SHOW_MOUSE_CROSSHAIR, 0);
 	Int(SHOW_EXTRA, 1);
 	Int(SHOW_SHADE, 1);

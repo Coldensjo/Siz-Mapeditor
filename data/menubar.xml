@@ -122,6 +122,7 @@
 		<menu name="Map Overlays">
 			<item name="Show Grid" hotkey="Shift+G" action="SHOW_GRID" help="Shows a grid over all items." />
 			<item name="Show Tile Coordinates" action="SHOW_TILE_COORDINATES" help="Display map coordinates overlay on the current floor." />
+			<item name="Show HUD" action="SHOW_HUD" help="Show an on-canvas overlay with the current position, floor and zoom." />
 			<item name="Show Client Box" hotkey="Shift+I" action="SHOW_INGAME_BOX" help="Shadows out areas not visible ingame (from the center of the screen)." />
 			<item name="Show Invisible Items" action="SHOW_INVISIBLE_ITEMS" help="Show helper icons on invisible items." />
 			<item name="Extended House Shader" action="EXT_HOUSE_SHADER" help="Draw house brush on walls and items." />

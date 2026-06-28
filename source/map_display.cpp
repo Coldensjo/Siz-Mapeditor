@@ -478,6 +478,7 @@ void MapCanvas::OnPaint(wxPaintEvent& event) {
 				options.show_grid = g_settings.getInteger(Config::SHOW_GRID);
 				options.show_chunk_boundaries = g_settings.getBoolean(Config::SHOW_CHUNK_BOUNDARIES);
 				options.show_tile_coordinates = g_settings.getBoolean(Config::SHOW_TILE_COORDINATES);
+				options.show_hud = g_settings.getBoolean(Config::SHOW_HUD);
 				options.show_mouse_crosshair = g_settings.getBoolean(Config::SHOW_MOUSE_CROSSHAIR);
 				options.ingame = !g_settings.getBoolean(Config::SHOW_EXTRA);
 				options.show_all_floors = g_settings.getBoolean(Config::SHOW_ALL_FLOORS);

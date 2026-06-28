@@ -80,7 +80,13 @@ app launches clean with intentionally-broken recent/client paths.
 
 Goal: accessibility and discoverability improvements that don't depend on redux's renderer.
 
-### M2-T1 — Tooltips + status-bar help text  ·  `TODO`
+### M2-T1 — Tooltips + status-bar help text  ·  `SKIP (already present)`
+> Verified 2026-06-28: toolbar buttons already pass short-help text to `AddTool`
+> (main_toolbar.cpp) and use `SetToolTip` on the position controls; every
+> `<item>` in `data/menubar.xml` already has a `help=` attribute, wired into the
+> status bar via `wxMenu::Append`'s help param (main_menubar.cpp:771). Dialogs
+> already carry 67 `SetToolTip` calls. Both acceptance bullets pass with no change.
+
 - **redux@9d99fb3, @f46e403, @d346d8c**
 - **Goal:** add hover tooltips to toolbar buttons and dialog controls, and status-bar help strings
   to menu items.
@@ -92,7 +98,14 @@ Goal: accessibility and discoverability improvements that don't depend on redux'
   the status bar. No layout regressions.
 - **Risk:** Low, additive. Tedious but safe. Can be split per-window if large.
 
-### M2-T2 — Map HUD / minimap polish  ·  `TODO`
+### M2-T2 — Map HUD / minimap polish  ·  `DONE`
+> Implemented an on-canvas HUD (top-left) showing centered position (X,Y,Z),
+> floor, and zoom %, reusing the fork's OpenGL 1.x screen-space text path
+> (`PushScreenSpaceGL`/`glutBitmapCharacter`). Gated behind a new "Show HUD"
+> View > Map Overlays toggle (`Config::SHOW_HUD`, default on; off for ingame/
+> screenshot rendering). Minimap left as-is for now. redux's diff was reference
+> only, as predicted.
+
 - **redux@2ac2fa7**
 - **Goal:** adopt the *ideas* — clearer on-canvas HUD (position/zoom/floor), minimap readability.
 - **Files:** [source/map_display.cpp](source/map_display.cpp),
