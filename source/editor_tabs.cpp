@@ -99,8 +99,9 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 		return;
 	}
 
-	if (mapTab && mapTab->IsUniqueReference() && mapTab->GetMap()) {
-		if (mapTab->GetMap()->hasChanged()) {
+	if (mapTab) {
+		// Prompt to save before we commit to closing.
+		if (mapTab->IsUniqueReference() && mapTab->GetMap() && mapTab->GetMap()->hasChanged()) {
 			SetFocusedTab(closingIndex);
 			if (!g_gui.root->DoQuerySave(false)) {
 				evt.Veto();
@@ -108,9 +109,19 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 			}
 		}
 
-		g_gui.RefreshPalettes(nullptr, false);
-		g_gui.UpdateMenus();
-		g_gui.SaveMapTabViewPosition(mapTab);
+		// Take over the close. If we let wxAuiNotebook delete the page after this
+		// handler returns, the MapTab (and with it the editor/map) is destroyed
+		// while rendering is still enabled. A paint event dispatched during that
+		// destruction renders through the freed editor and crashes -- intermittently,
+		// depending on paint timing and how much map data is being torn down (heavily
+		// edited maps are the most exposed). Veto and delete the tab ourselves via
+		// GUI::CloseCurrentEditor, which performs the deletion under a RenderingLock
+		// and WindowFreezeGuard, exactly like the menu/Ctrl+W close path.
+		evt.Veto();
+		wxTheApp->CallAfter([this, closingIndex]() {
+			SetFocusedTab(closingIndex);
+			g_gui.CloseCurrentEditor();
+		});
 		return;
 	}
 }
