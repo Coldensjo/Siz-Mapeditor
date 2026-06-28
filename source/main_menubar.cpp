@@ -32,6 +32,7 @@
 
 #include <wx/chartype.h>
 
+#include <chrono>
 #include <map>
 
 #include "editor.h"
@@ -214,6 +215,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 	MAKE_ACTION(FLOOR_15, wxITEM_RADIO, OnChangeFloor);
 
 	MAKE_ACTION(DEBUG_VIEW_DAT, wxITEM_NORMAL, OnDebugViewDat);
+	MAKE_ACTION(DEBUG_BENCHMARK, wxITEM_NORMAL, OnDebugBenchmark);
 	MAKE_ACTION(EXTENSIONS, wxITEM_NORMAL, OnListExtensions);
 	MAKE_ACTION(GOTO_WEBSITE, wxITEM_NORMAL, OnGotoWebsite);
 	MAKE_ACTION(ABOUT, wxITEM_NORMAL, OnAbout);
@@ -470,6 +472,7 @@ void MainMenuBar::Update() {
 
 
 	EnableItem(DEBUG_VIEW_DAT, loaded);
+	EnableItem(DEBUG_BENCHMARK, has_map);
 
 	UpdateFloorMenu();
 }
@@ -900,6 +903,61 @@ void MainMenuBar::OnDebugViewDat(wxCommandEvent& WXUNUSED(event)) {
 	wxDialog dlg(frame, wxID_ANY, "Debug .dat file", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
 	new DatDebugView(&dlg);
 	dlg.ShowModal();
+}
+
+void MainMenuBar::OnDebugBenchmark(wxCommandEvent& WXUNUSED(event)) {
+	// M3-T1 baseline: read-only micro-benchmark of the getTile hot path that the
+	// spatial hash grid (M3-T2) accelerates. Run before/after to compare.
+	Editor* editor = g_gui.GetCurrentEditor();
+	if (!editor) {
+		g_gui.PopupDialog("Benchmark", "Open a map first.", wxOK);
+		return;
+	}
+
+	Map& map = editor->getMap();
+
+	// Snapshot the positions of all existing tiles (does not mutate the map).
+	std::vector<Position> positions;
+	positions.reserve(static_cast<size_t>(map.getTileCount()));
+	for (MapIterator it = map.begin(); it != map.end(); ++it) {
+		if (Tile* tile = (*it)->get()) {
+			positions.push_back(tile->getPosition());
+		}
+	}
+
+	if (positions.empty()) {
+		g_gui.PopupDialog("Benchmark", "The map has no tiles to benchmark.", wxOK);
+		return;
+	}
+
+	const int rounds = 20;
+	volatile uint64_t checksum = 0; // volatile so the lookups can't be optimized away
+	const auto start = std::chrono::steady_clock::now();
+	for (int r = 0; r < rounds; ++r) {
+		for (const Position& pos : positions) {
+			checksum += reinterpret_cast<uintptr_t>(map.getTile(pos));
+		}
+	}
+	const auto finish = std::chrono::steady_clock::now();
+
+	const double total_ms = std::chrono::duration<double, std::milli>(finish - start).count();
+	const uint64_t lookups = static_cast<uint64_t>(rounds) * positions.size();
+	const double ns_each = (total_ms * 1.0e6) / static_cast<double>(lookups);
+
+	const wxString message = wxString::Format(
+		"getTile() benchmark\n\n"
+		"Tiles:          %llu\n"
+		"Rounds:         %d\n"
+		"Total lookups:  %llu\n"
+		"Total time:     %.2f ms\n"
+		"Per lookup:     %.1f ns\n",
+		static_cast<unsigned long long>(positions.size()),
+		rounds,
+		static_cast<unsigned long long>(lookups),
+		total_ms,
+		ns_each
+	);
+	g_gui.PopupDialog("Benchmark", message, wxOK);
 }
 
 void MainMenuBar::OnReloadDataFiles(wxCommandEvent& WXUNUSED(event)) {

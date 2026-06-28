@@ -127,7 +127,24 @@ Goal: the single best *non-rendering* perf idea in redux — speed up the hottes
 > ⚠️ This is a scoped engineering project, **not** a cherry-pick. Land it on a branch, benchmark
 > before/after, and only merge on a measured win with identical map output.
 
-### M3-T1 — Baseline benchmark  ·  `TODO`
+### M3-T1 — Baseline benchmark  ·  `DONE (harness shipped; numbers TBD)`
+> Added a read-only `getTile()` micro-benchmark under a (now active) **Debug**
+> menu → "Run getTile Benchmark" (`DEBUG_BENCHMARK`, enabled when a map is open).
+> It snapshots all tile positions, then times 20 full sweeps of `map.getTile(pos)`
+> (volatile checksum so nothing is optimized away) and reports tiles / total
+> lookups / total ms / ns-per-lookup. Read-only — does not mutate the map.
+> Wiring: main_menubar.h/.cpp + data/menubar.xml. The previously commented-out
+> Debug menu was left as-is; a fresh active Debug menu hosts only the benchmark.
+>
+> Numbers to be filled in by running on a large map (I can't run the app here):
+> record **before** (this is the post-M3-T2 build, so to get a true baseline,
+> measure with the spatial grid temporarily disabled vs. enabled) — that gives
+> the M3-T2 before/after the milestone exit criteria require.
+>
+> | Map | Tiles | ns/lookup (grid OFF) | ns/lookup (grid ON) |
+> |-----|-------|----------------------|---------------------|
+> |     |       |                      |                     |
+
 - **Goal:** measure current `getTile` / borderize / render cost on a large map before changing anything.
 - **Files:** none (measurement only); record numbers in this file under the task.
 - **Acceptance:** documented baseline (open-large-map time, pan/scroll FPS, full-map borderize time).

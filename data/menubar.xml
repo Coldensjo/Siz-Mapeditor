@@ -266,6 +266,9 @@
 		<item name="Debug .dat" action="DEBUG_VIEW_DAT" help="View all item sprites available."/>
 	</menu>
 	-->
+	<menu name="Debug">
+		<item name="Run getTile Benchmark" action="DEBUG_BENCHMARK" help="Measure getTile() throughput on the current map (M3 performance baseline)." />
+	</menu>
 	<menu name="About">
 		<item name="Extensions..." hotkey="F2" action="EXTENSIONS" help="" />
 		<item name="Goto Website" hotkey="F3" action="GOTO_WEBSITE" help="" />
