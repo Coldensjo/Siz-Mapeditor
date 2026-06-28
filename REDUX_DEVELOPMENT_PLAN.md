@@ -162,7 +162,19 @@ Goal: the single best *non-rendering* perf idea in redux — speed up the hottes
   benchmarks improve measurably with no correctness regressions.
 - **Risk:** High — core storage. Extensive manual testing (paste, fill, borderize, undo/redo, copy).
 
-### M3-T3 — Cache ItemType lookups on the hot path  ·  `TODO`
+### M3-T3 — Cache ItemType lookups on the hot path  ·  `DONE`
+> tile.cpp `Tile::update` called `getMiniMapColor()` twice each for ground and
+> every item — and that getter does a `g_items[id]` lookup + sprite deref every
+> time. Cached each result in a local (`ground_minimap_color`/`item_minimap_color`),
+> halving those lookups on the tile-update hot path. Behavior identical
+> (`uint8_t` in/out, same function).
+>
+> item.cpp needed NO change: it already matches redux's *safe final form* — its
+> getters take a fresh `g_items[id]` / `g_items.getItemType(id)` reference each
+> call and store no `ItemType*` member, so there is no dangling-pointer hazard on
+> version reload to fix (redux's unsafe intermediate `48c5af8` was never present
+> here). Stayed within the listed files.
+
 - **redux@e0e1051, @48c5af8**
 - **Goal:** eliminate repeated `g_items[id]` array lookups in tile update/draw.
 - **Files:** [source/tile.cpp](source/tile.cpp), [source/item.cpp](source/item.cpp).

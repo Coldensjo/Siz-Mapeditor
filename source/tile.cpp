@@ -473,8 +473,10 @@ void Tile::update() {
 		if (ground->getUniqueID() != 0) {
 			statflags |= TILESTATE_UNIQUE;
 		}
-		if (ground->getMiniMapColor() != 0) {
-			minimapColor = ground->getMiniMapColor();
+		// getMiniMapColor() does a g_items[id] lookup + sprite deref; call once.
+		const uint8_t ground_minimap_color = ground->getMiniMapColor();
+		if (ground_minimap_color != 0) {
+			minimapColor = ground_minimap_color;
 		}
 	}
 
@@ -487,8 +489,10 @@ void Tile::update() {
 		if (i->getUniqueID() != 0) {
 			statflags |= TILESTATE_UNIQUE;
 		}
-		if (i->getMiniMapColor() != 0) {
-			minimapColor = i->getMiniMapColor();
+		// getMiniMapColor() does a g_items[id] lookup + sprite deref; call once.
+		const uint8_t item_minimap_color = i->getMiniMapColor();
+		if (item_minimap_color != 0) {
+			minimapColor = item_minimap_color;
 		}
 
 		ItemType& it = g_items[i->getID()];
