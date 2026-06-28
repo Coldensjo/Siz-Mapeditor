@@ -498,6 +498,7 @@ void MapCanvas::OnPaint(wxPaintEvent& event) {
 				options.show_hooks = g_settings.getBoolean(Config::SHOW_WALL_HOOKS);
 				options.show_fishable_water = g_settings.getBoolean(Config::SHOW_FISHABLE_WATER);
 				options.show_borders = g_settings.getBoolean(Config::SHOW_BORDERS);
+				options.show_walls = g_settings.getBoolean(Config::SHOW_WALLS);
 				options.hide_items_when_zoomed = g_settings.getBoolean(Config::HIDE_ITEMS_WHEN_ZOOMED);
 				options.show_towns = g_settings.getBoolean(Config::SHOW_TOWNS);
 				options.always_show_zones = g_settings.getBoolean(Config::ALWAYS_SHOW_ZONES);

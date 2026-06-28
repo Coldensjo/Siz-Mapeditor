@@ -148,7 +148,8 @@
 			<item name="Show Houses" hotkey="Ctrl+H" action="SHOW_HOUSES" help="Show houses on the map." />
 			<item name="Show Pathing" hotkey="O" action="SHOW_PATHING" help="Show blocking tiles." />
 			<item name="Show Towns" action="SHOW_TOWNS" help="Show temple positions." />
-			<item name="Show Borders" action="SHOW_BORDERS" help="Show ground border items on the map." />
+			<item name="Show Borders" action="SHOW_BORDERS" hotkey="B" help="Show ground border items on the map." />
+			<item name="Show Walls" action="SHOW_WALLS" hotkey="W" help="Show wall items on the map." />
 			<item name="Show Wall Hooks" hotkey="K" action="SHOW_WALL_HOOKS" help="Show indicators for wall hooks." />
 			<item name="Show Fishable Water" action="SHOW_FISHABLE_WATER" help="Show indicators for fishing spots." />
 		</menu>

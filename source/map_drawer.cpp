@@ -209,6 +209,36 @@ bool tileHasInvalidRamp(const Tile* tile, const BaseMap& map) {
 	return false;
 }
 
+bool isDoorItem(const Item* item) {
+	if (!item) {
+		return false;
+	}
+	return item->isDoor() || item->isBrushDoor();
+}
+
+bool tileHasDoorOnBlockingItem(const Tile* tile) {
+	if (!tile) {
+		return false;
+	}
+
+	const int stackSize = getItemStackSize(tile);
+	for (int i = 0; i < stackSize; ++i) {
+		Item* door = tile->getItemAt(i);
+		if (!door || !isDoorItem(door)) {
+			continue;
+		}
+
+		for (int j = 0; j < i; ++j) {
+			Item* below = tile->getItemAt(j);
+			if (below && below->isBlocking()) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void getTooltipIconDrawPosition(uint32_t spriteId, float slotCenterX, float slotCenterY, float& anchorX, float& anchorY) {
 	GameSprite* spr = g_items[spriteId].sprite;
 	if (spr == nullptr) {
@@ -372,6 +402,7 @@ void DrawingOptions::SetDefault() {
 	show_hooks = false;
 	show_fishable_water = false;
 	show_borders = true;
+	show_walls = true;
 	hide_items_when_zoomed = true;
 
 	show_towns = false;
@@ -417,6 +448,7 @@ void DrawingOptions::SetIngame() {
 	show_hooks = false;
 	show_fishable_water = false;
 	show_borders = true;
+	show_walls = true;
 	hide_items_when_zoomed = false;
 
 	show_towns = false;
@@ -2251,6 +2283,10 @@ void MapDrawer::BlitItem(int& draw_x, int& draw_y, const Position& pos, Item* it
 		return;
 	}
 
+	if (item->isWall() && !options.show_walls) {
+		return;
+	}
+
 	int screenx = draw_x - spr->getDrawOffset().first;
 	int screeny = draw_y - spr->getDrawOffset().second;
 
@@ -2984,13 +3020,18 @@ void MapDrawer::DrawTile(TileLocation* location) {
 				}
 			}
 
-			// invalid ramp placement (warning sign drawn in DrawRampWarningIcons after the map)
+			// invalid ramp / door placement (warning sign drawn in DrawRampWarningIcons after the map)
 			if (!options.ingame && tileHasInvalidRamp(tile, editor.map)) {
 				ramp_warning_markers.push_back(MapRampWarningMarker {
 					draw_x,
-					draw_y - TileSize / 2,
+					draw_y - TileSize / 2, //pushes the warning sign up to the top of the tile
 				});
 			} else if (!options.ingame && tileHasInvalidItemSet(tile)) {
+				ramp_warning_markers.push_back(MapRampWarningMarker {
+					draw_x,
+					draw_y,
+				});
+			} else if (!options.ingame && tileHasDoorOnBlockingItem(tile)) {
 				ramp_warning_markers.push_back(MapRampWarningMarker {
 					draw_x,
 					draw_y,

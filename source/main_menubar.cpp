@@ -177,6 +177,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 	MAKE_ACTION(SHOW_WALL_HOOKS, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(SHOW_FISHABLE_WATER, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(SHOW_BORDERS, wxITEM_CHECK, OnChangeViewSettings);
+	MAKE_ACTION(SHOW_WALLS, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(SHOW_TOWNS, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(ALWAYS_SHOW_ZONES, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(EXT_HOUSE_SHADER, wxITEM_CHECK, OnChangeViewSettings);
@@ -537,6 +538,7 @@ void MainMenuBar::LoadValues() {
 	CheckItem(SHOW_WALL_HOOKS, g_settings.getBoolean(Config::SHOW_WALL_HOOKS));
 	CheckItem(SHOW_FISHABLE_WATER, g_settings.getBoolean(Config::SHOW_FISHABLE_WATER));
 	CheckItem(SHOW_BORDERS, g_settings.getBoolean(Config::SHOW_BORDERS));
+	CheckItem(SHOW_WALLS, g_settings.getBoolean(Config::SHOW_WALLS));
 	CheckItem(SHOW_TOWNS, g_settings.getBoolean(Config::SHOW_TOWNS));
 	CheckItem(ALWAYS_SHOW_ZONES, g_settings.getBoolean(Config::ALWAYS_SHOW_ZONES));
 	CheckItem(EXT_HOUSE_SHADER, g_settings.getBoolean(Config::EXT_HOUSE_SHADER));
@@ -2258,6 +2260,7 @@ void MainMenuBar::OnChangeViewSettings(wxCommandEvent& event) {
 	g_settings.setInteger(Config::SHOW_WALL_HOOKS, IsItemChecked(MenuBar::SHOW_WALL_HOOKS));
 	g_settings.setInteger(Config::SHOW_FISHABLE_WATER, IsItemChecked(MenuBar::SHOW_FISHABLE_WATER));
 	g_settings.setInteger(Config::SHOW_BORDERS, IsItemChecked(MenuBar::SHOW_BORDERS));
+	g_settings.setInteger(Config::SHOW_WALLS, IsItemChecked(MenuBar::SHOW_WALLS));
 	g_settings.setInteger(Config::SHOW_TOWNS, IsItemChecked(MenuBar::SHOW_TOWNS));
 	g_settings.setInteger(Config::ALWAYS_SHOW_ZONES, IsItemChecked(MenuBar::ALWAYS_SHOW_ZONES));
 	g_settings.setInteger(Config::EXT_HOUSE_SHADER, IsItemChecked(MenuBar::EXT_HOUSE_SHADER));
