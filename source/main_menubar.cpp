@@ -272,7 +272,8 @@ void MainMenuBar::OnSelectExitButton(wxCommandEvent&) {
 	}
 
 	// Step 4: Invoke the button action
-	housePanel->OnClickSelectExitButton(wxCommandEvent());
+	wxCommandEvent selectExitEvent;
+	housePanel->OnClickSelectExitButton(selectExitEvent);
 }
 
 MainMenuBar::~MainMenuBar() {

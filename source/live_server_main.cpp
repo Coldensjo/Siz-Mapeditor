@@ -294,7 +294,7 @@ bool saveHostedMap(bool automatic) {
 		return false;
 	}
 
-	FileName filename = g_editor->getMap().getFilename();
+	FileName filename = wxstr(g_editor->getMap().getFilename());
 	if (filename.GetFullPath().empty()) {
 		std::cout << "[live] Map has no filename; cannot save." << std::endl;
 		return false;

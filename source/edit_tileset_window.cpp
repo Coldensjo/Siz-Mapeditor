@@ -110,7 +110,8 @@ EditTilesetWindow::EditTilesetWindow(wxWindow* parent, Tileset* tileset, Tileset
 	pick_item_button(nullptr),
 	item_name_label(nullptr) {
 	const TilesetCategory* category = tileset->getCategory(categoryType);
-	TilesetExtractEditEntries(category, entries, wxString());
+	wxString extractWarnings;
+	TilesetExtractEditEntries(category, entries, extractWarnings);
 
 	wxSizer* topsizer = newd wxBoxSizer(wxVERTICAL);
 	wxStaticBoxSizer* list_box = newd wxStaticBoxSizer(wxVERTICAL, this, "Tileset entries");

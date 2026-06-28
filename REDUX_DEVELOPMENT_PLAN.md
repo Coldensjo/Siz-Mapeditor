@@ -205,16 +205,60 @@ save→reload, all edit operations verified by hand.
 
 ---
 
-## Milestone 4 — Renderer modernization  *(major, aspirational — plan only)*
+## Milestone 4 — Toolchain + renderer modernization  *(major, aspirational)*
 
-Goal: the headline of redux (OpenGL 4.x, async sprite loading, batching, GPU light, 160+ FPS).
-**Not portable commit-by-commit.** This milestone is a placeholder/decision point, not scheduled work.
+Goal: the headline of redux (OpenGL 4.x, async sprite loading, batching, GPU light, 160+ FPS),
+plus the build move to wxWidgets 3.3 / C++23. Split into a *cheap toolchain* part (done) and the
+*renderer rewrite* part (deferred — **not portable commit-by-commit**).
 
-- **redux:** the `feat(rendering)`/`refactor(rendering)` series + build move to wxWidgets 3.3 / C++23.
-- **Decision required (escalate to maintainer):** is a renderer rewrite worth it for this fork's
-  goals (live collaborative editing via MapServer)? If yes, scope as its own multi-week project
-  with its own plan; M3 (spatial hash) is the cheap prerequisite/down-payment.
-- **Do not start** M4 work as part of this plan without explicit sign-off.
+### M4-T1 — wxWidgets 3.3  ·  `DONE (already present)`
+> Verified 2026-06-28: vcpkg already provides wxWidgets **3.3.1** (`include/wx/version.h`
+> = 3.3.1) and the redistributed DLLs are `wxmsw331*` / `wxbase331*`. The projects link it
+> via `WXUSINGDLL`/vcpkg autolink. No work required.
+
+### M4-T2 — C++23  ·  `DONE (compiles; relink pending)`
+> Bumped `LanguageStandard` `stdcpp17` → `stdcpp23` in both `Editor.vcxproj` and
+> `MapServer.vcxproj` (Debug + Release). Toolset is VS18 / MSVC 14.51, which accepts the
+> `stdcpp23` MSBuild token. Both projects now compile **100% clean** under C++23. Five
+> conformance fixes were needed:
+> - **XPM resource arrays** (`brushes/*.xpm`, `static char *…`): C++23 removed the implicit
+>   string-literal→`char*` conversion. Fixed project-wide via `/Zc:strictStrings-` in
+>   `AdditionalOptions` (both vcxproj) rather than editing 11 generated files.
+> - `main_menubar.cpp` (~275): rvalue `wxCommandEvent()` → non-const `wxCommandEvent&`; use a
+>   named local.
+> - `edit_brush_window.cpp` (405, 414): ambiguous ternary `cond ? wxString : "literal"`; wrap
+>   the literal in `wxString(...)`.
+> - `edit_tileset_window.cpp` (113): rvalue `wxString()` → `wxString&` out-param; named local.
+> - `live_server_main.cpp` (297): `std::string` → `wxFileName` needs two user-defined
+>   conversions; route through `wxstr(...)`.
+>
+> Only the final **link** is outstanding, and only because the running `Editor_x64.exe` /
+> `MapServer_x64.exe` lock their output files (`LNK1104`). Close the apps and relink —
+> no code/compile work remains.
+>
+> CLI build (Git Bash mangles MSBuild `/p:` switches — use PowerShell):
+> `& "…\VS\18\Community\MSBuild\Current\Bin\MSBuild.exe" vcproj\Editor.sln -t:Editor -p:Configuration=Debug -p:Platform=x64 -m`
+
+### M4-T3 — OpenGL 4.x renderer rewrite  ·  `DEFERRED (maintainer decision 2026-06-28)`
+> Maintainer chose to **defer** the renderer and stay on the working GL 1.x path for now.
+> This is a from-scratch rewrite, not a port: this fork uses fixed-function GL 1.x
+> (`glBegin`/`glVertex`/`glColor`, the `glMatrixMode`/`glOrtho` matrix stack, and freeglut
+> `glutBitmapCharacter` text) concentrated in `map_drawer.cpp` (~3.6k lines), `light_drawer.cpp`,
+> and texture upload in `graphics.cpp`, plus a legacy `wxGLContext` (compatibility profile).
+
+When picked up, scope as its own multi-week project. Reference (redux @ `01c2536`):
+- **Context:** legacy `wxGLContext` → core profile via `wxGLAttributes`
+  (`PlatformDefaults().Defaults().RGBA().DoubleBuffer().Depth(24).Stencil(8)`), see redux
+  `source/rendering/ui/map_display.cpp:85`; load entry points with **glad** (`gladLoadGL()`
+  after `SetCurrent`). Deps: `glad` (core 4.6) + `glm` via vcpkg.
+- **Draw path:** immediate-mode quads/lines → VBO/VAO + GLSL `450 core` shaders, batched
+  (redux `source/rendering/core/` — `sprite_batch`, `primitive_renderer`, `atlas_manager`).
+- **Text:** `glRasterPos`/`glutBitmapCharacter` has no core-profile equivalent → texture-atlas
+  text renderer (redux `text_renderer`).
+- **Matrices:** `glm` matrices passed as uniforms, replacing the fixed-function matrix stack.
+- **Decision still standing:** redux's renderer is entangled with its fully-restructured source
+  tree, so a wholesale port drags in large parts of redux's architecture; an incremental in-place
+  rewrite (keeping this fork's live-editing/MapServer divergence) is the lower-risk path.
 
 ---
 

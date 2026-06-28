@@ -402,7 +402,7 @@ wxString EditBrushWindow::FormatEntryLabel(const BrushEditEntry& entry) const {
 	}
 
 	const ItemType& it = g_items.getItemType(entry.item_id);
-	wxString name = it.id != 0 ? wxstr(it.name) : "Unknown";
+	wxString name = it.id != 0 ? wxstr(it.name) : wxString("Unknown");
 	if (edit_brush->isWall()) {
 		return wxString::Format("%s  |  ID %u  |  %s  |  chance %d", wxstr(entry.wall_alignment), entry.item_id, name, entry.chance);
 	}
@@ -411,7 +411,7 @@ wxString EditBrushWindow::FormatEntryLabel(const BrushEditEntry& entry) const {
 
 wxString EditBrushWindow::FormatCompositeTileLabel(const std::pair<Position, uint16_t>& tile) const {
 	const ItemType& it = g_items.getItemType(tile.second);
-	const wxString name = it.id != 0 ? wxstr(it.name) : "Unknown";
+	const wxString name = it.id != 0 ? wxstr(it.name) : wxString("Unknown");
 	return wxString::Format("(%d, %d, %d)  |  ID %u  |  %s", tile.first.x, tile.first.y, tile.first.z, tile.second, name);
 }
 
