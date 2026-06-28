@@ -985,7 +985,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 	int mouse_map_x, mouse_map_y;
 	ScreenToMap(event.GetX(), event.GetY(), &mouse_map_x, &mouse_map_y);
 
-	if (editor.IsLive() && event.ControlDown() && event.ShiftDown()) {
+	if (editor.IsLive() && event.AltDown() && event.ShiftDown()) {
 		if (liveEditAllowed(editor, mouse_map_x, mouse_map_y)) {
 			editor.sendLivePing(Position(mouse_map_x, mouse_map_y, floor));
 			g_gui.SetStatusText(wxString::Format("Ping sent at %d, %d, %d", mouse_map_x, mouse_map_y, floor));
@@ -2078,12 +2078,19 @@ void MapCanvas::OnKeyDown(wxKeyEvent& event) {
 				event.Skip();
 				break;
 			}
-			int nv = g_gui.GetBrushVariation();
-			--nv;
-			if (nv < 0) {
-				nv = max(0, (g_gui.GetCurrentBrush() ? g_gui.GetCurrentBrush()->getMaxVariation() - 1 : 0));
+			if (Brush* brush = g_gui.GetCurrentBrush()) {
+				if (brush->isDoodad()) {
+					const int old_variation = g_gui.GetBrushVariation();
+					int nv = old_variation - 1;
+					if (nv < 0) {
+						nv = max(0, brush->getMaxVariation() - 1);
+					}
+					g_gui.SetBrushVariation(nv);
+					if (g_gui.GetBrushVariation() == old_variation) {
+						g_gui.RotateDoodadPreviewItems();
+					}
+				}
 			}
-			g_gui.SetBrushVariation(nv);
 			g_gui.RefreshView();
 			break;
 		}
@@ -2094,12 +2101,19 @@ void MapCanvas::OnKeyDown(wxKeyEvent& event) {
 				event.Skip();
 				break;
 			}
-			int nv = g_gui.GetBrushVariation();
-			++nv;
-			if (nv >= (g_gui.GetCurrentBrush() ? g_gui.GetCurrentBrush()->getMaxVariation() : 0)) {
-				nv = 0;
+			if (Brush* brush = g_gui.GetCurrentBrush()) {
+				if (brush->isDoodad()) {
+					const int old_variation = g_gui.GetBrushVariation();
+					int nv = old_variation + 1;
+					if (nv >= brush->getMaxVariation()) {
+						nv = 0;
+					}
+					g_gui.SetBrushVariation(nv);
+					if (g_gui.GetBrushVariation() == old_variation) {
+						g_gui.RotateDoodadPreviewItems();
+					}
+				}
 			}
-			g_gui.SetBrushVariation(nv);
 			g_gui.RefreshView();
 			break;
 		}
@@ -2578,8 +2592,10 @@ void MapCanvas::OnSelectDoodadBrush(wxCommandEvent& WXUNUSED(event)) {
 	}
 	Item* item = tile->getTopSelectedItem();
 
-	if (item) {
-		g_gui.SelectBrush(item->getDoodadBrush(), TILESET_DOODAD);
+	if (item && item->getDoodadBrush()) {
+		DoodadBrush* doodad_brush = item->getDoodadBrush()->asDoodad();
+		g_gui.SelectBrush(doodad_brush, TILESET_DOODAD);
+		g_gui.SetBrushVariation(doodad_brush->getVariationForItemId(item->getID()));
 	}
 }
 
@@ -2970,7 +2986,7 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 	removeCommentItem->Enable(allowCommentEdit && !tileComments.empty());
 
 	if (editor.IsLive()) {
-		wxMenuItem* pingItem = Append(MAP_POPUP_MENU_PING_HERE, "Ping &Here\tCTRL+SHIFT+P", "Draw attention to this tile for other mappers");
+		wxMenuItem* pingItem = Append(MAP_POPUP_MENU_PING_HERE, "Ping &Here\tCTRL+SHIFT+P", "Draw attention to this tile for other mappers (Alt+Shift+click)");
 		pingItem->Enable(allowCommentEdit);
 	}
 

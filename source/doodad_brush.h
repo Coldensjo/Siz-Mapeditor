@@ -78,6 +78,7 @@ public:
 		return do_new_borders;
 	}
 	bool ownsItem(Item* item) const;
+	int getVariationForItemId(uint16_t id) const;
 
 	bool hasExplicitAlternates() const {
 		return explicit_alternates;

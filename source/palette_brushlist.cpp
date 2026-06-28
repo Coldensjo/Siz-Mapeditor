@@ -32,6 +32,7 @@
 #include "sprites.h"
 #include "settings.h"
 #include "theme.h"
+#include "map_tab.h"
 
 #include <algorithm>
 #include <limits>
@@ -43,6 +44,38 @@
 // A common class for terrain/doodad/item/raw palette
 
 namespace {
+void ForwardPaletteKeyToMap(wxKeyEvent& event) {
+	if (g_settings.getInteger(Config::LISTBOX_EATS_ALL_EVENTS)) {
+		switch (event.GetKeyCode()) {
+			case WXK_UP:
+			case WXK_DOWN:
+			case WXK_LEFT:
+			case WXK_RIGHT:
+			case WXK_PAGEUP:
+			case WXK_PAGEDOWN:
+			case WXK_HOME:
+			case WXK_END:
+				event.Skip();
+				return;
+		}
+	}
+
+	if (event.ControlDown() || event.AltDown()) {
+		event.Skip();
+		return;
+	}
+
+	g_gui.AddPendingCanvasEvent(event);
+}
+
+void FocusMapCanvasFromPalette() {
+	if (MapTab* tab = g_gui.GetCurrentMapTab()) {
+		if (MapCanvas* canvas = tab->GetCanvas()) {
+			canvas->SetFocus();
+		}
+	}
+}
+
 void OpenTilesetEditorForPage(BrushPalettePanel* panel, int pageIndex) {
 	if (!panel || pageIndex < 0) {
 		return;
@@ -559,6 +592,7 @@ void BrushPanel::OnClickListBoxRow(wxCommandEvent& event) {
 		g_gui.ActivatePalette(static_cast<PaletteWindow*>(w));
 	}
 
+	FocusMapCanvasFromPalette();
 	g_gui.SelectBrush(tileset->brushlist[n], tileset->getType());
 }
 
@@ -577,6 +611,7 @@ EVT_LEFT_DOWN(BrushIconBox::OnMouseClick)
 EVT_RIGHT_DOWN(BrushIconBox::OnMouseRightClick)
 EVT_MOTION(BrushIconBox::OnMouseMotion)
 EVT_LEAVE_WINDOW(BrushIconBox::OnMouseLeave)
+EVT_KEY_DOWN(BrushIconBox::OnKey)
 END_EVENT_TABLE()
 
 BrushIconBox::BrushIconBox(wxWindow* parent, const TilesetCategory* _tileset, RenderSize rsz, bool useActualSize) :
@@ -966,7 +1001,7 @@ void BrushIconBox::OnMouseClick(wxMouseEvent& event) {
 	multi_selected.clear();
 	selected_index = index;
 	Refresh();
-	SetFocus();
+	FocusMapCanvasFromPalette();
 	HandleBrushSelection(brush);
 }
 
@@ -1181,29 +1216,10 @@ void BrushIconBox::OnMouseLeave(wxMouseEvent& event) {
 	event.Skip();
 }
 
+void BrushIconBox::OnKey(wxKeyEvent& event) {
+	ForwardPaletteKeyToMap(event);
+}
+
 void BrushListBox::OnKey(wxKeyEvent& event) {
-	switch (event.GetKeyCode()) {
-		case WXK_UP:
-		case WXK_DOWN:
-		case WXK_LEFT:
-		case WXK_RIGHT:
-			if (g_settings.getInteger(Config::LISTBOX_EATS_ALL_EVENTS)) {
-				case WXK_PAGEUP:
-				case WXK_PAGEDOWN:
-				case WXK_HOME:
-				case WXK_END:
-					event.Skip(true);
-			} else {
-				[[fallthrough]];
-				default:
-					// Let menu accelerators (Ctrl+Z, Ctrl+X, Ctrl+C, ...) be handled
-					// by the frame instead of forwarding the raw key to the map canvas,
-					// where single-letter brush shortcuts would otherwise swallow them.
-					if (event.ControlDown() || event.AltDown()) {
-						event.Skip();
-					} else if (g_gui.GetCurrentTab() != nullptr) {
-						g_gui.GetCurrentMapTab()->GetEventHandler()->AddPendingEvent(event);
-					}
-			}
-	}
+	ForwardPaletteKeyToMap(event);
 }

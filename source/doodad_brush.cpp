@@ -269,6 +269,15 @@ bool DoodadBrush::ownsItem(Item* item) const {
 	return false;
 }
 
+int DoodadBrush::getVariationForItemId(uint16_t id) const {
+	for (int variation = 0; variation < static_cast<int>(alternatives.size()); ++variation) {
+		if (alternatives[variation]->ownsItem(id)) {
+			return variation;
+		}
+	}
+	return 0;
+}
+
 void DoodadBrush::undraw(BaseMap* map, Tile* tile) {
 	// Remove all doodad-related
 	for (ItemVector::iterator item_iter = tile->items.begin(); item_iter != tile->items.end();) {

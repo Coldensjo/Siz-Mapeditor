@@ -2248,6 +2248,32 @@ void GUI::SetBrushVariation(int nz) {
 	}
 }
 
+bool GUI::RotateDoodadPreviewItems() {
+	if (!current_brush || !current_brush->isDoodad()) {
+		return false;
+	}
+
+	bool rotated = false;
+	for (MapIterator it = doodad_buffer_map->begin(); it != doodad_buffer_map->end(); ++it) {
+		Tile* tile = (*it)->get();
+		if (tile->ground && tile->ground->isRoteable()) {
+			tile->ground->doRotate();
+			rotated = true;
+		}
+		for (Item* item : tile->items) {
+			if (item->isRoteable()) {
+				item->doRotate();
+				rotated = true;
+			}
+		}
+	}
+
+	if (rotated) {
+		secondary_map = doodad_buffer_map;
+	}
+	return rotated;
+}
+
 void GUI::SetBrushShape(BrushShape bs) {
 	bool shapeChanged = (bs != brush_shape);
 	bool evenChanged = false;
@@ -2432,6 +2458,7 @@ void GUI::SelectBrushInternal(Brush* brush) {
 	// Fear no evil don't you say no evil
 	if (current_brush != brush && brush) {
 		previous_brush = current_brush;
+		brush_variation = 0;
 	}
 
 	current_brush = brush;
@@ -2439,7 +2466,8 @@ void GUI::SelectBrushInternal(Brush* brush) {
 		return;
 	}
 
-	brush_variation = min(brush_variation, brush->getMaxVariation());
+	const int max_variation = max(0, brush->getMaxVariation() - 1);
+	brush_variation = min(brush_variation, max_variation);
 	FillDoodadPreviewBuffer();
 	if (brush->isDoodad()) {
 		secondary_map = doodad_buffer_map;

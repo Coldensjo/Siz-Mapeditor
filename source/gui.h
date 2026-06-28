@@ -276,6 +276,7 @@ public:
 	void SetBrushSizeInternal(int nz);
 	void SetBrushShape(BrushShape bs);
 	void SetBrushVariation(int nz);
+	bool RotateDoodadPreviewItems();
 	void SetBrushThickness(int low, int ceil);
 	void SetBrushThickness(bool on, int low = -1, int ceil = -1);
 	// Helper functions for size

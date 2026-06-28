@@ -115,6 +115,7 @@ public:
 	void OnMouseRightClick(wxMouseEvent& event);
 	void OnMouseMotion(wxMouseEvent& event);
 	void OnMouseLeave(wxMouseEvent& event);
+	void OnKey(wxKeyEvent& event);
 
 protected:
 	struct Cell {
