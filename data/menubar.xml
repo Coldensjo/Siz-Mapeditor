@@ -111,6 +111,7 @@
 	<menu name="Show">
 		<menu name="Floors">
 			<item name="Show All Floors" hotkey="Ctrl+W" action="SHOW_ALL_FLOORS" help="If not checked, other floors are hidden." />
+			<item name="Show All Floors Underground" action="SHOW_ALL_FLOORS_UNDERGROUND" help="When underground, show every floor below instead of only two floors down. Uncheck to disable." />
 			<item name="Show Shade" hotkey="Q" action="SHOW_SHADE" help="Shade lower floors." />
 		</menu>
 		<menu name="Display Mode">

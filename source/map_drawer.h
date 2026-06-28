@@ -102,6 +102,7 @@ struct DrawingOptions {
 	wxColor mouse_crosshair_color;
 	wxColor viewport_background_color;
 	bool show_all_floors;
+	bool show_all_floors_underground;
 	bool show_creatures;
 	bool show_spawns;
 	bool show_houses;

@@ -150,6 +150,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 
 	MAKE_ACTION(SHOW_SHADE, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(SHOW_ALL_FLOORS, wxITEM_CHECK, OnChangeViewSettings);
+	MAKE_ACTION(SHOW_ALL_FLOORS_UNDERGROUND, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(GHOST_ITEMS, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(GHOST_ITEMS_ON_VOID, wxITEM_CHECK, OnChangeViewSettings);
 	MAKE_ACTION(GHOST_HIGHER_FLOORS, wxITEM_CHECK, OnChangeViewSettings);
@@ -518,6 +519,7 @@ void MainMenuBar::LoadValues() {
 	CheckItem(SHOW_LIGHT_STR, g_settings.getBoolean(Config::SHOW_LIGHT_STR));
 	CheckItem(SHOW_TECHNICAL_ITEMS, g_settings.getBoolean(Config::SHOW_TECHNICAL_ITEMS));
 	CheckItem(SHOW_ALL_FLOORS, g_settings.getBoolean(Config::SHOW_ALL_FLOORS));
+	CheckItem(SHOW_ALL_FLOORS_UNDERGROUND, g_settings.getBoolean(Config::SHOW_ALL_FLOORS_UNDERGROUND));
 	CheckItem(GHOST_ITEMS, g_settings.getBoolean(Config::TRANSPARENT_ITEMS));
 	CheckItem(GHOST_ITEMS_ON_VOID, g_settings.getBoolean(Config::TRANSPARENT_ITEMS_ON_VOID));
 	CheckItem(GHOST_HIGHER_FLOORS, g_settings.getBoolean(Config::TRANSPARENT_FLOORS));
@@ -2298,12 +2300,15 @@ void MainMenuBar::OnChangeViewSettings(wxCommandEvent& event) {
 	if (IsItemChecked(MenuBar::SHOW_ALL_FLOORS)) {
 		EnableItem(MenuBar::SELECT_MODE_VISIBLE, true);
 		EnableItem(MenuBar::SELECT_MODE_LOWER, true);
+		EnableItem(MenuBar::SHOW_ALL_FLOORS_UNDERGROUND, true);
 	} else {
 		EnableItem(MenuBar::SELECT_MODE_VISIBLE, false);
 		EnableItem(MenuBar::SELECT_MODE_LOWER, false);
+		EnableItem(MenuBar::SHOW_ALL_FLOORS_UNDERGROUND, false);
 		CheckItem(MenuBar::SELECT_MODE_CURRENT, true);
 		g_settings.setInteger(Config::SELECTION_TYPE, SELECT_CURRENT_FLOOR);
 	}
+	g_settings.setInteger(Config::SHOW_ALL_FLOORS_UNDERGROUND, IsItemChecked(MenuBar::SHOW_ALL_FLOORS_UNDERGROUND));
 	g_settings.setInteger(Config::TRANSPARENT_FLOORS, IsItemChecked(MenuBar::GHOST_HIGHER_FLOORS));
 	g_settings.setInteger(Config::TRANSPARENT_ITEMS, IsItemChecked(MenuBar::GHOST_ITEMS));
 	g_settings.setInteger(Config::TRANSPARENT_ITEMS_ON_VOID, IsItemChecked(MenuBar::GHOST_ITEMS_ON_VOID));

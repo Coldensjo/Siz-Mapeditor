@@ -163,6 +163,8 @@ void getVisibleMapBounds(const MapCanvas& canvas, int& start_x, int& start_y, in
 	if (g_settings.getBoolean(Config::SHOW_ALL_FLOORS)) {
 		if (current_floor <= GROUND_LAYER) {
 			start_z = GROUND_LAYER;
+		} else if (g_settings.getBoolean(Config::SHOW_ALL_FLOORS_UNDERGROUND)) {
+			start_z = MAP_MAX_LAYER;
 		} else {
 			start_z = std::min(MAP_MAX_LAYER, current_floor + 2);
 		}
@@ -482,6 +484,7 @@ void MapCanvas::OnPaint(wxPaintEvent& event) {
 				options.show_mouse_crosshair = g_settings.getBoolean(Config::SHOW_MOUSE_CROSSHAIR);
 				options.ingame = !g_settings.getBoolean(Config::SHOW_EXTRA);
 				options.show_all_floors = g_settings.getBoolean(Config::SHOW_ALL_FLOORS);
+				options.show_all_floors_underground = g_settings.getBoolean(Config::SHOW_ALL_FLOORS_UNDERGROUND);
 				options.show_creatures = g_settings.getBoolean(Config::SHOW_CREATURES);
 				options.show_spawns = g_settings.getBoolean(Config::SHOW_SPAWNS);
 				options.show_houses = g_settings.getBoolean(Config::SHOW_HOUSES);

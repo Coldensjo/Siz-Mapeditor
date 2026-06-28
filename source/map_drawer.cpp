@@ -384,6 +384,7 @@ void DrawingOptions::SetDefault() {
 	mouse_crosshair_color = wxColor(255, 255, 255);
 	viewport_background_color = wxColor(0, 0, 0);
 	show_all_floors = true;
+	show_all_floors_underground = true;
 	show_creatures = true;
 	show_spawns = true;
 	show_houses = true;
@@ -431,6 +432,7 @@ void DrawingOptions::SetIngame() {
 	mouse_crosshair_color = wxColor(255, 255, 255);
 	viewport_background_color = wxColor(0, 0, 0);
 	show_all_floors = true;
+	show_all_floors_underground = true;
 	show_creatures = true;
 	show_spawns = false;
 	show_houses = false;
@@ -489,6 +491,8 @@ void MapDrawer::SetupVars() {
 	if (options.show_all_floors) {
 		if (floor <= GROUND_LAYER) {
 			start_z = GROUND_LAYER;
+		} else if (options.show_all_floors_underground) {
+			start_z = MAP_MAX_LAYER;
 		} else {
 			start_z = std::min(MAP_MAX_LAYER, floor + 2);
 		}
