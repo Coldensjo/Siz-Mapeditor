@@ -365,6 +365,8 @@ public:
 		selected = !selected;
 	}
 
+	void copyTransformStateFrom(const Item& source);
+
 	// Item properties!
 	virtual bool isComplex() const {
 		return attributes && attributes->size();

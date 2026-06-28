@@ -96,14 +96,60 @@ Item* Item::deepCopy() const {
 	return copy;
 }
 
+void Item::copyTransformStateFrom(const Item& source) {
+	selected = source.selected;
+	if (source.attributes) {
+		attributes = newd ItemAttributeMap(*source.attributes);
+	}
+
+	if (const Door* old_door = source.asDoor()) {
+		if (Door* new_door = asDoor()) {
+			new_door->setDoorID(old_door->getDoorID());
+			new_door->setKeyHoleNumber(old_door->getKeyHoleNumber());
+			new_door->setDoorLevel(old_door->getDoorLevel());
+			new_door->setQuestNumber(old_door->getQuestNumber());
+			new_door->setQuestValue(old_door->getQuestValue());
+		}
+	}
+
+	if (const Teleport* old_teleport = source.asTeleport()) {
+		if (Teleport* new_teleport = asTeleport()) {
+			new_teleport->setDestination(old_teleport->getDestination());
+		}
+	}
+
+	if (const Key* old_key = source.asKey()) {
+		if (Key* new_key = asKey()) {
+			new_key->setKeyNumber(old_key->getKeyNumber());
+		}
+	}
+
+	if (const Depot* old_depot = dynamic_cast<const Depot*>(&source)) {
+		if (Depot* new_depot = dynamic_cast<Depot*>(this)) {
+			new_depot->setDepotID(old_depot->getDepotID());
+		}
+	}
+
+	if (const Container* old_container = dynamic_cast<const Container*>(&source)) {
+		if (Container* new_container = dynamic_cast<Container*>(this)) {
+			for (size_t i = 0; i < old_container->getItemCount(); ++i) {
+				new_container->getVector().push_back(old_container->getItem(i)->deepCopy());
+			}
+		}
+	}
+}
+
 Item* transformItem(Item* old_item, uint16_t new_id, Tile* parent) {
 	if (old_item == nullptr) {
 		return nullptr;
 	}
 
-	old_item->setID(new_id);
-	// Through the magic of deepCopy, this will now be a pointer to an item of the correct type.
-	Item* new_item = old_item->deepCopy();
+	Item* new_item = Item::Create(new_id, old_item->getSubtype());
+	if (!new_item) {
+		return nullptr;
+	}
+	new_item->copyTransformStateFrom(*old_item);
+
 	if (parent) {
 		// Find the old item and remove it from the tile, insert this one instead!
 		if (old_item == parent->ground) {
