@@ -23,6 +23,7 @@
 #include "filehandle.h"
 #include "map_allocator.h"
 #include "tile.h"
+#include "spatial_hash_grid.h"
 
 // Class declarations
 class QTreeNode;
@@ -108,12 +109,27 @@ public:
 	const TileLocation* getTileL(int x, int y, int z) const;
 	const TileLocation* getTileL(const Position& pos) const;
 
-	// Get a Quad Tree Leaf from the map
+	// Get a Quad Tree Leaf from the map. Both paths consult the spatial hash
+	// grid first so repeated/neighbouring lookups skip the full tree walk.
 	QTreeNode* getLeaf(int x, int y) {
-		return root.getLeaf(x, y);
+		const uint32_t key = SpatialHashGrid::cellKey(x, y);
+		if (QTreeNode* cached = leaf_cache.find(key)) {
+			return cached;
+		}
+		QTreeNode* leaf = root.getLeaf(x, y);
+		if (leaf) {
+			leaf_cache.insert(key, leaf);
+		}
+		return leaf;
 	}
 	QTreeNode* createLeaf(int x, int y) {
-		return root.getLeafForce(x, y);
+		const uint32_t key = SpatialHashGrid::cellKey(x, y);
+		if (QTreeNode* cached = leaf_cache.find(key)) {
+			return cached;
+		}
+		QTreeNode* leaf = root.getLeafForce(x, y);
+		leaf_cache.insert(key, leaf);
+		return leaf;
 	}
 
 	// Assigns a tile, it might seem pointless to provide position, but it is not, as the passed tile may be nullptr
@@ -144,6 +160,7 @@ protected:
 	uint64_t tilecount;
 
 	QTreeNode root; // The Quad Tree root
+	SpatialHashGrid leaf_cache; // Accelerator over `root`; not the source of truth
 
 	friend class QTreeNode;
 };

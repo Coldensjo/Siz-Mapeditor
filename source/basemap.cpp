@@ -40,6 +40,9 @@ void BaseMap::clear(bool del) {
 	for (PositionVector::iterator pos_iter = pos_vec.begin(); pos_iter != pos_vec.end(); ++pos_iter) {
 		setTile(*pos_iter, nullptr, del);
 	}
+	// The quadtree structure survives clear(), but drop the accelerator anyway
+	// so a future structural teardown can never leave dangling cached leaves.
+	leaf_cache.clear();
 }
 
 void BaseMap::clearVisible(uint32_t mask) {
@@ -48,7 +51,7 @@ void BaseMap::clearVisible(uint32_t mask) {
 
 Tile* BaseMap::createTile(int x, int y, int z) {
 	ASSERT(z < MAP_LAYERS);
-	QTreeNode* leaf = root.getLeafForce(x, y);
+	QTreeNode* leaf = createLeaf(x, y);
 	TileLocation* loc = leaf->createTile(x, y, z);
 	if (loc->get()) {
 		return loc->get();
@@ -70,7 +73,7 @@ Tile* BaseMap::getOrCreateTile(const Position& pos) {
 
 TileLocation* BaseMap::getTileL(int x, int y, int z) {
 	ASSERT(z < MAP_LAYERS);
-	QTreeNode* leaf = root.getLeaf(x, y);
+	QTreeNode* leaf = getLeaf(x, y);
 	if (leaf) {
 		Floor* floor = leaf->getFloor(z);
 		if (floor) {
@@ -98,7 +101,7 @@ const TileLocation* BaseMap::getTileL(const Position& pos) const {
 TileLocation* BaseMap::createTileL(int x, int y, int z) {
 	ASSERT(z < MAP_LAYERS);
 
-	QTreeNode* leaf = root.getLeafForce(x, y);
+	QTreeNode* leaf = createLeaf(x, y);
 	Floor* floor = leaf->createFloor(x, y, z);
 	uint32_t offsetX = x & 3;
 	uint32_t offsetY = y & 3;
@@ -115,7 +118,7 @@ void BaseMap::setTile(int x, int y, int z, Tile* newtile, bool remove) {
 	ASSERT(!newtile || newtile->getY() == int(y));
 	ASSERT(!newtile || newtile->getZ() == int(z));
 
-	QTreeNode* leaf = root.getLeafForce(x, y);
+	QTreeNode* leaf = createLeaf(x, y);
 	Tile* old = leaf->setTile(x, y, z, newtile);
 	if (remove) {
 		delete old;
@@ -128,7 +131,7 @@ Tile* BaseMap::swapTile(int x, int y, int z, Tile* newtile) {
 	ASSERT(!newtile || newtile->getY() == int(y));
 	ASSERT(!newtile || newtile->getZ() == int(z));
 
-	QTreeNode* leaf = root.getLeafForce(x, y);
+	QTreeNode* leaf = createLeaf(x, y);
 	return leaf->setTile(x, y, z, newtile);
 }
 

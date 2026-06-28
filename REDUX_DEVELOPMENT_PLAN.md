@@ -133,7 +133,24 @@ Goal: the single best *non-rendering* perf idea in redux — speed up the hottes
 - **Acceptance:** documented baseline (open-large-map time, pan/scroll FPS, full-map borderize time).
 - **Risk:** None.
 
-### M3-T2 — Introduce spatial hash grid behind the map API  ·  `TODO`
+### M3-T2 — Introduce spatial hash grid behind the map API  ·  `DONE (pending benchmark)`
+> Implemented `source/spatial_hash_grid.h`: a leaf-lookup accelerator over the
+> existing HexTree. Keyed by the upper 14 bits of x/y (the leaf = 4x4 block the
+> tree navigation resolves to), it caches `QTreeNode*` leaf pointers plus a
+> single-entry fast path for spatially-local access (rendering/borderize scans).
+> Wired behind `BaseMap::getLeaf`/`createLeaf` (basemap.h) so all call sites —
+> `getTileL`, create/set/swap, live client/server, map_drawer — are unchanged.
+> The quadtree stays the source of truth; the cache is dropped on `clear()`.
+>
+> Safety: leaves are never individually freed (no `freeNode` caller; only the
+> recursive `~QTreeNode` at teardown), so cached pointers can't dangle. Map
+> access is already single-threaded (live net work is marshalled to the main
+> thread via `CallAfter`), so the write-on-read cache adds no new race.
+>
+> STILL REQUIRED before this counts as fully `DONE`: a Release|x64 build, the
+> M3-T1 baseline, and a save->reload byte-identical + measured-win check. I
+> cannot build/run in this environment.
+
 - **redux@0022306, @552ebce, @cec63db, @48406ee**
 - **Goal:** add a spatial hash grid (sorted-vector backed, cell-index not pointer) caching tile
   lookups, behind the existing `BaseMap`/`Map` accessors so call sites don't change.
