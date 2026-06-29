@@ -24,8 +24,10 @@
 #include "live_update.h"
 
 #include <chrono>
+#include <deque>
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -106,6 +108,7 @@ public:
 
 protected:
 	void parsePacket(NetworkMessage message);
+	void doWrite();
 
 	// parse packets
 	void parseHello(NetworkMessage& message);
@@ -138,10 +141,22 @@ protected:
 	//
 	NetworkMessage readMessage;
 
+	// asio forbids overlapping async_writes on one socket; queue sends so only one
+	// write is in flight at a time, otherwise the bytes interleave and corrupt the
+	// stream. The completion handler drains the queue in order.
+	struct OutboundPacket {
+		std::shared_ptr<NetworkMessage> message;
+		std::function<void()> onSent;
+	};
+	std::deque<OutboundPacket> writeQueue;
+	bool writing = false;
+
 	std::set<uint32_t> queryNodeList;
 	std::map<uint32_t, std::chrono::steady_clock::time_point> pendingNodeRequests;
 	std::chrono::steady_clock::time_point lastNodeRequestTick {};
 	std::unique_ptr<wxTimer> nodeRetryTimer;
+	// Throttles the "malformed packet" log so a persistently bad stream can't spam.
+	bool warnedMalformedStream = false;
 	bool viewportRefreshPending;
 	bool hasPendingCommentList;
 	std::vector<MapComment> pendingCommentList;

@@ -1373,6 +1373,13 @@ void GUI::CloseLiveEditors(LiveSocket* sender) {
 		return;
 	}
 
+	// Deleting a live MapTab destroys its Editor/Map. MapCanvas::OnPaint renders
+	// through the editor while rendering is enabled, so a paint dispatched mid-
+	// destruction would dereference the freed editor and crash (intermittently).
+	// Gate it behind a rendering lock exactly like CloseCurrentEditor/CloseAllEditors.
+	UnnamedRenderingLock();
+	WindowFreezeGuard freeze_guard(root);
+
 	// First, detach any live log tab so the socket's back-reference is cleared
 	// before the editor (and the socket it owns) gets destroyed.
 	// LiveClient::close() may already have detached the log tab (socket == nullptr),

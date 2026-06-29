@@ -27,9 +27,11 @@
 #include <wx/string.h>
 
 // A single file the live server offers to outdated clients as part of an
-// editor update package (the editor executable and, optionally, its DLLs).
+// editor update package (the editor executable, DLLs, data/, icons/, etc.).
 struct LiveUpdateFile {
-	std::string filename; // base name as written on the client (e.g. "Editor_x64.exe")
+	// Path relative to the editor folder on the client, using forward slashes
+	// (e.g. "Editor_x64.exe", "data/800/borders.xml", "icons/terrain.png").
+	std::string filename;
 	wxFileName sourcePath; // server-side absolute path to read from
 	uint32_t size = 0;
 };

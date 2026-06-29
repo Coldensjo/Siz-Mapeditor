@@ -248,49 +248,56 @@ void LiveClient::receive(uint32_t packetSize) {
 }
 
 void LiveClient::send(NetworkMessage& message) {
-	NetworkMessage outbound;
-	outbound.buffer = message.buffer;
-	outbound.position = message.position;
-	outbound.size = message.size;
-
-	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound)]() mutable {
-		memcpy(&outbound.buffer[0], &outbound.size, 4);
-		const size_t packetLength = outbound.size + 4;
-		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
-		asio::async_write(*socket,
-			asio::buffer(packet->buffer.data(), packetLength),
-			[this, packet](const net_error_code& error, size_t bytesTransferred) -> void {
-				if (error) {
-					wxTheApp->CallAfter([this, error]() {
-						logMessage(wxString() + getHostName() + ": " + error.message());
-					});
-				}
-			});
-	});
+	send(message, nullptr);
 }
 
 void LiveClient::send(NetworkMessage& message, std::function<void()> onSent) {
-	NetworkMessage outbound;
-	outbound.buffer = message.buffer;
-	outbound.position = message.position;
-	outbound.size = message.size;
+	auto packet = std::make_shared<NetworkMessage>();
+	packet->buffer = message.buffer;
+	packet->position = message.position;
+	packet->size = message.size;
 
-	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound), onSent = std::move(onSent)]() mutable {
-		memcpy(&outbound.buffer[0], &outbound.size, 4);
-		const size_t packetLength = outbound.size + 4;
-		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
-		asio::async_write(*socket,
-			asio::buffer(packet->buffer.data(), packetLength),
-			[this, packet, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
-				if (error) {
-					wxTheApp->CallAfter([this, error]() {
-						logMessage(wxString() + getHostName() + ": " + error.message());
-					});
-				} else if (onSent) {
-					onSent();
-				}
-			});
+	NetworkConnection::getInstance().dispatch([this, packet, onSent = std::move(onSent)]() mutable {
+		memcpy(&packet->buffer[0], &packet->size, 4);
+		writeQueue.push_back(OutboundPacket { std::move(packet), std::move(onSent) });
+		// Serialize writes: overlapping async_writes on one socket interleave bytes
+		// and corrupt the stream. The completion handler drains the queue in order.
+		if (!writing) {
+			writing = true;
+			doWrite();
+		}
 	});
+}
+
+void LiveClient::doWrite() {
+	// Runs on the network thread with writing == true and a non-empty queue.
+	const OutboundPacket& front = writeQueue.front();
+	const size_t packetLength = front.message->size + 4;
+	asio::async_write(*socket,
+		asio::buffer(front.message->buffer.data(), packetLength),
+		[this](const net_error_code& error, size_t bytesTransferred) -> void {
+			OutboundPacket completed = std::move(writeQueue.front());
+			writeQueue.pop_front();
+
+			if (error) {
+				writing = false;
+				writeQueue.clear();
+				wxTheApp->CallAfter([this, error]() {
+					logMessage(wxString() + getHostName() + ": " + error.message());
+				});
+				return;
+			}
+
+			if (completed.onSent) {
+				completed.onSent();
+			}
+
+			if (!writeQueue.empty()) {
+				doWrite();
+			} else {
+				writing = false;
+			}
+		});
 }
 
 void LiveClient::updateCursor(const Position& position) {
@@ -468,6 +475,16 @@ void LiveClient::queryNode(int32_t ndx, int32_t ndy, bool underground) {
 	nd |= ((ndx >> 2) << 18);
 	nd |= ((ndy >> 2) << 4);
 	nd |= (underground ? 1 : 0);
+
+	// Don't re-queue a node we're already waiting on. The map drawer can't mark a
+	// not-yet-created leaf as "requested", so it calls queryNode every frame until
+	// the response lands; without this guard each frame re-sends the whole batch and
+	// the server re-sends every node's full data, saturating the connection. The
+	// retry timer (tickNodeRequests) re-asks if a node really was dropped.
+	if (pendingNodeRequests.find(nd) != pendingNodeRequests.end()) {
+		return;
+	}
+
 	queryNodeList.insert(nd);
 	pendingNodeRequests[nd] = std::chrono::steady_clock::now();
 }
@@ -664,10 +681,16 @@ void LiveClient::parsePacket(NetworkMessage message) {
 				parseItemBlockList(message);
 				break;
 			default: {
-				// A bad packet type means the stream has desynced; the rest of this
-				// buffer is garbage. Tear the session down instead of looping over it
-				// and leaving a half-loaded map tab open (which looks like a hang).
-				disconnectFromServer(wxString::Format("Unknown packet received (type 0x%02X)! Disconnecting.", packetType));
+				// A bad packet type means this buffer's contents desynced - the rest
+				// is garbage. Stop parsing THIS buffer but keep the connection: packet
+				// framing is length-prefixed and read independently, so the next packet
+				// is still intact, and the node-retry timer re-fetches anything dropped.
+				// (Tearing the session down here is what made connects "load then close"
+				// for any data-dependent desync, plus it hit the close-during-render path.)
+				if (!warnedMalformedStream) {
+					warnedMalformedStream = true;
+					logMessage(wxString::Format("Unknown packet received (type 0x%02X); skipping the rest of this packet.", packetType));
+				}
 				return;
 			}
 		}
@@ -678,11 +701,14 @@ void LiveClient::parsePacket(NetworkMessage message) {
 			return;
 		}
 
-		// A read ran past the end of the buffer: the packet was truncated or the
-		// stream desynced. Abort instead of silently dropping the rest (which would
-		// leave a half-loaded map), and don't trust message.position any further.
+		// A read ran past the end of the buffer (truncated/oversized field). Stop
+		// parsing this buffer rather than reading garbage; stay connected so the
+		// retry timer can re-request whatever nodes were dropped.
 		if (message.overflow) {
-			disconnectFromServer(wxString() + getHostName() + ": Malformed packet from server (truncated read). Disconnecting.");
+			if (!warnedMalformedStream) {
+				warnedMalformedStream = true;
+				logMessage(wxString() + getHostName() + ": Truncated packet field; skipping the rest of this packet.");
+			}
 			return;
 		}
 	}

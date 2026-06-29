@@ -67,6 +67,13 @@ void LivePeer::close() {
 }
 
 bool LivePeer::handleError(const net_error_code& error) {
+	// The read loop and the write queue can both surface the same disconnect; log
+	// and close only once so a dropped peer can't spam the server console.
+	if (disconnecting) {
+		return true;
+	}
+	disconnecting = true;
+
 	if (error == asio::error::eof || error == asio::error::connection_reset) {
 		livePeerLog(log, wxString() + getHostName() + ": disconnected.");
 	} else if (error == asio::error::connection_aborted) {
@@ -153,25 +160,53 @@ void LivePeer::send(NetworkMessage& message) {
 }
 
 void LivePeer::send(NetworkMessage& message, std::function<void()> onSent) {
-	NetworkMessage outbound;
-	outbound.buffer = message.buffer;
-	outbound.position = message.position;
-	outbound.size = message.size;
+	auto packet = std::make_shared<NetworkMessage>();
+	packet->buffer = message.buffer;
+	packet->position = message.position;
+	packet->size = message.size;
 
-	NetworkConnection::getInstance().dispatch([this, outbound = std::move(outbound), onSent = std::move(onSent)]() mutable {
-		memcpy(&outbound.buffer[0], &outbound.size, 4);
-		const size_t packetLength = outbound.size + 4;
-		const auto packet = std::make_shared<NetworkMessage>(std::move(outbound));
-		asio::async_write(socket,
-			asio::buffer(packet->buffer.data(), packetLength),
-			[this, packet, onSent = std::move(onSent)](const net_error_code& error, size_t bytesTransferred) -> void {
-				if (error) {
-					livePeerLog(log, wxString() + getHostName() + ": " + error.message());
-				} else if (onSent) {
-					onSent();
-				}
-			});
+	NetworkConnection::getInstance().dispatch([this, packet, onSent = std::move(onSent)]() mutable {
+		memcpy(&packet->buffer[0], &packet->size, 4);
+		writeQueue.push_back(OutboundPacket { std::move(packet), std::move(onSent) });
+		// Only kick off a write if none is in flight; the completion handler drains
+		// the rest in order. This serialization is what prevents the interleaved
+		// async_writes that were corrupting the live stream.
+		if (!writing) {
+			writing = true;
+			doWrite();
+		}
 	});
+}
+
+void LivePeer::doWrite() {
+	// Runs on the network thread with writing == true and a non-empty queue.
+	const OutboundPacket& front = writeQueue.front();
+	const size_t packetLength = front.message->size + 4;
+	asio::async_write(socket,
+		asio::buffer(front.message->buffer.data(), packetLength),
+		[this](const net_error_code& error, size_t bytesTransferred) -> void {
+			OutboundPacket completed = std::move(writeQueue.front());
+			writeQueue.pop_front();
+
+			if (error) {
+				// One write error is terminal for the socket; drop the rest and tear
+				// down once (handleError is guarded so queued failures don't spam).
+				writing = false;
+				writeQueue.clear();
+				handleError(error);
+				return;
+			}
+
+			if (completed.onSent) {
+				completed.onSent(); // may enqueue the next chunk (asset/update transfer)
+			}
+
+			if (!writeQueue.empty()) {
+				doWrite();
+			} else {
+				writing = false;
+			}
+		});
 }
 
 void LivePeer::parseLoginPacket(NetworkMessage message) {
@@ -277,7 +312,7 @@ void LivePeer::parseHello(NetworkMessage& message) {
 		return;
 	}
 
-	(void)message.read<uint32_t>(); // client-reported version; server assets are authoritative
+	uint32_t clientVersion = message.read<uint32_t>(); // client-reported version; server assets are authoritative
 	std::string nickname = message.read<std::string>();
 	std::string password = message.read<std::string>();
 	const uint8_t r = message.read<uint8_t>();
@@ -298,7 +333,7 @@ void LivePeer::parseHello(NetworkMessage& message) {
 	}
 
 	name = wxString(nickname.c_str(), wxConvUTF8);
-	livePeerLog(log, name + " (" + getHostName() + ") connected.");
+	livePeerLog(log, name + " (" + getHostName() + ") connected (editor version " + std::to_string(clientVersion) + ").");
 
 	NetworkMessage outMessage;
 	outMessage.write<uint8_t>(PACKET_CHANGE_CLIENT_VERSION);
@@ -533,9 +568,20 @@ void LivePeer::parseReady(NetworkMessage& message) {
 void LivePeer::parseNodeRequest(NetworkMessage& message) {
 	Map& map = server->getEditor()->getMap();
 	const LiveSessionBounds& bounds = server->getSessionBounds();
+
+	// Flush the response in bounded chunks instead of one giant packet. A whole
+	// viewport's nodes can be several MB; sent as a single write it monopolizes the
+	// (now serialized) socket for seconds -- blocking cursors/pings and forcing the
+	// client to wait for the entire blob before rendering anything. Smaller packets
+	// let other traffic interleave and let the client render nodes progressively.
+	constexpr size_t kNodeResponseFlushBytes = 32 * 1024;
+
 	NetworkMessage response;
 	for (uint32_t nodes = message.read<uint32_t>(); nodes != 0; --nodes) {
 		const uint32_t ind = message.read<uint32_t>();
+		if (message.overflow) {
+			break; // truncated/corrupt request; stop rather than spin on garbage
+		}
 
 		const int32_t ndx = ind >> 18;
 		const int32_t ndy = (ind >> 4) & 0x3FFF;
@@ -544,11 +590,15 @@ void LivePeer::parseNodeRequest(NetworkMessage& message) {
 
 		if (bounds.enabled && !bounds.intersectsLeaf(ndx * 4, ndy * 4)) {
 			appendNode(response, clientId, nullptr, ndx, ndy, floorMask);
-			continue;
+		} else {
+			QTreeNode* node = map.createLeaf(ndx * 4, ndy * 4);
+			appendNode(response, clientId, node, ndx, ndy, floorMask);
 		}
 
-		QTreeNode* node = map.createLeaf(ndx * 4, ndy * 4);
-		appendNode(response, clientId, node, ndx, ndy, floorMask);
+		if (response.size >= kNodeResponseFlushBytes) {
+			send(response);
+			response.clear();
+		}
 	}
 
 	if (response.size > 0) {

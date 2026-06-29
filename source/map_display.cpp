@@ -2595,15 +2595,21 @@ void MapCanvas::OnSelectDoodadBrush(wxCommandEvent& WXUNUSED(event)) {
 		return;
 	}
 	Item* item = tile->getTopSelectedItem();
-	if (!item || !item->getDoodadBrush()) {
+	if (!item) {
 		return;
 	}
 
-	// getDoodadBrush() is not necessarily an actual DoodadBrush, so asDoodad()
-	// may return nullptr. Guard against it to avoid dereferencing null.
-	DoodadBrush* doodad_brush = item->getDoodadBrush()->asDoodad();
-	if (doodad_brush) {
-		g_gui.SelectBrush(doodad_brush, TILESET_DOODAD);
+	// getDoodadBrush() is the brush shown for this item in the doodad palette.
+	// It is not necessarily an actual DoodadBrush (it can be a RAW fallback,
+	// see Tileset::loadTileset), so select it as a generic brush and only apply
+	// the doodad variation when asDoodad() actually returns a DoodadBrush.
+	Brush* brush = item->getDoodadBrush();
+	if (!brush) {
+		return;
+	}
+
+	g_gui.SelectBrush(brush, TILESET_DOODAD);
+	if (DoodadBrush* doodad_brush = brush->asDoodad()) {
 		g_gui.SetBrushVariation(doodad_brush->getVariationForItemId(item->getID()));
 	}
 }

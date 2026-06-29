@@ -25,6 +25,8 @@
 
 #include <functional>
 #include <fstream>
+#include <deque>
+#include <memory>
 
 class LiveServer;
 class LivePeer : public LiveSocket {
@@ -60,6 +62,20 @@ public:
 	void receive(uint32_t packetSize);
 	void send(NetworkMessage& message);
 	void send(NetworkMessage& message, std::function<void()> onSent);
+
+private:
+	// asio forbids overlapping async_writes on one socket; they interleave bytes and
+	// corrupt the stream. All sends go through a queue so only one write is in flight.
+	struct OutboundPacket {
+		std::shared_ptr<NetworkMessage> message;
+		std::function<void()> onSent;
+	};
+	std::deque<OutboundPacket> writeQueue;
+	bool writing = false;
+	bool disconnecting = false; // makes handleError log/close exactly once
+	void doWrite();
+
+public:
 
 	//
 	void updateCursor(const Position& position) { }

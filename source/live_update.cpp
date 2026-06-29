@@ -39,10 +39,71 @@ bool fileSizeIfExists(const wxFileName& path, uint32_t& size) {
 	return true;
 }
 
+wxString normalizeUpdateRelativePath(wxString path) {
+	path.Trim(true).Trim(false);
+	path.Replace("\\", "/");
+	while (path.StartsWith("./")) {
+		path = path.Mid(2);
+	}
+	while (path.EndsWith("/") && path.length() > 1) {
+		path.RemoveLast();
+	}
+	return path;
+}
+
+bool isSafeUpdateRelativePath(const wxString& path) {
+	if (path.empty()) {
+		return false;
+	}
+	if (path.StartsWith("/") || path.Find(':') != wxNOT_FOUND) {
+		return false;
+	}
+
+	const wxString normalized = normalizeUpdateRelativePath(path);
+	const wxArrayString parts = wxSplit(normalized, '/');
+	for (const wxString& part : parts) {
+		if (part.empty() || part == "." || part == "..") {
+			return false;
+		}
+	}
+	return !parts.empty();
+}
+
+bool resolveUpdatePath(const wxFileName& baseDir, const wxString& relativePath, wxFileName& out) {
+	if (!isSafeUpdateRelativePath(relativePath)) {
+		return false;
+	}
+
+	const wxString normalized = normalizeUpdateRelativePath(relativePath);
+	const wxArrayString parts = wxSplit(normalized, '/');
+	if (parts.empty()) {
+		return false;
+	}
+
+	out = baseDir;
+	for (size_t i = 0; i + 1 < parts.size(); ++i) {
+		out.AppendDir(parts[i]);
+	}
+	out.SetFullName(parts.Last());
+	return true;
+}
+
+std::string makeUpdateRelativeFilename(const wxFileName& baseDir, const wxFileName& sourcePath) {
+	wxFileName relative = sourcePath;
+	const wxString base = baseDir.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR);
+	if (relative.MakeRelativeTo(base)) {
+		return nstr(normalizeUpdateRelativePath(relative.GetFullPath()));
+	}
+	return nstr(sourcePath.GetFullName());
+}
+
 } // namespace
 
 bool collectUpdateFiles(const std::vector<wxString>& paths, std::vector<LiveUpdateFile>& files, wxString& error) {
 	files.clear();
+
+	wxFileName baseDir;
+	baseDir.AssignDir(executableDirectory());
 
 	for (const wxString& rawPath : paths) {
 		wxString trimmed = rawPath;
@@ -52,6 +113,7 @@ bool collectUpdateFiles(const std::vector<wxString>& paths, std::vector<LiveUpda
 		}
 
 		wxFileName sourcePath(trimmed);
+		sourcePath.Normalize(wxPATH_NORM_ALL, wxEmptyString);
 		if (!sourcePath.FileExists()) {
 			error = "Update file not found: " + trimmed;
 			files.clear();
@@ -65,8 +127,15 @@ bool collectUpdateFiles(const std::vector<wxString>& paths, std::vector<LiveUpda
 			return false;
 		}
 
+		const std::string relativeName = makeUpdateRelativeFilename(baseDir, sourcePath);
+		if (!isSafeUpdateRelativePath(wxstr(relativeName))) {
+			error = "Update file has an invalid relative path: " + trimmed;
+			files.clear();
+			return false;
+		}
+
 		LiveUpdateFile file;
-		file.filename = nstr(sourcePath.GetFullName());
+		file.filename = relativeName;
 		file.sourcePath = sourcePath;
 		file.size = size;
 		files.push_back(file);
@@ -104,15 +173,18 @@ bool beginLiveUpdateReceive(LiveUpdateReceiveState& state, const std::string& fi
 	}
 	state.stagingDir.Mkdir(0755, wxPATH_MKDIR_FULL);
 
-	// Update packages are flat lists of file names; guard against path traversal.
-	wxString baseName = wxFileName(wxstr(filename)).GetFullName();
-	if (baseName.empty()) {
+	const wxString relativePath = normalizeUpdateRelativePath(wxstr(filename));
+	if (!isSafeUpdateRelativePath(relativePath)) {
 		error = "Server sent an update file with an invalid name.";
 		return false;
 	}
 
-	wxFileName target(state.stagingDir);
-	target.SetFullName(baseName);
+	wxFileName target;
+	if (!resolveUpdatePath(state.stagingDir, relativePath, target)) {
+		error = "Server sent an update file with an invalid name.";
+		return false;
+	}
+	target.Mkdir(wxPATH_MKDIR_FULL);
 
 	state.output.open(nstr(target.GetFullPath()), std::ios::binary | std::ios::trunc);
 	if (!state.output.is_open()) {
@@ -120,7 +192,7 @@ bool beginLiveUpdateReceive(LiveUpdateReceiveState& state, const std::string& fi
 		return false;
 	}
 
-	state.currentFilename = nstr(baseName);
+	state.currentFilename = nstr(relativePath);
 	state.expectedSize = size;
 	state.receivedSize = 0;
 	state.active = true;
@@ -177,11 +249,17 @@ bool applyLiveUpdateAndRestart(const wxFileName& stagingDir, const std::vector<s
 	}
 	const wxString runningExe = execFile.GetFullName();
 
+	wxFileName execDirFile;
+	execDirFile.AssignDir(execDir);
+
 	// Validate every staged file up front so we never start swapping with a
 	// truncated download.
 	for (const std::string& name : files) {
-		wxFileName staged(stagingDir);
-		staged.SetFullName(wxstr(name));
+		wxFileName staged;
+		if (!resolveUpdatePath(stagingDir, wxstr(name), staged)) {
+			error = "The downloaded update contains an invalid file path.";
+			return false;
+		}
 		uint32_t size = 0;
 		if (!fileSizeIfExists(staged, size) || size == 0) {
 			error = "The downloaded update is incomplete; please try again.";
@@ -208,24 +286,33 @@ bool applyLiveUpdateAndRestart(const wxFileName& stagingDir, const std::vector<s
 	};
 
 	for (const std::string& name : files) {
-		wxFileName staged(stagingDir);
-		staged.SetFullName(wxstr(name));
+		wxFileName staged;
+		if (!resolveUpdatePath(stagingDir, wxstr(name), staged)) {
+			error = "The downloaded update contains an invalid file path.";
+			rollback();
+			return false;
+		}
 
 		wxFileName target;
-		target.AssignDir(execDir);
-		target.SetFullName(wxstr(name));
+		if (!resolveUpdatePath(execDirFile, wxstr(name), target)) {
+			error = "The downloaded update contains an invalid file path.";
+			rollback();
+			return false;
+		}
+		target.Mkdir(wxPATH_MKDIR_FULL);
 
 		if (target.FileExists()) {
-			wxFileName backup = target;
-			backup.SetFullName(target.GetFullName() + ".old");
-			if (backup.FileExists()) {
-				wxRemoveFile(backup.GetFullPath());
+			const wxString backupPath = target.GetFullPath() + ".old";
+			if (wxFileExists(backupPath)) {
+				wxRemoveFile(backupPath);
 			}
-			if (!wxRenameFile(target.GetFullPath(), backup.GetFullPath(), true)) {
-				error = "Could not replace '" + target.GetFullName() + "'. Close other editor windows and try again.";
+			if (!wxRenameFile(target.GetFullPath(), backupPath, true)) {
+				error = "Could not replace '" + wxstr(name) + "'. Close other editor windows and try again.";
 				rollback();
 				return false;
 			}
+			wxFileName backup;
+			backup.Assign(backupPath);
 			backups.emplace_back(target, backup);
 		}
 
@@ -238,7 +325,7 @@ bool applyLiveUpdateAndRestart(const wxFileName& stagingDir, const std::vector<s
 			}
 		}
 		if (!installed) {
-			error = "Could not install the new '" + target.GetFullName() + "'.";
+			error = "Could not install the new '" + wxstr(name) + "'.";
 			rollback();
 			return false;
 		}
@@ -277,11 +364,6 @@ void cleanupLiveUpdateLeftovers() {
 	// Drop any half-finished staging folder from an interrupted update.
 	wxFileName staging = getLiveUpdateStagingDir();
 	if (staging.DirExists()) {
-		wxArrayString stagedFiles;
-		wxDir::GetAllFiles(staging.GetFullPath(), &stagedFiles, wxEmptyString, wxDIR_FILES);
-		for (const wxString& file : stagedFiles) {
-			wxRemoveFile(file);
-		}
-		wxRmdir(staging.GetFullPath());
+		staging.Rmdir(wxPATH_RMDIR_RECURSIVE);
 	}
 }
