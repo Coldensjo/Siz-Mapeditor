@@ -110,6 +110,9 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 	button_sizer->Add(creature_button, 0, wxALL, 2);
 	button_sizer->Add(raw_button, 0, wxALL, 2);
 
+	// Add the tileset shortcut icons below the category buttons
+	CreateTilesetShortcutButtons(button_sizer);
+
 	// Add palette panels to page sizer (initially hidden)
 	page_sizer->Add(terrain_palette, 1, wxEXPAND);
 	page_sizer->Add(doodad_palette, 1, wxEXPAND);
@@ -144,6 +147,90 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 
 PaletteWindow::~PaletteWindow() {
 	////
+}
+
+void PaletteWindow::CreateTilesetShortcutButtons(wxSizer* button_sizer) {
+	// Quick-access icons for commonly used tilesets. Each entry pairs an icon
+	// file (in icons/) with the exact <tileset> name from the data XML. Clicking
+	// jumps to that tileset, preferring its Doodad version (see GoToTileset).
+	static const struct {
+		const char* icon;
+		const char* tileset;
+	} shortcuts[] = {
+		{ "grounds.png", "Grounds" },
+		{ "walls.png", "Walls" },
+		{ "nature.png", "Nature" },
+		{ "architecture.png", "Architecture" },
+		{ "interior.png", "Interior" },
+		{ "exterior.png", "Exterior" },
+		{ "hangables.png", "Hangables" },
+		{ "corpses.png", "Corpses" },
+		{ "splash.png", "Splash" },
+		{ "trash.png", "Trash" },
+	};
+
+	// 2 columns so the icons stack into a compact grid when there are many.
+	wxGridSizer* grid = newd wxGridSizer(0, 2, 2, 2);
+
+	for (const auto& shortcut : shortcuts) {
+		const std::string tilesetName = shortcut.tileset;
+		// Skip tilesets that aren't present in any palette so there are no
+		// dead buttons.
+		if (!HasTilesetInAnyPalette(tilesetName)) {
+			continue;
+		}
+
+		wxBitmap icon = LoadPaletteCategoryIcon(shortcut.icon);
+		if (!icon.IsOk()) {
+			continue;
+		}
+
+		wxBitmapButton* button = newd wxBitmapButton(this, wxID_ANY, icon);
+		button->SetToolTip(wxstr(tilesetName));
+		button->Bind(wxEVT_BUTTON, [this, tilesetName](wxCommandEvent&) {
+			GoToTileset(tilesetName);
+		});
+		grid->Add(button, 0, wxALL, 1);
+	}
+
+	if (grid->GetItemCount() > 0) {
+		button_sizer->Add(grid, 0, wxTOP, 6);
+	} else {
+		delete grid;
+	}
+}
+
+bool PaletteWindow::HasTilesetInAnyPalette(const std::string& tilesetName) const {
+	BrushPalettePanel* panels[] = { doodad_palette, terrain_palette, item_palette, raw_palette };
+	for (BrushPalettePanel* panel : panels) {
+		if (panel && panel->HasTileset(tilesetName)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool PaletteWindow::GoToTileset(const std::string& tilesetName) {
+	// Prefer the Doodad version of the tileset, then fall back to the other
+	// brush palettes that can hold the same tileset name.
+	const struct {
+		PaletteType type;
+		BrushPalettePanel* panel;
+	} order[] = {
+		{ TILESET_DOODAD, doodad_palette },
+		{ TILESET_TERRAIN, terrain_palette },
+		{ TILESET_ITEM, item_palette },
+		{ TILESET_RAW, raw_palette },
+	};
+
+	for (const auto& target : order) {
+		if (target.panel && target.panel->HasTileset(tilesetName)) {
+			ShowPalettePage(target.type);
+			target.panel->SelectTileset(tilesetName);
+			return true;
+		}
+	}
+	return false;
 }
 
 PalettePanel* PaletteWindow::CreateTerrainPalette(wxWindow* parent, const TilesetContainer& tilesets) {

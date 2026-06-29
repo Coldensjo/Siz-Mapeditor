@@ -216,6 +216,31 @@ PaletteType BrushPalettePanel::GetType() const {
 	return palette_type;
 }
 
+bool BrushPalettePanel::HasTileset(const std::string& tilesetName) const {
+	if (!choicebook) {
+		return false;
+	}
+	for (size_t iz = 0; iz < choicebook->GetPageCount(); ++iz) {
+		if (choicebook->GetPageText(iz).ToStdString() == tilesetName) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool BrushPalettePanel::SelectTileset(const std::string& tilesetName) {
+	if (!choicebook) {
+		return false;
+	}
+	for (size_t iz = 0; iz < choicebook->GetPageCount(); ++iz) {
+		if (choicebook->GetPageText(iz).ToStdString() == tilesetName) {
+			choicebook->SetSelection(iz);
+			return true;
+		}
+	}
+	return false;
+}
+
 void BrushPalettePanel::SetListType(BrushListType ltype) {
 	if (!choicebook) {
 		return;

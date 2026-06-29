@@ -222,6 +222,11 @@ public:
 		return choicebook;
 	}
 
+	// Returns true if this palette has a tileset page with the given name.
+	bool HasTileset(const std::string& tilesetName) const;
+	// Selects the tileset page with the given name. Returns false if absent.
+	bool SelectTileset(const std::string& tilesetName);
+
 	// Refreshes the page belonging to the given tileset so a freshly added item
 	// shows up, without rebuilding the whole palette. Only the currently visible
 	// page is reloaded immediately; others are flagged to reload when next shown.
