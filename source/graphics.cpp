@@ -189,7 +189,8 @@ GraphicManager::GraphicManager() :
 	has_frame_durations(false),
 	has_frame_groups(false),
 	loaded_textures(0),
-	lastclean(0) {
+	lastclean(0),
+	warning_sign_texture(0) {
 	animation_timer = newd wxStopWatch();
 	animation_timer->Start();
 }
@@ -219,6 +220,42 @@ GLuint GraphicManager::getFreeTextureID() {
 	return id_counter++; // This should (hopefully) never run out
 }
 
+GLuint GraphicManager::getWarningSignTexture() {
+	if (warning_sign_texture != 0) {
+		return warning_sign_texture;
+	}
+
+	wxMemoryInputStream stream(exclamation_png, sizeof(exclamation_png));
+	wxImage image(stream, wxBITMAP_TYPE_PNG);
+	if (!image.IsOk()) {
+		return 0;
+	}
+
+	const int width = image.GetWidth();
+	const int height = image.GetHeight();
+	const uint8_t* rgb = image.GetData();
+	const uint8_t* alpha = image.HasAlpha() ? image.GetAlpha() : nullptr;
+
+	std::vector<uint8_t> rgba(size_t(width) * height * 4);
+	for (int i = 0; i < width * height; ++i) {
+		rgba[i * 4 + 0] = rgb[i * 3 + 0];
+		rgba[i * 4 + 1] = rgb[i * 3 + 1];
+		rgba[i * 4 + 2] = rgb[i * 3 + 2];
+		rgba[i * 4 + 3] = alpha ? alpha[i] : 255;
+	}
+
+	const GLuint texture = getFreeTextureID();
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // Nearest-neighbor: no anti-aliasing
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // Nearest-neighbor: no anti-aliasing
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+
+	warning_sign_texture = texture;
+	return warning_sign_texture;
+}
+
 void GraphicManager::clear() {
 	SpriteMap new_sprite_space;
 	for (SpriteMap::iterator iter = sprite_space.begin(); iter != sprite_space.end(); ++iter) {
@@ -242,6 +279,11 @@ void GraphicManager::clear() {
 	loaded_textures = 0;
 	lastclean = time(nullptr);
 	spritefile = "";
+
+	if (warning_sign_texture != 0) {
+		glDeleteTextures(1, &warning_sign_texture);
+		warning_sign_texture = 0;
+	}
 
 	unloaded = true;
 }

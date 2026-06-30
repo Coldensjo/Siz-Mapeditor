@@ -42,6 +42,7 @@ extern unsigned char door_quest_png[764];
 extern unsigned char door_quest_small_png[552];
 extern unsigned char eraser_png[878];
 extern unsigned char eraser_small_png[667];
+extern unsigned char exclamation_png[256];
 extern unsigned char gem_edit_png[697];
 extern unsigned char gem_move_png[662];
 extern unsigned char no_logout_png[782];

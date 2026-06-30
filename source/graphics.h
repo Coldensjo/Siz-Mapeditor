@@ -290,6 +290,10 @@ public:
 	// Get an unused texture id (this is acquired by simply increasing a value starting from 0x10000000)
 	GLuint getFreeTextureID();
 
+	// Lazily uploads the embedded exclamation.png to a GL texture and returns its id (0 on failure).
+	// Used as the map-canvas warning marker for invalid ramp/door placement.
+	GLuint getWarningSignTexture();
+
 	// This is part of the binary
 	bool loadEditorSprites();
 	// Metadata should be loaded first
@@ -340,6 +344,8 @@ private:
 
 	int loaded_textures;
 	int lastclean;
+
+	GLuint warning_sign_texture; // 0 until first use; see getWarningSignTexture()
 
 	wxStopWatch* animation_timer;
 

@@ -34,10 +34,11 @@ wxBoxSizer* CreateBrowsePathRow(wxWindow* parent, wxTextCtrl** pathOut, const wx
 	rowSizer->Add(browseBtn, 0, wxLEFT, 6);
 	(*pathOut)->SetToolTip(tooltip);
 
-	browseBtn->Bind(wxEVT_BUTTON, [parent, pathOut](wxCommandEvent&) {
-		wxDirDialog dlg(parent, "Select directory", (*pathOut)->GetValue());
+	wxTextCtrl* pathCtrl = *pathOut;
+	browseBtn->Bind(wxEVT_BUTTON, [parent, pathCtrl](wxCommandEvent&) {
+		wxDirDialog dlg(parent, "Select directory", pathCtrl->GetValue());
 		if (dlg.ShowModal() == wxID_OK) {
-			(*pathOut)->SetValue(dlg.GetPath());
+			pathCtrl->SetValue(dlg.GetPath());
 		}
 	});
 
@@ -52,10 +53,11 @@ wxBoxSizer* CreateBrowseFileRow(wxWindow* parent, wxTextCtrl** pathOut, const wx
 	rowSizer->Add(browseBtn, 0, wxLEFT, 6);
 	(*pathOut)->SetToolTip(tooltip);
 
-	browseBtn->Bind(wxEVT_BUTTON, [parent, pathOut, wildcard](wxCommandEvent&) {
-		wxFileDialog dlg(parent, "Select file", "", (*pathOut)->GetValue(), wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+	wxTextCtrl* pathCtrl = *pathOut;
+	browseBtn->Bind(wxEVT_BUTTON, [parent, pathCtrl, wildcard](wxCommandEvent&) {
+		wxFileDialog dlg(parent, "Select file", "", pathCtrl->GetValue(), wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 		if (dlg.ShowModal() == wxID_OK) {
-			(*pathOut)->SetValue(dlg.GetPath());
+			pathCtrl->SetValue(dlg.GetPath());
 		}
 	});
 

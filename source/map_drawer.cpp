@@ -209,11 +209,16 @@ bool tileHasInvalidRamp(const Tile* tile, const BaseMap& map) {
 	return false;
 }
 
-bool isDoorItem(const Item* item) {
+// Only "real" doors (normal/locked/quest/magic) are walkable passages that must
+// stay reachable, so a blocking item beneath one is a genuine mistake. Archways,
+// windows and hatch windows share the OTB "door" item group but are decorative
+// wall pieces -- they must not raise the door-on-blocking warning.
+bool isRealDoorItem(const Item* item) {
 	if (!item) {
 		return false;
 	}
-	return item->isDoor() || item->isBrushDoor();
+	const Door* door = item->asDoor();
+	return door && door->isRealDoor();
 }
 
 bool tileHasDoorOnBlockingItem(const Tile* tile) {
@@ -224,7 +229,7 @@ bool tileHasDoorOnBlockingItem(const Tile* tile) {
 	const int stackSize = getItemStackSize(tile);
 	for (int i = 0; i < stackSize; ++i) {
 		Item* door = tile->getItemAt(i);
-		if (!door || !isDoorItem(door)) {
+		if (!door || !isRealDoorItem(door)) {
 			continue;
 		}
 
@@ -1850,10 +1855,15 @@ void MapDrawer::DrawRampWarningIcons() {
 		return;
 	}
 
+	const GLuint warningTexture = g_gui.gfx.getWarningSignTexture();
+	if (warningTexture == 0) {
+		return;
+	}
+
 	const GLboolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
 	glEnable(GL_TEXTURE_2D);
 	for (const MapRampWarningMarker& marker : ramp_warning_markers) {
-		BlitSpriteType(marker.draw_x, marker.draw_y, SPRITE_WARNING_SIGN, 255, 255, 64, 220);
+		glBlitTexture(marker.draw_x, marker.draw_y, warningTexture, 255, 255, 255, 220);
 	}
 	if (!textureWasEnabled) {
 		glDisable(GL_TEXTURE_2D);
