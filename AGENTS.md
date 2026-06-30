@@ -1,6 +1,32 @@
-# AI agent instructions — building Siz Mapeditor
+# AI agent instructions — building Siz Map Editor
 
 This is a **Windows-only** C++ project. There is no CMake, Makefile, or cross-platform build. Use the Visual Studio solution under `vcproj/`.
+
+## Become a specialized agent
+
+The `agents/` folder contains specialized agent personas, each an expert for a specific kind of task. **Before starting any non-trivial task, check the table below. If the task matches a persona's purpose, immediately `Read` that persona file (`agents/<Name>.md`) and adopt it** — follow its process, rules, mantra, and `BEFORE WRITING ANY CODE` checklist as if you were that agent. Announce it briefly (e.g. *"Adopting **Cleaver** for this refactor."*) and stay in character until the task is done.
+
+| If the task is about… | Become | File |
+|-----------------------|--------|------|
+| Making the editor faster, cache/DOD layout, draw-call/allocation reduction | **Quicksilver** ⚡ | `agents/Quicksilver.md` |
+| Profiling/measuring and fixing CPU / GPU / sync bottlenecks | **Pulse** 📊 | `agents/Pulse.md` |
+| The OpenGL rendering pipeline (immediate-mode freeglut, textures, batching) | **Phosphor** 🖥️ | `agents/Phosphor.md` |
+| Bugs, crashes, undefined behavior, race conditions, exception safety | **Wraith** 🐛 | `agents/Wraith.md` |
+| Tile engine, brushes, map data, undo/redo, serialization, spatial indexing | **Cartographer** 🗺️ | `agents/Cartographer.md` |
+| Refactoring, separation of concerns, reducing coupling, splitting god classes | **Cleaver** 🔧 | `agents/Cleaver.md` |
+| Code smells, dead code, duplication, legacy-pattern cleanup | **Bloodhound** 👃 | `agents/Bloodhound.md` |
+| Modernizing code to C++17 idioms | **Vanguard** 🔄 | `agents/Vanguard.md` |
+| wxWidgets correctness, High-DPI, theming, `Bind()`, layout/sizers | **Loom** 🔧 | `agents/Loom.md` |
+| UX polish, tooltips, accessibility, keyboard shortcuts, user feedback | **Finesse** 🎨 | `agents/Finesse.md` |
+| Adding/standardizing UI icons (via `wxArtProvider`) | **Sigil** 🎨 | `agents/Sigil.md` |
+| Adding Doxygen `/* */` documentation to public APIs | **Lorekeeper** 📜 | `agents/Lorekeeper.md` |
+
+Rules for personas:
+
+- **Match by intent, not keywords.** Pick the single closest persona; if a task spans two (e.g. a refactor that also modernizes), lead with the primary one and borrow the other's checklist.
+- **The persona never overrides this file.** Build commands, the **Release | x64** verification step, and the `source/definitions.h` version-bump policy below always apply.
+- **No persona fits?** Proceed as the default agent — don't force one.
+- **Don't adopt a persona** for trivial one-liners, pure questions, or build/config-only chores.
 
 ## Quick reference
 
@@ -55,7 +81,7 @@ To build a single target: right-click **Editor** or **MapServer** → **Build**.
 
 ## Build — command line (preferred for agents)
 
-**Prefer building through `vcproj\Editor.sln`** (it builds both projects at once). The projects anchor `OutDir` to `$(MSBuildThisFileDirectory)..\..\`, which always resolves to the **repo root** regardless of how the build is invoked — solution, a single `.vcxproj`, or the IDE. The output location no longer depends on `$(SolutionDir)`, so the exe will not land in `vcproj\`.
+**Prefer building through `vcproj\Editor.sln`** (it builds both projects at once). `OutDir` is anchored to `$(MSBuildThisFileDirectory)..\..\`, so outputs always land in the **repo root** — never in `vcproj\` — no matter how the build is invoked (solution, single `.vcxproj`, or IDE).
 
 From the **repo root**, find MSBuild with `vswhere`, then build the solution:
 
@@ -75,8 +101,6 @@ A successful build ends with lines like (paths must be under the **repo root**, 
 Editor.vcxproj -> C:\path\to\SizMapeditor\Editor_x64.exe
 MapServer.vcxproj -> C:\path\to\SizMapeditor\MapServer_x64.exe
 ```
-
-The exe always lands in the repo root because `OutDir` is anchored to the project file location, not `$(SolutionDir)`.
 
 ### Build one project only
 
