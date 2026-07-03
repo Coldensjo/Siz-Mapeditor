@@ -87,7 +87,7 @@ public:
 	GLuint getHardwareID(int _x, int _y, int _layer, int _subtype, int _pattern_x, int _pattern_y, int _pattern_z, int _frame);
 	GLuint getHardwareID(int _x, int _y, int _dir, int _addon, int _pattern_z, const Outfit& _outfit, int _frame); // CreatureDatabase
 	virtual void DrawTo(wxDC* dc, SpriteSize sz, int start_x, int start_y, int width = -1, int height = -1);
-	wxImage getCreatureImage(int dir, int addon, int pattern_z, const Outfit& outfit);
+	wxImage getCreatureImage(int dir, int addon, int pattern_z, const Outfit& outfit, int frame = 0);
 
 	virtual void unloadDC();
 

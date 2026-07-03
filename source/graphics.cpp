@@ -1176,7 +1176,7 @@ wxMemoryDC* GameSprite::getDC(SpriteSize size) {
 	return dc[size];
 }
 
-wxImage GameSprite::getCreatureImage(int dir, int addon, int pattern_z, const Outfit& outfit) {
+wxImage GameSprite::getCreatureImage(int dir, int addon, int pattern_z, const Outfit& outfit, int frame) {
 	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
 
 	const int image_size = std::max<int>(width, height) * SPRITE_PIXELS;
@@ -1196,7 +1196,7 @@ wxImage GameSprite::getCreatureImage(int dir, int addon, int pattern_z, const Ou
 
 	for (uint8_t w = 0; w < width; w++) {
 		for (uint8_t h = 0; h < height; h++) {
-			const int i = getIndex(w, h, 0, dir, addon, pattern_z, 0);
+			const int i = getIndex(w, h, 0, dir, addon, pattern_z, frame);
 			uint8_t* data = nullptr;
 			if (layers > 1) {
 				data = getTemplateImage(i, outfit)->getRGBData();

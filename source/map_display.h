@@ -67,6 +67,7 @@ public:
 	void OnCopy(wxCommandEvent& event);
 	void OnCopyPosition(wxCommandEvent& event);
 	void OnCopyRaidArea(wxCommandEvent& event);
+	void OnExportSpritesheet(wxCommandEvent& event);
 	void OnCopyServerId(wxCommandEvent& event);
 	void OnCopyClientId(wxCommandEvent& event);
 	void OnCopyName(wxCommandEvent& event);

@@ -22,6 +22,8 @@
 #include <limits>
 #include <algorithm>
 #include <map>
+#include <set>
+#include <vector>
 #include <wx/wfstream.h>
 #include <wx/textdlg.h>
 #include <wx/msgdlg.h>
@@ -334,6 +336,7 @@ EVT_MENU(MAP_POPUP_MENU_CUT, MapCanvas::OnCut)
 EVT_MENU(MAP_POPUP_MENU_COPY, MapCanvas::OnCopy)
 EVT_MENU(MAP_POPUP_MENU_COPY_POSITION, MapCanvas::OnCopyPosition)
 EVT_MENU(MAP_POPUP_MENU_COPY_RAID_AREA, MapCanvas::OnCopyRaidArea)
+EVT_MENU(MAP_POPUP_MENU_EXPORT_SPRITESHEET, MapCanvas::OnExportSpritesheet)
 EVT_MENU(MAP_POPUP_MENU_PASTE, MapCanvas::OnPaste)
 EVT_MENU(MAP_POPUP_MENU_DELETE, MapCanvas::OnDelete)
 EVT_MENU(MAP_POPUP_MENU_ADD_COMMENT, MapCanvas::OnAddComment)
@@ -2428,6 +2431,261 @@ void MapCanvas::OnCopyRaidArea(wxCommandEvent& WXUNUSED(event)) {
 	}
 }
 
+namespace {
+
+// Composites the base outfit sprite, its mount (if any), and all currently active addons for one
+// direction/animation frame, mirroring DrawCreatureBrushInSlot's layering (palette_creature.cpp).
+wxImage ComposeCreatureFrame(GameSprite* spr, const Outfit& outfit, int dir, int frame) {
+	wxImage image;
+	int pattern_z = 0;
+	if (outfit.lookMount != 0) {
+		if (GameSprite* mountSpr = g_gui.gfx.getCreatureSprite(outfit.lookMount)) {
+			Outfit mountOutfit;
+			mountOutfit.lookType = outfit.lookMount;
+			mountOutfit.lookHead = outfit.lookMountHead;
+			mountOutfit.lookBody = outfit.lookMountBody;
+			mountOutfit.lookLegs = outfit.lookMountLegs;
+			mountOutfit.lookFeet = outfit.lookMountFeet;
+			image = mountSpr->getCreatureImage(dir, 0, 0, mountOutfit, frame);
+			pattern_z = std::min<int>(1, spr->pattern_z - 1);
+		}
+	}
+
+	for (int addon = 0; addon < spr->pattern_y; ++addon) {
+		if (addon > 0 && !(outfit.lookAddon & (1 << (addon - 1)))) {
+			continue;
+		}
+		wxImage part = spr->getCreatureImage(dir, addon, pattern_z, outfit, frame);
+		if (!image.IsOk()) {
+			image = part;
+		} else if (part.IsOk()) {
+			image.Paste(part, 0, 0);
+		}
+	}
+
+	return image;
+}
+
+// Builds a grid of the creature's full outfit with directions running left-to-right (North, East,
+// South, West - matching the Direction enum order) and animation frames stacked top-to-bottom,
+// so the export includes every walking frame, not just the single pose it faces on the map.
+wxBitmap BuildCreatureSheet(GameSprite* spr, const Outfit& outfit, const wxColour& transparentKey) {
+	const int directions = std::max<int>(1, std::min<int>(spr->pattern_x, DIRECTION_LAST - DIRECTION_FIRST + 1));
+	const int frameCount = std::max<int>(1, spr->frames);
+	const int cellWidth = std::max<int>(1, spr->width) * TileSize;
+	const int cellHeight = std::max<int>(1, spr->height) * TileSize;
+
+	wxBitmap sheet(cellWidth * directions, cellHeight * frameCount, 24);
+	wxMemoryDC dc;
+	dc.SelectObject(sheet);
+	dc.SetBackground(wxBrush(transparentKey));
+	dc.Clear();
+
+	for (int frame = 0; frame < frameCount; ++frame) {
+		for (int dir = 0; dir < directions; ++dir) {
+			wxImage frameImage = ComposeCreatureFrame(spr, outfit, dir, frame);
+			if (!frameImage.IsOk()) {
+				continue;
+			}
+			if (frameImage.GetWidth() != cellWidth || frameImage.GetHeight() != cellHeight) {
+				frameImage = frameImage.GetSubImage(wxRect(0, 0, cellWidth, cellHeight));
+			}
+			wxBitmap cellBitmap(frameImage, -1);
+			dc.DrawBitmap(cellBitmap, dir * cellWidth, frame * cellHeight, true);
+		}
+	}
+
+	dc.SelectObject(wxNullBitmap);
+	return sheet;
+}
+
+} // namespace
+
+void MapCanvas::OnExportSpritesheet(wxCommandEvent& WXUNUSED(event)) {
+	if (editor.selection.size() == 0) {
+		return;
+	}
+
+	Position minPos = editor.selection.minPosition();
+
+	// Same colour key GameSprite uses for transparency, so masked-out pixels convert cleanly to PNG alpha.
+	const wxColour transparentKey(0xFF, 0x00, 0xFF);
+
+	struct SpriteDraw {
+		GameSprite* sprite; // set for items; null for creatures (use image instead)
+		wxImage image;
+		int pixelX;
+		int pixelY;
+		int pixelWidth;
+		int pixelHeight;
+	};
+
+	struct CreatureSheetSource {
+		GameSprite* sprite;
+		Outfit outfit;
+	};
+
+	std::vector<SpriteDraw> draws;
+	std::vector<CreatureSheetSource> creatureSheetSources;
+	std::set<std::string> names;
+
+	int canvasMinX = 0, canvasMinY = 0, canvasMaxX = 0, canvasMaxY = 0;
+	bool first = true;
+
+	auto extendCanvas = [&](int pixelX, int pixelY, int pixelWidth, int pixelHeight) {
+		if (first) {
+			canvasMinX = pixelX;
+			canvasMinY = pixelY;
+			canvasMaxX = pixelX + pixelWidth;
+			canvasMaxY = pixelY + pixelHeight;
+			first = false;
+		} else {
+			canvasMinX = std::min(canvasMinX, pixelX);
+			canvasMinY = std::min(canvasMinY, pixelY);
+			canvasMaxX = std::max(canvasMaxX, pixelX + pixelWidth);
+			canvasMaxY = std::max(canvasMaxY, pixelY + pixelHeight);
+		}
+	};
+
+	for (Tile* tile : editor.selection) {
+		// A multi-tile sprite is anchored so its bottom-right cell sits on the item's own tile,
+		// extending up and to the left (see MapDrawer::BlitSpriteType) - so its top-left pixel
+		// can fall outside this tile's own 32x32 cell, and outside the selection's tile bounds.
+		int tilePixelRight = (tile->getX() - minPos.x + 1) * TileSize;
+		int tilePixelBottom = (tile->getY() - minPos.y + 1) * TileSize;
+
+		for (Item* item : tile->getSelectedItems()) {
+			GameSprite* sprite = g_items.getItemType(item->getID()).sprite;
+			if (!sprite) {
+				continue;
+			}
+
+			int pixelWidth = std::max<int>(1, sprite->width) * TileSize;
+			int pixelHeight = std::max<int>(1, sprite->height) * TileSize;
+			int pixelX = tilePixelRight - pixelWidth;
+			int pixelY = tilePixelBottom - pixelHeight;
+
+			draws.push_back({ sprite, wxImage(), pixelX, pixelY, pixelWidth, pixelHeight });
+
+			std::string name = item->getName();
+			if (!name.empty()) {
+				names.insert(name);
+			}
+
+			extendCanvas(pixelX, pixelY, pixelWidth, pixelHeight);
+		}
+
+		if (tile->creature && tile->creature->isSelected()) {
+			Creature* creature = tile->creature;
+			const Outfit& outfit = creature->getLookType();
+
+			if (outfit.lookItem != 0) {
+				GameSprite* sprite = g_items.getItemType(outfit.lookItem).sprite;
+				if (sprite) {
+					int pixelWidth = std::max<int>(1, sprite->width) * TileSize;
+					int pixelHeight = std::max<int>(1, sprite->height) * TileSize;
+					int pixelX = tilePixelRight - pixelWidth;
+					int pixelY = tilePixelBottom - pixelHeight;
+
+					draws.push_back({ sprite, wxImage(), pixelX, pixelY, pixelWidth, pixelHeight });
+					extendCanvas(pixelX, pixelY, pixelWidth, pixelHeight);
+				}
+			} else if (GameSprite* spr = g_gui.gfx.getCreatureSprite(outfit.lookType)) {
+				// The creature's full directions/frames grid (built below) already covers its
+				// current pose, so it isn't placed into the positional item scene as well.
+				creatureSheetSources.push_back({ spr, outfit });
+			}
+
+			std::string name = creature->getName();
+			if (!name.empty()) {
+				names.insert(name);
+			}
+		}
+	}
+
+	if (draws.empty() && creatureSheetSources.empty()) {
+		return;
+	}
+
+	// Each selected creature's full directions/frames grid is stacked above the positional item
+	// scene, in that order (creature sheets first, then the placed items below).
+	std::vector<wxBitmap> blocks;
+	for (const CreatureSheetSource& source : creatureSheetSources) {
+		blocks.push_back(BuildCreatureSheet(source.sprite, source.outfit, transparentKey));
+	}
+
+	if (!draws.empty()) {
+		int sceneWidth = canvasMaxX - canvasMinX;
+		int sceneHeight = canvasMaxY - canvasMinY;
+
+		wxBitmap scene(sceneWidth, sceneHeight, 24);
+		wxMemoryDC dc;
+		dc.SelectObject(scene);
+		dc.SetBackground(wxBrush(transparentKey));
+		dc.Clear();
+
+		for (const SpriteDraw& draw : draws) {
+			int drawX = draw.pixelX - canvasMinX;
+			int drawY = draw.pixelY - canvasMinY;
+			if (draw.sprite) {
+				draw.sprite->DrawTo(&dc, SPRITE_SIZE_ACTUAL, drawX, drawY, draw.pixelWidth, draw.pixelHeight);
+			} else {
+				wxBitmap creatureBitmap(draw.image, -1);
+				dc.DrawBitmap(creatureBitmap, drawX, drawY, true);
+			}
+		}
+
+		dc.SelectObject(wxNullBitmap);
+		blocks.push_back(scene);
+	}
+
+	// No gap between blocks - keeps the sheet's total height an exact multiple of tile pixels,
+	// so nothing drifts off a tile-aligned grid.
+	const int blockGap = 0;
+	int finalWidth = 0;
+	int finalHeight = 0;
+	for (const wxBitmap& block : blocks) {
+		finalWidth = std::max(finalWidth, block.GetWidth());
+		finalHeight += (finalHeight > 0 ? blockGap : 0) + block.GetHeight();
+	}
+
+	wxBitmap finalBitmap(finalWidth, finalHeight, 24);
+	wxMemoryDC finalDc;
+	finalDc.SelectObject(finalBitmap);
+	finalDc.SetBackground(wxBrush(transparentKey));
+	finalDc.Clear();
+
+	int runningY = 0;
+	for (const wxBitmap& block : blocks) {
+		finalDc.DrawBitmap(block, 0, runningY);
+		runningY += block.GetHeight() + blockGap;
+	}
+	finalDc.SelectObject(wxNullBitmap);
+
+	wxString defaultName;
+	for (const std::string& name : names) {
+		if (!defaultName.IsEmpty()) {
+			defaultName += " ";
+		}
+		defaultName += wxstr(name);
+	}
+	if (defaultName.IsEmpty()) {
+		defaultName = "spritesheet";
+	}
+	static const wxString invalidChars = wxT("\\/:*?\"<>|");
+	for (size_t i = 0; i < invalidChars.size(); ++i) {
+		defaultName.Replace(wxString(invalidChars[i]), wxT("_"));
+	}
+	defaultName += ".png";
+
+	wxFileDialog dialog(this, "Export Spritesheet", "", defaultName, "PNG files (*.png)|*.png", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+	if (dialog.ShowModal() == wxID_OK) {
+		wxImage image = finalBitmap.ConvertToImage();
+		image.SetMaskColour(transparentKey.Red(), transparentKey.Green(), transparentKey.Blue());
+		image.SaveFile(dialog.GetPath(), wxBITMAP_TYPE_PNG);
+	}
+}
+
 void MapCanvas::OnCopyServerId(wxCommandEvent& WXUNUSED(event)) {
 	ASSERT(editor.selection.size() == 1);
 
@@ -3021,6 +3279,9 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 
 	wxMenuItem* copyRaidAreaItem = Append(MAP_POPUP_MENU_COPY_RAID_AREA, "Copy Raid Area", "Copy the selection bounds for raid scripts");
 	copyRaidAreaItem->Enable(anything_selected);
+
+	wxMenuItem* exportSpritesheetItem = Append(MAP_POPUP_MENU_EXPORT_SPRITESHEET, "Export &Spritesheet...", "Export the selected items as a PNG spritesheet, preserving their layout");
+	exportSpritesheetItem->Enable(anything_selected);
 
 	wxMenuItem* pasteItem = Append(MAP_POPUP_MENU_PASTE, "&Paste\tCTRL+V", "Paste items in the copybuffer here");
 	pasteItem->Enable(editor.copybuffer.canPaste() && allow_clipboard);
