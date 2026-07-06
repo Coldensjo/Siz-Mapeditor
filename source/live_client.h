@@ -94,6 +94,7 @@ public:
 	void sendReady();
 	void sendCommentAdd(const Position& pos, const std::string& text);
 	void sendCommentRemove(uint32_t commentId);
+	void sendCommentEdit(uint32_t commentId, const std::string& text);
 	void sendPing(const Position& pos);
 
 	void warnIfBlockedBrushUse(const Brush* brush);

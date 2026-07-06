@@ -102,6 +102,8 @@ public: // Functions
 	bool showMapCommentsAt(const Position& pos);
 	std::string getMapCommentAuthor() const;
 	bool promptAddMapComment(const Position& pos);
+	bool editMapComment(uint32_t commentId, const std::string& newText);
+	bool promptEditMapComment(uint32_t commentId);
 
 	uint16_t getMapWidth() const {
 		return map.width;

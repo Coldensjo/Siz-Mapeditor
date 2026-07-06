@@ -481,6 +481,18 @@ void LiveClient::sendCommentRemove(uint32_t commentId) {
 	send(message);
 }
 
+void LiveClient::sendCommentEdit(uint32_t commentId, const std::string& text) {
+	if (text.empty()) {
+		return;
+	}
+
+	NetworkMessage message;
+	message.write<uint8_t>(PACKET_COMMENT_EDIT);
+	message.write<uint32_t>(commentId);
+	message.write<std::string>(text);
+	send(message);
+}
+
 void LiveClient::sendPing(const Position& pos) {
 	NetworkMessage message;
 	message.write<uint8_t>(PACKET_CLIENT_PING);
@@ -792,6 +804,12 @@ void LiveClient::parseHello(NetworkMessage& message) {
 	}
 
 	startNodeRetryTimer();
+
+	// The new tab isn't guaranteed to fire the notebook's page-changed event (it
+	// won't if this is the very first tab), which is the only other place that
+	// refreshes the palettes. Without this, live-only palette buttons (e.g.
+	// Comments) can stay hidden after joining until the user switches tabs.
+	g_gui.RefreshPalettes(&editor->getMap());
 
 	logMessage("Connected to live map.");
 	g_gui.UpdateMenubar();
@@ -1186,6 +1204,7 @@ void LiveClient::parseCommentList(NetworkMessage& message) {
 
 	editor->getMap().getComments().setAll(std::move(loaded), 1);
 	g_gui.RefreshView();
+	g_gui.RefreshCommentsWindow();
 }
 
 void LiveClient::parseComment(NetworkMessage& message) {
@@ -1195,6 +1214,7 @@ void LiveClient::parseComment(NetworkMessage& message) {
 
 	editor->getMap().getComments().upsert(readMapComment(message));
 	g_gui.RefreshView();
+	g_gui.RefreshCommentsWindow();
 }
 
 void LiveClient::parseCommentRemoved(NetworkMessage& message) {
@@ -1205,6 +1225,7 @@ void LiveClient::parseCommentRemoved(NetworkMessage& message) {
 	const uint32_t commentId = message.read<uint32_t>();
 	editor->getMap().getComments().removeById(commentId);
 	g_gui.RefreshView();
+	g_gui.RefreshCommentsWindow();
 }
 
 void LiveClient::parseStartOperation(NetworkMessage& message) {

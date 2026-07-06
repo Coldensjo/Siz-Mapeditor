@@ -105,6 +105,7 @@ protected:
 	void parseClientPing(NetworkMessage& message);
 	void parseCommentAdd(NetworkMessage& message);
 	void parseCommentRemove(NetworkMessage& message);
+	void parseCommentEdit(NetworkMessage& message);
 
 	//
 	NetworkMessage readMessage;

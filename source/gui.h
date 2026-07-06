@@ -49,6 +49,7 @@ class MapWindow;
 class MapCanvas;
 
 class SearchResultWindow;
+class CommentsWindow;
 class MinimapWindow;
 class LiveSocket;
 class PaletteWindow;
@@ -212,6 +213,12 @@ public:
 	// Search Results
 	SearchResultWindow* ShowSearchWindow();
 	void HideSearchWindow();
+
+	// Map Comments (live mapping)
+	CommentsWindow* ShowCommentsWindow();
+	void HideCommentsWindow();
+	bool IsCommentsWindowShown() const;
+	void RefreshCommentsWindow();
 
 	// Minimap
 	void CreateMinimap();
@@ -434,6 +441,7 @@ public:
 	MinimapWindow* minimap;
 	DCButton* gem; // The small gem in the lower-right corner
 	SearchResultWindow* search_result_window;
+	CommentsWindow* comments_window;
 	GraphicManager gfx;
 
 	BaseMap* secondary_map; // A buffer map

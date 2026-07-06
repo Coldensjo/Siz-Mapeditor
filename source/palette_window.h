@@ -24,6 +24,7 @@ class BrushPalettePanel;
 class CreaturePalettePanel;
 class HousePalettePanel;
 class PaletteButton;
+class wxBitmapButton;
 
 class PaletteWindow : public wxPanel {
 public:
@@ -99,6 +100,9 @@ protected:
 	PaletteButton* house_button;
 	PaletteButton* creature_button;
 	PaletteButton* raw_button;
+	// Live-mapping-only shortcut to browse/jump to map comments; hidden unless
+	// the active editor is a live session (see OnUpdate).
+	wxBitmapButton* comments_button;
 	PaletteType current_page;
 
 	BrushPalettePanel* terrain_palette;

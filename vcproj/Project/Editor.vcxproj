@@ -260,6 +260,8 @@
     <ClCompile Include="..\..\source\old_properties_window.cpp" />
     <ClInclude Include="..\..\source\result_window.h" />
     <ClCompile Include="..\..\source\result_window.cpp" />
+    <ClInclude Include="..\..\source\comments_window.h" />
+    <ClCompile Include="..\..\source\comments_window.cpp" />
     <ClInclude Include="..\..\source\map_display.h" />
     <ClCompile Include="..\..\source\map_display.cpp" />
     <ClInclude Include="..\..\source\map_drawer.h" />

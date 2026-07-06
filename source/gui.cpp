@@ -35,6 +35,7 @@
 
 #include "common_windows.h"
 #include "result_window.h"
+#include "comments_window.h"
 #include "minimap_window.h"
 #include "palette_window.h"
 #include "map_display.h"
@@ -471,6 +472,7 @@ GUI::GUI() :
 	minimap(nullptr),
 	gem(nullptr),
 	search_result_window(nullptr),
+	comments_window(nullptr),
 	secondary_map(nullptr),
 	doodad_buffer_map(nullptr),
 
@@ -1587,6 +1589,35 @@ SearchResultWindow* GUI::ShowSearchWindow() {
 	}
 	aui_manager->Update();
 	return search_result_window;
+}
+
+void GUI::HideCommentsWindow() {
+	if (comments_window) {
+		aui_manager->GetPane(comments_window).Show(false);
+		aui_manager->Update();
+	}
+}
+
+CommentsWindow* GUI::ShowCommentsWindow() {
+	if (comments_window == nullptr) {
+		comments_window = newd CommentsWindow(root);
+		aui_manager->AddPane(comments_window, wxAuiPaneInfo().Caption("Map Comments"));
+	} else {
+		aui_manager->GetPane(comments_window).Show();
+		comments_window->ReloadList();
+	}
+	aui_manager->Update();
+	return comments_window;
+}
+
+bool GUI::IsCommentsWindowShown() const {
+	return comments_window && aui_manager->GetPane(comments_window).IsShown();
+}
+
+void GUI::RefreshCommentsWindow() {
+	if (comments_window) {
+		comments_window->ReloadList();
+	}
 }
 
 //=============================================================================

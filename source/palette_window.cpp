@@ -30,6 +30,7 @@
 
 #include "house_brush.h"
 #include "map.h"
+#include "editor.h"
 
 namespace {
 
@@ -69,6 +70,7 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 	house_button(nullptr),
 	creature_button(nullptr),
 	raw_button(nullptr),
+	comments_button(nullptr),
 	terrain_palette(nullptr),
 	doodad_palette(nullptr),
 	item_palette(nullptr),
@@ -109,6 +111,20 @@ PaletteWindow::PaletteWindow(wxWindow* parent, const TilesetContainer& tilesets)
 	button_sizer->Add(house_button, 0, wxALL, 2);
 	button_sizer->Add(creature_button, 0, wxALL, 2);
 	button_sizer->Add(raw_button, 0, wxALL, 2);
+
+	// Live-mapping-only shortcut: browse all map comments, see who left them,
+	// jump to one, and edit/delete it. Hidden until OnUpdate finds a live editor.
+	comments_button = newd wxBitmapButton(this, wxID_ANY, LoadPaletteCategoryIcon("comments.png"));
+	comments_button->SetToolTip("Map Comments");
+	comments_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+		if (g_gui.IsCommentsWindowShown()) {
+			g_gui.HideCommentsWindow();
+		} else {
+			g_gui.ShowCommentsWindow();
+		}
+	});
+	comments_button->Hide();
+	button_sizer->Add(comments_button, 0, wxALL, 2);
 
 	// Add the tileset shortcut icons below the category buttons
 	CreateTilesetShortcutButtons(button_sizer);
@@ -739,6 +755,14 @@ void PaletteWindow::OnUpdate(Map* map) {
 	}
 	if (house_palette) {
 		house_palette->SetMap(map);
+	}
+	if (comments_button) {
+		Editor* editor = g_gui.GetCurrentEditor();
+		bool showComments = editor && editor->IsLive();
+		if (comments_button->IsShown() != showComments) {
+			comments_button->Show(showComments);
+			Layout();
+		}
 	}
 }
 

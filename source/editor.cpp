@@ -583,6 +583,7 @@ void Editor::addMapComment(const Position& pos, const std::string& text) {
 	}
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
 	}
 }
 
@@ -645,6 +646,60 @@ bool Editor::promptAddMapComment(const Position& pos) {
 	return true;
 }
 
+bool Editor::editMapComment(uint32_t commentId, const std::string& newText) {
+	if (newText.empty()) {
+		return false;
+	}
+
+	const MapComment* existing = map.comments.findById(commentId);
+	if (!existing) {
+		return false;
+	}
+
+	MapComment updated = *existing;
+	updated.text = newText;
+
+	if (IsLiveClient()) {
+		map.comments.upsert(updated);
+		live_client->sendCommentEdit(commentId, newText);
+		if (!g_gui.IsHeadless()) {
+			g_gui.RefreshView();
+			g_gui.RefreshCommentsWindow();
+		}
+		return true;
+	}
+
+	map.comments.upsert(updated);
+	map.doChange();
+	if (IsLiveServer()) {
+		live_server->broadcastComment(updated);
+	}
+	if (!g_gui.IsHeadless()) {
+		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
+	}
+	return true;
+}
+
+bool Editor::promptEditMapComment(uint32_t commentId) {
+	const MapComment* existing = map.comments.findById(commentId);
+	if (!existing) {
+		return false;
+	}
+
+	wxTextEntryDialog dlg(g_gui.root, "Edit comment:", "Edit Map Comment", wxstr(existing->text), wxOK | wxCANCEL | wxTE_MULTILINE);
+	if (dlg.ShowModal() != wxID_OK) {
+		return false;
+	}
+
+	const wxString text = dlg.GetValue().Trim(true).Trim(false);
+	if (text.empty()) {
+		return false;
+	}
+
+	return editMapComment(commentId, nstr(text));
+}
+
 bool Editor::removeMapComment(uint32_t commentId) {
 	if (IsLiveClient()) {
 		if (!map.comments.removeById(commentId)) {
@@ -653,6 +708,7 @@ bool Editor::removeMapComment(uint32_t commentId) {
 		live_client->sendCommentRemove(commentId);
 		if (!g_gui.IsHeadless()) {
 			g_gui.RefreshView();
+			g_gui.RefreshCommentsWindow();
 		}
 		return true;
 	}
@@ -667,6 +723,7 @@ bool Editor::removeMapComment(uint32_t commentId) {
 	}
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
 	}
 	return true;
 }

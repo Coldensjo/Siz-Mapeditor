@@ -269,6 +269,9 @@ void LivePeer::parseEditorPacket(NetworkMessage message) {
 			case PACKET_COMMENT_REMOVE:
 				parseCommentRemove(message);
 				break;
+			case PACKET_COMMENT_EDIT:
+				parseCommentEdit(message);
+				break;
 			default: {
 				livePeerLog(log, "Invalid editor packet received, connection severed.");
 				close();
@@ -754,6 +757,7 @@ void LivePeer::parseCommentAdd(NetworkMessage& message) {
 
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
 	}
 }
 
@@ -770,5 +774,31 @@ void LivePeer::parseCommentRemove(NetworkMessage& message) {
 
 	if (!g_gui.IsHeadless()) {
 		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
+	}
+}
+
+void LivePeer::parseCommentEdit(NetworkMessage& message) {
+	const uint32_t commentId = message.read<uint32_t>();
+	const std::string text = message.read<std::string>();
+	if (text.empty()) {
+		return;
+	}
+
+	Editor& editor = *server->getEditor();
+	const MapComment* existing = editor.getMap().getComments().findById(commentId);
+	if (!existing) {
+		return;
+	}
+
+	MapComment updated = *existing;
+	updated.text = text;
+	editor.getMap().getComments().upsert(updated);
+	editor.getMap().doChange();
+	server->broadcastComment(updated);
+
+	if (!g_gui.IsHeadless()) {
+		g_gui.RefreshView();
+		g_gui.RefreshCommentsWindow();
 	}
 }
