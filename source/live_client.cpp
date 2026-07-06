@@ -1125,6 +1125,22 @@ void LiveClient::parseClientList(NetworkMessage& message) {
 			break;
 		}
 	}
+
+	// Drop cursors for clients that are no longer connected. The server only ever
+	// pushes cursor *updates*, so without this a disconnected peer's cursor would
+	// stay rendered at its last position forever.
+	for (auto it = cursors.begin(); it != cursors.end();) {
+		const uint32_t id = it->first;
+		bool stillConnected = false;
+		for (const LiveParticipant& participant : participants) {
+			if (participant.id == id) {
+				stillConnected = true;
+				break;
+			}
+		}
+		it = stillConnected ? std::next(it) : cursors.erase(it);
+	}
+
 	requestViewportRefresh();
 	g_gui.RefreshView();
 	g_gui.UpdateMinimap();
