@@ -30,6 +30,14 @@
 #include <iostream>
 #include <vector>
 
+// How many chunks to keep queued ahead of the write that's actually in flight.
+// Chunk transfers used to enqueue one chunk, then wait for it to be written
+// before reading/enqueueing the next -- capping throughput at one chunk per
+// network round-trip regardless of available bandwidth, which dominated on
+// higher-latency links. Windowing lets the write queue (see doWrite()) keep
+// draining back-to-back instead of idling between chunks.
+static const size_t LIVE_TRANSFER_WINDOW = 8;
+
 static void livePeerLog(LiveLogTab* log, const wxString& message) {
 	std::cout << "[live] " << message.ToStdString() << std::endl;
 	std::cout.flush();
@@ -365,24 +373,32 @@ void LivePeer::parseHello(NetworkMessage& message) {
 
 void LivePeer::startAssetTransfer() {
 	assetFileIndex = 0;
-	sendNextAssetChunk();
+	assetChunksInFlight = 0;
+	pumpAssetTransfer();
 }
 
-void LivePeer::sendNextAssetChunk() {
-	if (assetFileIndex >= assetFiles.size()) {
+void LivePeer::pumpAssetTransfer() {
+	while (assetChunksInFlight < LIVE_TRANSFER_WINDOW && assetFileIndex < assetFiles.size()) {
+		if (!sendNextAssetChunk()) {
+			return; // error path already closed the connection
+		}
+	}
+
+	if (assetChunksInFlight == 0 && assetFileIndex >= assetFiles.size()) {
 		NetworkMessage doneMessage;
 		doneMessage.write<uint8_t>(PACKET_ASSET_FILES_DONE);
 		send(doneMessage);
-		return;
 	}
+}
 
+bool LivePeer::sendNextAssetChunk() {
 	if (!assetStream.is_open()) {
 		const LiveAssetFile& file = assetFiles[assetFileIndex];
 		assetStream.open(nstr(file.sourcePath.GetFullPath()), std::ios::binary);
 		if (!assetStream.is_open()) {
 			livePeerLog(log, "Failed to open asset file: " + file.sourcePath.GetFullPath());
 			close();
-			return;
+			return false;
 		}
 
 		assetBytesRemaining = file.size;
@@ -401,7 +417,7 @@ void LivePeer::sendNextAssetChunk() {
 	if (bytesRead <= 0) {
 		livePeerLog(log, "Failed while reading asset file for transfer.");
 		close();
-		return;
+		return false;
 	}
 
 	std::string chunk(assetChunkBuffer.data(), static_cast<size_t>(bytesRead));
@@ -410,22 +426,22 @@ void LivePeer::sendNextAssetChunk() {
 	NetworkMessage chunkMessage;
 	chunkMessage.write<uint8_t>(PACKET_ASSET_FILE_CHUNK);
 	chunkMessage.write<std::string>(chunk);
+	++assetChunksInFlight;
 	send(chunkMessage, [this]() {
-		if (assetBytesRemaining == 0) {
-			if (assetStream.is_open()) {
-				assetStream.close();
-			}
-
-			NetworkMessage endMessage;
-			endMessage.write<uint8_t>(PACKET_ASSET_FILE_END);
-			send(endMessage, [this]() {
-				++assetFileIndex;
-				sendNextAssetChunk();
-			});
-		} else {
-			sendNextAssetChunk();
-		}
+		--assetChunksInFlight;
+		pumpAssetTransfer();
 	});
+
+	if (assetBytesRemaining == 0) {
+		assetStream.close();
+
+		NetworkMessage endMessage;
+		endMessage.write<uint8_t>(PACKET_ASSET_FILE_END);
+		send(endMessage);
+		++assetFileIndex;
+	}
+
+	return true;
 }
 
 void LivePeer::sendUpdatePackage() {
@@ -455,27 +471,35 @@ void LivePeer::sendUpdatePackage() {
 
 void LivePeer::startUpdateTransfer() {
 	updateFileIndex = 0;
-	sendNextUpdateChunk();
+	updateChunksInFlight = 0;
+	pumpUpdateTransfer();
 }
 
-void LivePeer::sendNextUpdateChunk() {
-	if (updateFileIndex >= updateFiles.size()) {
+void LivePeer::pumpUpdateTransfer() {
+	while (updateChunksInFlight < LIVE_TRANSFER_WINDOW && updateFileIndex < updateFiles.size()) {
+		if (!sendNextUpdateChunk()) {
+			return; // error path already closed the connection
+		}
+	}
+
+	if (updateChunksInFlight == 0 && updateFileIndex >= updateFiles.size()) {
 		NetworkMessage doneMessage;
 		doneMessage.write<uint8_t>(PACKET_UPDATE_DONE);
 		// Close once the final packet has flushed; the client takes over from here.
 		send(doneMessage, [this]() {
 			close();
 		});
-		return;
 	}
+}
 
+bool LivePeer::sendNextUpdateChunk() {
 	if (!updateStream.is_open()) {
 		const LiveUpdateFile& file = updateFiles[updateFileIndex];
 		updateStream.open(nstr(file.sourcePath.GetFullPath()), std::ios::binary);
 		if (!updateStream.is_open()) {
 			livePeerLog(log, "Failed to open update file: " + file.sourcePath.GetFullPath());
 			close();
-			return;
+			return false;
 		}
 
 		updateBytesRemaining = file.size;
@@ -493,7 +517,7 @@ void LivePeer::sendNextUpdateChunk() {
 	if (bytesRead <= 0) {
 		livePeerLog(log, "Failed while reading update file for transfer.");
 		close();
-		return;
+		return false;
 	}
 
 	std::string chunk(updateChunkBuffer.data(), static_cast<size_t>(bytesRead));
@@ -502,22 +526,22 @@ void LivePeer::sendNextUpdateChunk() {
 	NetworkMessage chunkMessage;
 	chunkMessage.write<uint8_t>(PACKET_UPDATE_FILE_CHUNK);
 	chunkMessage.write<std::string>(chunk);
+	++updateChunksInFlight;
 	send(chunkMessage, [this]() {
-		if (updateBytesRemaining == 0) {
-			if (updateStream.is_open()) {
-				updateStream.close();
-			}
-
-			NetworkMessage endMessage;
-			endMessage.write<uint8_t>(PACKET_UPDATE_FILE_END);
-			send(endMessage, [this]() {
-				++updateFileIndex;
-				sendNextUpdateChunk();
-			});
-		} else {
-			sendNextUpdateChunk();
-		}
+		--updateChunksInFlight;
+		pumpUpdateTransfer();
 	});
+
+	if (updateBytesRemaining == 0) {
+		updateStream.close();
+
+		NetworkMessage endMessage;
+		endMessage.write<uint8_t>(PACKET_UPDATE_FILE_END);
+		send(endMessage);
+		++updateFileIndex;
+	}
+
+	return true;
 }
 
 void LivePeer::parseReady(NetworkMessage& message) {

@@ -81,11 +81,13 @@ public:
 	void updateCursor(const Position& position) { }
 
 	void startAssetTransfer();
-	void sendNextAssetChunk();
+	void pumpAssetTransfer();
+	bool sendNextAssetChunk();
 
 	void sendUpdatePackage();
 	void startUpdateTransfer();
-	void sendNextUpdateChunk();
+	void pumpUpdateTransfer();
+	bool sendNextUpdateChunk();
 
 protected:
 	void parseLoginPacket(NetworkMessage message);
@@ -121,6 +123,7 @@ protected:
 	size_t assetFileIndex;
 	std::ifstream assetStream;
 	uint32_t assetBytesRemaining;
+	size_t assetChunksInFlight = 0;
 
 	std::vector<char> assetChunkBuffer;
 	std::vector<char> updateChunkBuffer;
@@ -129,6 +132,7 @@ protected:
 	size_t updateFileIndex;
 	std::ifstream updateStream;
 	uint32_t updateBytesRemaining;
+	size_t updateChunksInFlight = 0;
 
 	std::vector<uint8_t> changeParseBuffer;
 
