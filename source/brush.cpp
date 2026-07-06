@@ -90,53 +90,63 @@ void Brushes::init() {
 	CarpetBrush::init();
 }
 
-bool Brushes::unserializeBrush(pugi::xml_node node, wxArrayString& warnings) {
+Brush* Brushes::createBrush(pugi::xml_node node, wxArrayString& warnings) {
 	pugi::xml_attribute attribute;
 	if (!(attribute = node.attribute("name"))) {
 		warnings.push_back("Brush node without name.");
-		return false;
+		return nullptr;
 	}
 
 	const std::string& brushName = attribute.as_string();
 	if (brushName == "all" || brushName == "none") {
 		warnings.push_back(wxString("Using reserved brushname \"") << wxstr(brushName) << "\".");
-		return false;
+		return nullptr;
 	}
 
 	Brush* brush = getBrush(brushName);
+	if (brush) {
+		return brush;
+	}
+
+	if (!(attribute = node.attribute("type"))) {
+		warnings.push_back("Couldn't read brush type");
+		return nullptr;
+	}
+
+	const std::string brushType = attribute.as_string();
+	if (brushType == "border" || brushType == "ground") {
+		brush = newd GroundBrush();
+	} else if (brushType == "wall") {
+		brush = newd WallBrush();
+	} else if (brushType == "wall decoration") {
+		brush = newd WallDecorationBrush();
+	} else if (brushType == "carpet") {
+		brush = newd CarpetBrush();
+	} else if (brushType == "table") {
+		brush = newd TableBrush();
+	} else if (brushType == "doodad") {
+		brush = newd DoodadBrush();
+	} else {
+		warnings.push_back(wxString("Unknown brush type ") << wxstr(brushType));
+		return nullptr;
+	}
+
+	ASSERT(brush);
+	brush->setName(brushName);
+	brushes.insert(std::make_pair(brush->getName(), brush));
+	return brush;
+}
+
+bool Brushes::unserializeBrush(pugi::xml_node node, wxArrayString& warnings) {
+	Brush* brush = createBrush(node, warnings);
 	if (!brush) {
-		if (!(attribute = node.attribute("type"))) {
-			warnings.push_back("Couldn't read brush type");
-			return false;
-		}
-
-		const std::string brushType = attribute.as_string();
-		if (brushType == "border" || brushType == "ground") {
-			brush = newd GroundBrush();
-		} else if (brushType == "wall") {
-			brush = newd WallBrush();
-		} else if (brushType == "wall decoration") {
-			brush = newd WallDecorationBrush();
-		} else if (brushType == "carpet") {
-			brush = newd CarpetBrush();
-		} else if (brushType == "table") {
-			brush = newd TableBrush();
-		} else if (brushType == "doodad") {
-			brush = newd DoodadBrush();
-		} else {
-			warnings.push_back(wxString("Unknown brush type ") << wxstr(brushType));
-			return false;
-		}
-
-		ASSERT(brush);
-		brush->setName(brushName);
+		return false;
 	}
 
 	if (!node.first_child()) {
 		if (!current_load_file.empty()) {
 			brush->setSourceFile(current_load_file);
 		}
-		brushes.insert(std::make_pair(brush->getName(), brush));
 		return true;
 	}
 

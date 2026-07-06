@@ -72,6 +72,13 @@ public:
 	bool unserializeBorder(pugi::xml_node node, wxArrayString& warnings);
 	bool unserializeBrush(pugi::xml_node node, wxArrayString& warnings);
 
+	// Finds the brush named by this node, or creates it (from its "type" attribute) and
+	// registers it under its name. Idempotent: safe to call again once the node is fully
+	// loaded. Used to pre-register brush names ahead of a full load pass, so brushes that
+	// reference each other by name (e.g. ground border "to" brushes) resolve regardless of
+	// the order brushes are defined in the XML.
+	Brush* createBrush(pugi::xml_node node, wxArrayString& warnings);
+
 	void setCurrentLoadFile(const std::string& file) {
 		current_load_file = file;
 	}

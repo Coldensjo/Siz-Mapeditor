@@ -48,7 +48,12 @@ public:
 	}
 
 protected:
-	bool unserializeMaterials(const FileName& filename, pugi::xml_node node, wxString& error, wxArrayString& warnings);
+	// Pass 1 (namesOnly = true) walks materials.xml and its includes registering every
+	// <brush> name up front, without loading their contents, so that brushes referencing
+	// each other by name (e.g. ground border "to" attributes) resolve regardless of which
+	// one is defined first in the XML. Pass 2 (namesOnly = false) then does the real load.
+	bool loadMaterialsFile(const FileName& identifier, wxString& error, wxArrayString& warnings, bool namesOnly);
+	bool unserializeMaterials(const FileName& filename, pugi::xml_node node, wxString& error, wxArrayString& warnings, bool namesOnly);
 	bool unserializeTileset(pugi::xml_node node, wxArrayString& warnings);
 
 	MaterialsExtensionList extensions;

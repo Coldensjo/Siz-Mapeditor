@@ -68,6 +68,16 @@ MaterialsExtensionList Materials::getExtensionsByVersion(uint16_t version_id) {
 }
 
 bool Materials::loadMaterials(const FileName& identifier, wxString& error, wxArrayString& warnings) {
+	// Pass 1: pre-register brush names across the whole materials.xml + include tree so
+	// forward references (a brush defined earlier pointing at one defined later) resolve.
+	wxArrayString nameWarnings;
+	loadMaterialsFile(identifier, error, nameWarnings, true);
+
+	// Pass 2: the real load.
+	return loadMaterialsFile(identifier, error, warnings, false);
+}
+
+bool Materials::loadMaterialsFile(const FileName& identifier, wxString& error, wxArrayString& warnings, bool namesOnly) {
 	pugi::xml_document doc;
 	pugi::xml_parse_result result = doc.load_file(identifier.GetFullPath().mb_str());
 	if (!result) {
@@ -82,7 +92,7 @@ bool Materials::loadMaterials(const FileName& identifier, wxString& error, wxArr
 	}
 
 	g_brushes.setCurrentLoadFile(identifier.GetFullPath().ToStdString());
-	unserializeMaterials(identifier, node, error, warnings);
+	unserializeMaterials(identifier, node, error, warnings, namesOnly);
 	return true;
 }
 
@@ -187,14 +197,14 @@ bool Materials::loadExtensions(FileName directoryName, wxString& error, wxArrayS
 
 		extensions.push_back(materialExtension);
 		if (materialExtension->isForVersion(g_gui.GetCurrentVersionID())) {
-			unserializeMaterials(filename, extensionNode, error, warnings);
+			unserializeMaterials(filename, extensionNode, error, warnings, false);
 		}
 	} while (ext_dir.GetNext(&filename));
 
 	return true;
 }
 
-bool Materials::unserializeMaterials(const FileName& filename, pugi::xml_node node, wxString& error, wxArrayString& warnings) {
+bool Materials::unserializeMaterials(const FileName& filename, pugi::xml_node node, wxString& error, wxArrayString& warnings, bool namesOnly) {
 	wxString warning;
 	pugi::xml_attribute attribute;
 	for (pugi::xml_node childNode = node.first_child(); childNode; childNode = childNode.next_sibling()) {
@@ -209,18 +219,26 @@ bool Materials::unserializeMaterials(const FileName& filename, pugi::xml_node no
 			includeName.SetFullName(wxString(attribute.as_string(), wxConvUTF8));
 
 			wxString subError;
-			if (!loadMaterials(includeName, subError, warnings)) {
+			if (!loadMaterialsFile(includeName, subError, warnings, namesOnly)) {
 				warnings.push_back("Error while loading file \"" + includeName.GetFullName() + "\": " + subError);
 			}
+		} else if (childName == "brush") {
+			// Pre-registers the brush's name (and, in the real load pass, its full contents).
+			if (namesOnly) {
+				g_brushes.createBrush(childNode, warnings);
+			} else {
+				g_brushes.unserializeBrush(childNode, warnings);
+				if (warning.size()) {
+					warnings.push_back("materials.xml: " + warning);
+				}
+			}
+		} else if (namesOnly) {
+			// Nothing else needs pre-registering ahead of the real load pass.
+			continue;
 		} else if (childName == "metaitem") {
 			g_items.loadMetaItem(childNode);
 		} else if (childName == "border") {
 			g_brushes.unserializeBorder(childNode, warnings);
-			if (warning.size()) {
-				warnings.push_back("materials.xml: " + warning);
-			}
-		} else if (childName == "brush") {
-			g_brushes.unserializeBrush(childNode, warnings);
 			if (warning.size()) {
 				warnings.push_back("materials.xml: " + warning);
 			}
