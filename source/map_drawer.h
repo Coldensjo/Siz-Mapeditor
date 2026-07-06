@@ -129,6 +129,7 @@ struct DrawingOptions {
 	bool show_invisible_items;
 	bool show_creature_spawn_time;
 	bool show_hud;
+	bool show_autoborder_indicator;
 };
 
 class MapCanvas;
@@ -181,6 +182,7 @@ public:
 	void DrawChunkBoundaries();
 	void DrawTileCoordinates();
 	void DrawHUD();
+	void DrawAutoborderIndicator();
 	void DrawMouseCrosshair();
 	void DrawTooltips();
 	void DrawLiveCursors();

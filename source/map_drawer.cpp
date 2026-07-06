@@ -417,6 +417,7 @@ void DrawingOptions::SetDefault() {
 	show_invisible_items = true;
 	show_creature_spawn_time = false;
 	show_hud = true;
+	show_autoborder_indicator = true;
 }
 
 void DrawingOptions::SetIngame() {
@@ -465,6 +466,7 @@ void DrawingOptions::SetIngame() {
 	show_invisible_items = false;
 	show_creature_spawn_time = false;
 	show_hud = false;
+	show_autoborder_indicator = false;
 }
 
 bool DrawingOptions::isDrawLight() const noexcept {
@@ -596,6 +598,10 @@ void MapDrawer::Draw() {
 
 	if (options.show_hud) {
 		DrawHUD();
+	}
+
+	if (options.show_autoborder_indicator) {
+		DrawAutoborderIndicator();
 	}
 
 	if (editor.live_client) {
@@ -3288,6 +3294,60 @@ void MapDrawer::DrawHUD() {
 		for (size_t j = 0; j < line.length(); ++j) {
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(line[j]));
 		}
+	}
+
+	PopScreenSpaceGL();
+
+	if (texturesEnabled) {
+		glEnable(GL_TEXTURE_2D);
+	}
+}
+
+void MapDrawer::DrawAutoborderIndicator() {
+	// On-canvas indicator, top-left corner (below the HUD box, if visible),
+	// showing whether Automagic (autoborder) is currently enabled.
+	const bool automagic_on = g_settings.getInteger(Config::USE_AUTOMAGIC) != 0;
+	const wxString text = automagic_on ? "Automagic: ON" : "Automagic: OFF";
+
+	const float padding = 5.0f;
+	const float lineHeight = 14.0f;
+
+	float textWidth = 0.0f;
+	for (size_t i = 0; i < text.length(); ++i) {
+		textWidth += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(text[i]));
+	}
+
+	const float boxWidth = textWidth + padding * 2.0f;
+	const float boxHeight = lineHeight + padding * 2.0f;
+	const float boxLeft = padding;
+	const float hudHeight = options.show_hud ? (lineHeight * 2.0f + padding * 2.0f + padding) : 0.0f;
+	const float boxTop = padding + hudHeight;
+
+	const GLboolean texturesEnabled = glIsEnabled(GL_TEXTURE_2D);
+	if (texturesEnabled) {
+		glDisable(GL_TEXTURE_2D);
+	}
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	PushScreenSpaceGL(screensize_x, screensize_y);
+
+	glColor4ub(0, 0, 0, 180);
+	glBegin(GL_QUADS);
+	glVertex2f(boxLeft, boxTop);
+	glVertex2f(boxLeft + boxWidth, boxTop);
+	glVertex2f(boxLeft + boxWidth, boxTop + boxHeight);
+	glVertex2f(boxLeft, boxTop + boxHeight);
+	glEnd();
+
+	if (automagic_on) {
+		glColor4ub(120, 255, 120, 240);
+	} else {
+		glColor4ub(220, 220, 220, 200);
+	}
+	glRasterPos2f(boxLeft + padding, boxTop + padding + lineHeight - 3.0f);
+	for (size_t i = 0; i < text.length(); ++i) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, static_cast<unsigned char>(text[i]));
 	}
 
 	PopScreenSpaceGL();
