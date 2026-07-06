@@ -670,7 +670,7 @@ END_EVENT_TABLE()
 
 CreaturePalettePanel::CreaturePalettePanel(wxWindow* parent, wxWindowID id) :
 	PalettePanel(parent, id),
-	use_grid_view(false),
+	use_grid_view(true),
 	handling_event(false) {
 	wxSizer* topsizer = newd wxBoxSizer(wxVERTICAL);
 
@@ -682,15 +682,15 @@ CreaturePalettePanel::CreaturePalettePanel(wxWindow* parent, wxWindowID id) :
 	view_styles.Add("List view");
 	view_styles.Add("Grid view");
 	view_style_choice = newd wxChoice(this, PALETTE_CREATURE_VIEW_STYLE, wxDefaultPosition, wxDefaultSize, view_styles);
-	view_style_choice->SetSelection(0);
+	view_style_choice->SetSelection(1);
 	sidesizer->Add(view_style_choice, 0, wxEXPAND | wxTOP, 2);
 
 	creature_list = newd CreatureListBox(this, PALETTE_CREATURE_LISTBOX);
 	sidesizer->Add(creature_list, 1, wxEXPAND);
+	creature_list->Hide();
 
 	creature_grid = newd CreatureSpriteGrid(this, PALETTE_CREATURE_GRID);
 	sidesizer->Add(creature_grid, 1, wxEXPAND);
-	creature_grid->Hide();
 
 	topsizer->Add(sidesizer, 1, wxEXPAND);
 
