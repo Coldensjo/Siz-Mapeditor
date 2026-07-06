@@ -1071,10 +1071,10 @@ int GameSprite::getIndex(int width, int height, int layer, int pattern_x, int pa
 
 GLuint GameSprite::getHardwareID(int _x, int _y, int _layer, int _count, int _pattern_x, int _pattern_y, int _pattern_z, int _frame) {
 	uint32_t v;
-	if (_count >= 0 && height <= 1 && width <= 1) {
+	if (_count >= 0 && height <= 1 && width <= 1 && layers <= 1) {
 		v = _count;
 	} else {
-		v = ((((((_frame)*pattern_y + _pattern_y) * pattern_x + _pattern_x) * layers + _layer) * height + _y) * width + _x);
+		v = ((((((_frame % frames) * pattern_z + _pattern_z) * pattern_y + _pattern_y) * pattern_x + _pattern_x) * layers + _layer) * height + _y) * width + _x;
 	}
 	if (v >= numsprites) {
 		if (numsprites == 1) {
@@ -1152,10 +1152,25 @@ wxMemoryDC* GameSprite::getDC(SpriteSize size) {
 					const int i = getIndex(w, h, l, 0, 0, 0, 0);
 					uint8_t* data = spriteList[i]->getRGBData();
 					if (data) {
-						wxImage img(SPRITE_PIXELS, SPRITE_PIXELS, data);
-						img.SetMaskColour(0xFF, 0x00, 0xFF);
-						image.Paste(img, (width - w - 1) * SPRITE_PIXELS, (height - h - 1) * SPRITE_PIXELS);
-						img.Destroy();
+						// Blend manually instead of wxImage::Paste + SetMaskColour: Paste does not
+						// reliably skip transparent (magenta) source pixels, which erases
+						// already-drawn lower layers when compositing multi-layer sprites (e.g. a
+						// door's frame layer getting wiped out by the front layer's empty space).
+						const int dst_x = (width - w - 1) * SPRITE_PIXELS;
+						const int dst_y = (height - h - 1) * SPRITE_PIXELS;
+						for (int py = 0; py < SPRITE_PIXELS; ++py) {
+							for (int px = 0; px < SPRITE_PIXELS; ++px) {
+								const int si = (py * SPRITE_PIXELS + px) * 3;
+								const uint8_t r = data[si + 0];
+								const uint8_t g = data[si + 1];
+								const uint8_t b = data[si + 2];
+								if (r == 0xFF && g == 0x00 && b == 0xFF) {
+									continue;
+								}
+								image.SetRGB(dst_x + px, dst_y + py, r, g, b);
+							}
+						}
+						delete[] data;
 					}
 				}
 			}
