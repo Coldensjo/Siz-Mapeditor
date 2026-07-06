@@ -85,6 +85,7 @@ public:
 	void UpdateFloorMenu();
 	void OnIdle(wxIdleEvent& event);
 	void OnExit(wxCloseEvent& event);
+	void OnCharHook(wxKeyEvent& event);
 
 #ifdef __WINDOWS__
 	virtual bool MSWTranslateMessage(WXMSG* msg);

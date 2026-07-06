@@ -45,6 +45,7 @@
 #include "../brushes/icon/editor_icon.xpm"
 
 BEGIN_EVENT_TABLE(MainFrame, wxFrame)
+EVT_CHAR_HOOK(MainFrame::OnCharHook)
 EVT_CLOSE(MainFrame::OnExit)
 
 EVT_ON_UPDATE_MENUS(wxID_ANY, MainFrame::OnUpdateMenus)
@@ -427,6 +428,17 @@ MainFrame::~MainFrame() = default;
 
 void MainFrame::OnIdle(wxIdleEvent& event) {
 	////
+}
+
+void MainFrame::OnCharHook(wxKeyEvent& event) {
+	if (event.GetKeyCode() == WXK_F12 && event.ControlDown() && !event.ShiftDown() && !event.AltDown()) {
+		const bool enabled = !g_settings.getBoolean(Config::SHOW_MAKE_SCRIPT_MENU);
+		g_settings.setInteger(Config::SHOW_MAKE_SCRIPT_MENU, enabled ? 1 : 0);
+		g_settings.save();
+		g_gui.SetStatusText(wxString::Format("Make script menu %s", enabled ? "enabled" : "disabled"));
+		return;
+	}
+	event.Skip();
 }
 
 void MainFrame::OnUpdateMenus(wxCommandEvent&) {

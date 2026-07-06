@@ -3350,10 +3350,12 @@ void MapPopupMenu::Update(const Position& cursorTile) {
 				Append(MAP_POPUP_MENU_COPY_SERVER_ID, "Copy Item Server Id", "Copy the server id of this item");
 				Append(MAP_POPUP_MENU_COPY_CLIENT_ID, "Copy Item Client Id", "Copy the client id of this item");
 				Append(MAP_POPUP_MENU_COPY_NAME, "Copy Item Name", "Copy the name of this item");
-				Append(MAP_POPUP_MENU_CREATE_GENERATE_SCRIPT, "Make [Create] Script", "generate(...) script");
-				Append(MAP_POPUP_MENU_CREATE_REMOVE_SCRIPT, "Make [Remove] Script", "remove(...) script");
-				Append(MAP_POPUP_MENU_CREATE_CREATE_SCRIPT, "Make [Create and Remove] Script", "create(...) script");
-				Append(MAP_POPUP_MENU_CREATE_CHECK_SCRIPT, "Make [Check] Script", "checkitem(...) script");
+				if (g_settings.getBoolean(Config::SHOW_MAKE_SCRIPT_MENU)) {
+					Append(MAP_POPUP_MENU_CREATE_GENERATE_SCRIPT, "Make [Create] Script", "generate(...) script");
+					Append(MAP_POPUP_MENU_CREATE_REMOVE_SCRIPT, "Make [Remove] Script", "remove(...) script");
+					Append(MAP_POPUP_MENU_CREATE_CREATE_SCRIPT, "Make [Create and Remove] Script", "create(...) script");
+					Append(MAP_POPUP_MENU_CREATE_CHECK_SCRIPT, "Make [Check] Script", "checkitem(...) script");
+				}
 				AppendSeparator();
 			}
 

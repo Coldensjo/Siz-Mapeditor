@@ -418,6 +418,7 @@ void Settings::IO(IOMode mode) {
 
 	// checkbox in terrain palette
 	Int(DRAW_LOCKED_DOOR, 0);
+	Int(SHOW_MAKE_SCRIPT_MENU, 0);
 
 #undef section
 #undef Int

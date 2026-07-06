@@ -221,6 +221,8 @@ namespace Config {
 		SHOW_PALETTE_TOOLS,
 		SHOW_PALETTE_BRUSH_SIZE,
 
+		SHOW_MAKE_SCRIPT_MENU,
+
 		LAST,
 	};
 }
