@@ -1689,6 +1689,7 @@ void MapCanvas::OnMousePropertiesClick(wxMouseEvent& event) {
 
 	last_click_map_x = mouse_map_x;
 	last_click_map_y = mouse_map_y;
+	last_click_map_z = floor;
 	g_gui.RefreshView();
 }
 

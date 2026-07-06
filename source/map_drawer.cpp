@@ -404,7 +404,7 @@ void DrawingOptions::SetDefault() {
 	show_as_minimap = false;
 	show_only_colors = false;
 	show_only_modified = false;
-	show_preview = false;
+	show_preview = true;
 	show_hooks = false;
 	show_fishable_water = false;
 	show_borders = true;
