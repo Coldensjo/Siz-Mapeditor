@@ -50,6 +50,15 @@ public:
 	// Logs the reason then tears the session down on the GUI thread (closes the
 	// socket and the live editor tab). Safe to call from the network thread.
 	void disconnectFromServer(const wxString& reason);
+	// Closes the socket, then deletes this client and its live editor tab once
+	// any network-thread completion handlers for the just-cancelled reads/writes
+	// have drained. Every teardown path (menu disconnect, tab close, connection
+	// error) must go through this instead of calling close() + CloseLiveEditors()
+	// directly, or a cancelled read's completion handler can race the delete.
+	// Must be called from the GUI thread. Guards against being called twice (e.g.
+	// a network error racing the user closing the tab). If given, onTornDown runs
+	// after this client has been deleted, so it must not capture `this`.
+	void closeAndTeardown(std::function<void()> onTornDown = nullptr);
 
 	//
 	std::string getHostName() const;
@@ -175,6 +184,9 @@ protected:
 
 	wxColor ownClientColor;
 	bool stopped;
+	// Guards closeAndTeardown() against running twice (e.g. the user closing
+	// the tab while a network error is also tearing the session down).
+	bool teardownInitiated = false;
 
 	ClientVersionID pendingVersionId;
 	std::vector<LiveAssetFile> pendingAssetManifest;

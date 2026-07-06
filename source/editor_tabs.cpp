@@ -81,8 +81,7 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 		if (auto* client = dynamic_cast<LiveClient*>(logTab->GetSocket())) {
 			evt.Veto();
 			wxTheApp->CallAfter([client]() {
-				client->close();
-				g_gui.CloseLiveEditors(client);
+				client->closeAndTeardown();
 			});
 			return;
 		}
@@ -93,8 +92,7 @@ void MapTabbook::OnNotebookPageClose(wxAuiNotebookEvent& evt) {
 		evt.Veto();
 		auto* client = static_cast<LiveClient*>(&mapTab->GetEditor()->GetLive());
 		wxTheApp->CallAfter([client]() {
-			client->close();
-			g_gui.CloseLiveEditors(client);
+			client->closeAndTeardown();
 		});
 		return;
 	}

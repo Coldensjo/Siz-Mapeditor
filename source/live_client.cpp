@@ -163,6 +163,32 @@ void LiveClient::close() {
 	stopped = true;
 }
 
+void LiveClient::closeAndTeardown(std::function<void()> onTornDown) {
+	if (teardownInitiated) {
+		// Already tearing down -- e.g. a network error raced with the user
+		// closing the tab. Scheduling a second CloseLiveEditors here would
+		// delete this client twice.
+		return;
+	}
+	teardownInitiated = true;
+
+	close();
+
+	// close() cancels the outstanding read/write and its completion handler
+	// (which touches `this`) gets queued on the network thread with
+	// operation_aborted. Post a no-op there so it runs after that completion
+	// has drained, then hop back to the GUI thread to actually delete `this`.
+	// Deleting synchronously here would race the still-in-flight handler.
+	NetworkConnection::getInstance().post([this, onTornDown = std::move(onTornDown)]() mutable {
+		wxTheApp->CallAfter([this, onTornDown = std::move(onTornDown)]() {
+			g_gui.CloseLiveEditors(this); // deletes `this`
+			if (onTornDown) {
+				onTornDown();
+			}
+		});
+	});
+}
+
 bool LiveClient::handleError(const net_error_code& error) {
 	if (error == asio::error::eof || error == asio::error::connection_reset) {
 		disconnectFromServer(wxString() + getHostName() + ": disconnected.");
@@ -189,10 +215,10 @@ void LiveClient::disconnectFromServer(const wxString& reason) {
 	// The read/write callbacks run on the network thread, and CloseLiveEditors
 	// deletes this LiveClient, so the teardown must happen on the GUI thread.
 	wxTheApp->CallAfter([this]() {
-		close();
-		g_gui.CloseLiveEditors(this);
+		closeAndTeardown();
 	});
 }
+
 
 std::string LiveClient::getHostName() const {
 	if (!socket) {
@@ -782,9 +808,8 @@ void LiveClient::parseKick(NetworkMessage& message) {
 	}
 	stopped = true;
 	wxTheApp->CallAfter([this, kickMessage]() {
-		close();
 		g_gui.PopupDialog("Disconnected", wxstr(kickMessage), wxOK);
-		g_gui.CloseLiveEditors(this);
+		closeAndTeardown();
 	});
 }
 
@@ -950,9 +975,8 @@ void LiveClient::failUpdate(const wxString& reason) {
 	}
 	stopped = true;
 	wxTheApp->CallAfter([this, reason]() {
-		close();
 		g_gui.PopupDialog("Update Failed", reason, wxOK);
-		g_gui.CloseLiveEditors(this);
+		closeAndTeardown();
 	});
 }
 
@@ -1047,38 +1071,38 @@ void LiveClient::parseUpdateDone(NetworkMessage& WXUNUSED(message)) {
 	stopped = true;
 
 	// Defer teardown off the parsePacket loop so 'this' is not deleted mid-parse.
-	// The lambda tears down the live session and then runs the prompt + swap fully
-	// decoupled from the (now gone) live client, using only the snapshotted locals.
+	// closeAndTeardown() tears down the live session and then, once 'this' is
+	// gone, runs the prompt + swap fully decoupled from the live client, using
+	// only the snapshotted locals.
 	wxTheApp->CallAfter([this, stagingDir, files]() {
-		close();
-		g_gui.CloseLiveEditors(this); // deletes 'this'; nothing below touches it
+		closeAndTeardown([stagingDir, files]() {
+			if (files.empty()) {
+				g_gui.PopupDialog("Update Failed", "The server did not send any update files.", wxOK);
+				return;
+			}
 
-		if (files.empty()) {
-			g_gui.PopupDialog("Update Failed", "The server did not send any update files.", wxOK);
-			return;
-		}
+			const long choice = g_gui.PopupDialog(
+				"Editor Update",
+				"A newer version of the editor is required to join this live server.\n\n"
+				"Update now? The editor will restart and reconnect automatically.",
+				wxYES | wxNO
+			);
 
-		const long choice = g_gui.PopupDialog(
-			"Editor Update",
-			"A newer version of the editor is required to join this live server.\n\n"
-			"Update now? The editor will restart and reconnect automatically.",
-			wxYES | wxNO
-		);
+			if (choice != wxID_YES) {
+				return;
+			}
 
-		if (choice != wxID_YES) {
-			return;
-		}
+			wxString error;
+			if (!applyLiveUpdateAndRestart(stagingDir, files, true, error)) {
+				g_gui.PopupDialog("Update Failed", error, wxOK);
+				return;
+			}
 
-		wxString error;
-		if (!applyLiveUpdateAndRestart(stagingDir, files, true, error)) {
-			g_gui.PopupDialog("Update Failed", error, wxOK);
-			return;
-		}
-
-		// New instance is launching; shut this one down so it can replace us.
-		if (g_gui.root) {
-			g_gui.root->Close(true);
-		}
+			// New instance is launching; shut this one down so it can replace us.
+			if (g_gui.root) {
+				g_gui.root->Close(true);
+			}
+		});
 	});
 }
 

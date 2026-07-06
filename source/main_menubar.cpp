@@ -994,8 +994,7 @@ void MainMenuBar::OnLiveConnect(wxCommandEvent& WXUNUSED(event)) {
 void MainMenuBar::OnLiveDisconnect(wxCommandEvent& WXUNUSED(event)) {
 	Editor* editor = g_gui.GetCurrentEditor();
 	if (editor && editor->IsLiveClient()) {
-		static_cast<LiveClient&>(editor->GetLive()).close();
-		g_gui.CloseLiveEditors(&editor->GetLive());
+		static_cast<LiveClient&>(editor->GetLive()).closeAndTeardown();
 		return;
 	}
 
@@ -1008,8 +1007,7 @@ void MainMenuBar::OnLiveDisconnect(wxCommandEvent& WXUNUSED(event)) {
 		if (mapTab) {
 			Editor* tabEditor = mapTab->GetEditor();
 			if (tabEditor && tabEditor->IsLiveClient()) {
-				static_cast<LiveClient&>(tabEditor->GetLive()).close();
-				g_gui.CloseLiveEditors(&tabEditor->GetLive());
+				static_cast<LiveClient&>(tabEditor->GetLive()).closeAndTeardown();
 				return;
 			}
 		}
