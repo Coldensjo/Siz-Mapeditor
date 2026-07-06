@@ -41,6 +41,7 @@ DCButton::DCButton() :
 	size(RENDER_SIZE_16x16),
 	sprite(nullptr),
 	overlay(nullptr) {
+	SetBackgroundStyle(wxBG_STYLE_PAINT);
 	SetSprite(0);
 }
 
@@ -64,6 +65,7 @@ DCButton::DCButton(wxWindow* parent, wxWindowID id, wxPoint pos, int type, Rende
 	size(sz),
 	sprite(nullptr),
 	overlay(nullptr) {
+	SetBackgroundStyle(wxBG_STYLE_PAINT);
 	SetMinSize(GetDefaultButtonSize(sz));
 	SetMaxSize(GetDefaultButtonSize(sz));
 	SetSprite(sprite_id, false); // Don't refresh during construction

@@ -427,7 +427,10 @@ MainFrame::MainFrame(const wxString& title, const wxPoint& pos, const wxSize& si
 MainFrame::~MainFrame() = default;
 
 void MainFrame::OnIdle(wxIdleEvent& event) {
-	////
+	if (g_gui.gfx.takePaletteRefreshNeeded()) {
+		g_gui.RefreshPalettes();
+	}
+	event.Skip();
 }
 
 void MainFrame::OnCharHook(wxKeyEvent& event) {

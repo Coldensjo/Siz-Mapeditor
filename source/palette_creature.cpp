@@ -434,6 +434,7 @@ CreatureSpriteGrid::CreatureSpriteGrid(wxWindow* parent, wxWindowID id) :
 	cell_width(CREATURE_SLOT_SIZE + 2 * CELL_PADDING),
 	cell_height(CREATURE_SLOT_SIZE + TEXT_HEIGHT + 2 * CELL_PADDING),
 	selected_index(wxNOT_FOUND) {
+	SetBackgroundStyle(wxBG_STYLE_PAINT);
 	SetBackgroundColour(ThemeManager::Get().GetPalette().surface);
 	SetScrollRate(0, cell_height);
 }

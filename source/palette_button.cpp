@@ -31,11 +31,12 @@ END_EVENT_TABLE()
 PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& label,
 	const wxBitmap& buttonIcon, const wxPoint& pos, const wxSize& size, long style,
 	const wxValidator& validator, const wxString& name)
-	: wxButton(parent, id, label, pos, size, style, validator, name),
+	: wxButton(parent, id, label, pos, size, style | wxBORDER_NONE, validator, name),
 	  isPressed(false),
 	  isHovered(false),
 	  isActive(false),
 	  icon(buttonIcon) {
+	SetBackgroundStyle(wxBG_STYLE_PAINT);
 	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
 	if (icon.IsOk()) {
 		SetMinSize(wxSize(36, 36));

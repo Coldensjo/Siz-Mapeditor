@@ -190,7 +190,8 @@ GraphicManager::GraphicManager() :
 	has_frame_groups(false),
 	loaded_textures(0),
 	lastclean(0),
-	warning_sign_texture(0) {
+	warning_sign_texture(0),
+	palette_refresh_needed(false) {
 	animation_timer = newd wxStopWatch();
 	animation_timer->Start();
 }
@@ -294,6 +295,7 @@ void GraphicManager::cleanSoftwareSprites() {
 			iter->second->unloadDC();
 		}
 	}
+	palette_refresh_needed = true;
 }
 
 Sprite* GraphicManager::getSprite(int id) {
@@ -949,7 +951,14 @@ void GraphicManager::addSpriteToCleanup(GameSprite* spr) {
 			cleanup_list.front()->unloadDC();
 			cleanup_list.pop_front();
 		}
+		palette_refresh_needed = true;
 	}
+}
+
+bool GraphicManager::takePaletteRefreshNeeded() {
+	const bool needed = palette_refresh_needed;
+	palette_refresh_needed = false;
+	return needed;
 }
 
 void GraphicManager::garbageCollection() {
@@ -1022,6 +1031,9 @@ GameSprite::GameSprite() :
 	drawoffset_x(0),
 	drawoffset_y(0),
 	minimap_color(0) {
+	bm[SPRITE_SIZE_16x16] = nullptr;
+	bm[SPRITE_SIZE_32x32] = nullptr;
+	bm[SPRITE_SIZE_ACTUAL] = nullptr;
 	dc[SPRITE_SIZE_16x16] = nullptr;
 	dc[SPRITE_SIZE_32x32] = nullptr;
 	dc[SPRITE_SIZE_ACTUAL] = nullptr;
@@ -1047,10 +1059,16 @@ void GameSprite::clean(int time) {
 void GameSprite::unloadDC() {
 	delete dc[SPRITE_SIZE_16x16];
 	delete dc[SPRITE_SIZE_32x32];
+	delete dc[SPRITE_SIZE_ACTUAL];
 	dc[SPRITE_SIZE_16x16] = nullptr;
 	dc[SPRITE_SIZE_32x32] = nullptr;
-	delete dc[SPRITE_SIZE_ACTUAL];
 	dc[SPRITE_SIZE_ACTUAL] = nullptr;
+	delete bm[SPRITE_SIZE_16x16];
+	delete bm[SPRITE_SIZE_32x32];
+	delete bm[SPRITE_SIZE_ACTUAL];
+	bm[SPRITE_SIZE_16x16] = nullptr;
+	bm[SPRITE_SIZE_32x32] = nullptr;
+	bm[SPRITE_SIZE_ACTUAL] = nullptr;
 }
 
 int GameSprite::getDrawHeight() const {
@@ -1183,8 +1201,8 @@ wxMemoryDC* GameSprite::getDC(SpriteSize size) {
 				image.Rescale(32, 32, wxIMAGE_QUALITY_NEAREST);
 			}
 		}
-		wxBitmap bmp(image, -1);
-		dc[size] = newd wxMemoryDC(bmp);
+		bm[size] = newd wxBitmap(image, -1);
+		dc[size] = newd wxMemoryDC(*bm[size]);
 		g_gui.gfx.addSpriteToCleanup(this);
 		image.Destroy();
 	}

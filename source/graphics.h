@@ -183,6 +183,7 @@ protected:
 	};
 
 	uint32_t id;
+	wxBitmap* bm[SPRITE_SIZE_COUNT];
 	wxMemoryDC* dc[SPRITE_SIZE_COUNT];
 
 public:
@@ -306,6 +307,7 @@ public:
 	// Cleans old & unused textures according to config settings
 	void garbageCollection();
 	void addSpriteToCleanup(GameSprite* spr);
+	bool takePaletteRefreshNeeded();
 
 	wxFileName getMetadataFileName() const {
 		return metadata_file;
@@ -348,6 +350,8 @@ private:
 	GLuint warning_sign_texture; // 0 until first use; see getWarningSignTexture()
 
 	wxStopWatch* animation_timer;
+
+	bool palette_refresh_needed;
 
 	friend class GameSprite::Image;
 	friend class GameSprite::NormalImage;
