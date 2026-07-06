@@ -1496,7 +1496,7 @@ void Editor::moveSelection(Position offset) {
 
 		new_pos = old_pos - offset;
 
-		if (new_pos.z < 0 && new_pos.z > MAP_MAX_LAYER) {
+		if (new_pos.z < 0 || new_pos.z > MAP_MAX_LAYER) {
 			delete tile;
 			continue;
 		}

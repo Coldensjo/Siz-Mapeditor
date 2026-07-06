@@ -112,6 +112,8 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 	MAKE_ACTION(BORDERIZE_MAP, wxITEM_NORMAL, OnBorderizeMap);
 	MAKE_ACTION(RANDOMIZE_SELECTION, wxITEM_NORMAL, OnRandomizeSelection);
 	MAKE_ACTION(RANDOMIZE_MAP, wxITEM_NORMAL, OnRandomizeMap);
+	MAKE_ACTION(MOVE_SELECTION_UP, wxITEM_NORMAL, OnMoveSelectionUp);
+	MAKE_ACTION(MOVE_SELECTION_DOWN, wxITEM_NORMAL, OnMoveSelectionDown);
 	MAKE_ACTION(GOTO_PREVIOUS_POSITION, wxITEM_NORMAL, OnGotoPreviousPosition);
 	MAKE_ACTION(GOTO_POSITION, wxITEM_NORMAL, OnGotoPosition);
 	MAKE_ACTION(JUMP_TO_BRUSH, wxITEM_NORMAL, OnJumpToBrush);
@@ -435,6 +437,8 @@ void MainMenuBar::Update() {
 	EnableItem(BORDERIZE_MAP, is_local);
 	EnableItem(RANDOMIZE_SELECTION, has_map && has_selection);
 	EnableItem(RANDOMIZE_MAP, is_local);
+	EnableItem(MOVE_SELECTION_UP, has_map && has_selection);
+	EnableItem(MOVE_SELECTION_DOWN, has_map && has_selection);
 
 	EnableItem(GOTO_PREVIOUS_POSITION, has_map);
 	EnableItem(GOTO_POSITION, has_map);
@@ -641,7 +645,7 @@ bool MainMenuBar::Load(const FileName& path, wxArrayString& warnings, wxString& 
 	}
 
 #ifdef __LINUX__
-	const int count = 46;
+	const int count = 48;
 	wxAcceleratorEntry entries[count];
 	// Edit
 	entries[0].Set(wxACCEL_CTRL, (int)'Z', MAIN_FRAME_MENU + MenuBar::UNDO);
@@ -691,6 +695,10 @@ bool MainMenuBar::Load(const FileName& path, wxArrayString& warnings, wxString& 
 	entries[41].Set(wxACCEL_NORMAL, (int)'C', MAIN_FRAME_MENU + MenuBar::SELECT_CREATURE);
 	entries[42].Set(wxACCEL_NORMAL, (int)'R', MAIN_FRAME_MENU + MenuBar::SELECT_RAW);
 	entries[44].Set(wxACCEL_NORMAL, (int)'Z', MAIN_FRAME_MENU + MenuBar::SELECT_EXIT_BUTTON);
+
+	// Edit (selection floor movement)
+	entries[46].Set(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_UP, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_UP);
+	entries[47].Set(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_DOWN, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_DOWN);
 
 	wxAcceleratorTable accelerator(count, entries);
 	frame->SetAcceleratorTable(accelerator);
@@ -1678,6 +1686,24 @@ void MainMenuBar::OnRandomizeMap(wxCommandEvent& WXUNUSED(event)) {
 		g_gui.GetCurrentEditor()->randomizeMap(true);
 	}
 
+	g_gui.RefreshView();
+}
+
+void MainMenuBar::OnMoveSelectionUp(wxCommandEvent& WXUNUSED(event)) {
+	if (!g_gui.IsEditorOpen()) {
+		return;
+	}
+
+	g_gui.GetCurrentEditor()->moveSelection(Position(0, 0, 1));
+	g_gui.RefreshView();
+}
+
+void MainMenuBar::OnMoveSelectionDown(wxCommandEvent& WXUNUSED(event)) {
+	if (!g_gui.IsEditorOpen()) {
+		return;
+	}
+
+	g_gui.GetCurrentEditor()->moveSelection(Position(0, 0, -1));
 	g_gui.RefreshView();
 }
 
