@@ -446,7 +446,16 @@ void MainFrame::OnCharHook(wxKeyEvent& event) {
 
 void MainFrame::OnUpdateMenus(wxCommandEvent&) {
 	UpdateMenubar();
-	g_gui.UpdateMinimap(true);
+	// Editor::addBatch()/addAction() fire this on every single draw tick
+	// during a continuous brush stroke (one per tile painted while
+	// dragging). Forcing an *immediate* minimap rebuild here meant every
+	// one of those ticks did a full pixel-by-pixel minimap repaint
+	// synchronously -- cheap for the small docked strip, but scales with
+	// the minimap's pixel area and became very noticeable once the
+	// minimap is floated (and typically enlarged). The non-immediate path
+	// still keeps it fresh, just via the existing throttled/delayed
+	// update instead of rebuilding on every single tile.
+	g_gui.UpdateMinimap();
 	g_gui.UpdateTitle();
 }
 
