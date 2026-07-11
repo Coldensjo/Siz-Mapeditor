@@ -110,6 +110,7 @@ public:
 	void OnKey(wxKeyEvent& event);
 	void OnSize(wxSizeEvent& event);
 	void OnAuiPaneEvent(wxAuiManagerEvent& event);
+	void OnAuiPaneClose(wxAuiManagerEvent& event);
 
 	void OnZoomIn(wxCommandEvent& event);
 	void OnZoomOut(wxCommandEvent& event);
@@ -123,6 +124,7 @@ public:
 	bool IsPaneFloating() const;
 
 protected:
+	wxWindow* aui_event_source;
 	MinimapCaptionBar* caption_bar;
 	MinimapCanvas* canvas;
 	wxStaticText* title_label;
@@ -131,6 +133,7 @@ protected:
 	wxButton* zoom_in_button;
 	wxButton* close_button;
 	bool last_floating_state;
+	bool last_active_state;
 	bool caption_drag_pending;
 	wxPoint caption_drag_start_screen;
 	wxPoint caption_drag_offset;

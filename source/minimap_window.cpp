@@ -27,11 +27,71 @@
 #include "map_display.h"
 #include "minimap_window.h"
 #include <algorithm>
+#include <atomic>
+#include <fstream>
 #include <wx/aui/dockart.h>
 #include <wx/aui/framemanager.h>
+#include <wx/filename.h>
 #include <wx/rawbmp.h>
+#include <wx/stdpaths.h>
 
 namespace {
+
+// --- TEMPORARY diagnostics -------------------------------------------------
+// Counts how often each piece of minimap machinery runs, dumped to
+// "minimap_debug.log" next to the executable roughly once a second. This is
+// purely to pin down which code path is spinning while the minimap pane is
+// floating; remove once the root cause is confirmed.
+struct MinimapDiagCounters {
+	std::atomic<long> paint_count { 0 };
+	std::atomic<long> rebuild_count { 0 };
+	std::atomic<long> size_count { 0 };
+	std::atomic<long> delayed_update_count { 0 };
+	std::atomic<long> timer_notify_count { 0 };
+	std::atomic<long> aui_render_events { 0 };
+	std::atomic<long> chrome_applied_count { 0 };
+	std::atomic<long> reason_dirty { 0 };
+	std::atomic<long> reason_not_ok { 0 };
+	std::atomic<long> reason_floor { 0 };
+	std::atomic<long> reason_show_all { 0 };
+	std::atomic<long> reason_start { 0 };
+	std::atomic<long> reason_size { 0 };
+	std::atomic<long> reason_zoom { 0 };
+};
+
+MinimapDiagCounters g_minimap_diag;
+
+void MinimapDiagDumpIfDue() {
+	static std::chrono::steady_clock::time_point lastDump = std::chrono::steady_clock::now();
+	const auto now = std::chrono::steady_clock::now();
+	if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastDump).count() < 1000) {
+		return;
+	}
+	lastDump = now;
+
+	wxFileName fn(wxStandardPaths::Get().GetExecutablePath());
+	fn.SetFullName("minimap_debug.log");
+	std::ofstream out(fn.GetFullPath().ToStdString(), std::ios::app);
+	if (!out) {
+		return;
+	}
+	out << "paint=" << g_minimap_diag.paint_count.exchange(0)
+		<< " rebuild=" << g_minimap_diag.rebuild_count.exchange(0)
+		<< " size=" << g_minimap_diag.size_count.exchange(0)
+		<< " delayedUpdate=" << g_minimap_diag.delayed_update_count.exchange(0)
+		<< " timerNotify=" << g_minimap_diag.timer_notify_count.exchange(0)
+		<< " auiRender=" << g_minimap_diag.aui_render_events.exchange(0)
+		<< " chromeApplied=" << g_minimap_diag.chrome_applied_count.exchange(0)
+		<< " r_dirty=" << g_minimap_diag.reason_dirty.exchange(0)
+		<< " r_notOk=" << g_minimap_diag.reason_not_ok.exchange(0)
+		<< " r_floor=" << g_minimap_diag.reason_floor.exchange(0)
+		<< " r_showAll=" << g_minimap_diag.reason_show_all.exchange(0)
+		<< " r_start=" << g_minimap_diag.reason_start.exchange(0)
+		<< " r_size=" << g_minimap_diag.reason_size.exchange(0)
+		<< " r_zoom=" << g_minimap_diag.reason_zoom.exchange(0)
+		<< std::endl;
+}
+// --- end TEMPORARY diagnostics ----------------------------------------------
 
 void DrawLiveUserMarkers(wxDC& dc, Editor& editor, int start_x, int start_y, int floor, int window_width, int window_height, double zoom) {
 	if (!editor.IsLive()) {
@@ -254,12 +314,14 @@ void MinimapCanvas::ComputeViewBounds(Editor& editor, MapCanvas* canvas, int win
 }
 
 void MinimapCanvas::OnSize(wxSizeEvent& event) {
+	++g_minimap_diag.size_count;
 	MarkDirty();
 	Refresh();
 	event.Skip();
 }
 
 void MinimapCanvas::DelayedUpdate() {
+	++g_minimap_diag.delayed_update_count;
 	bitmap_dirty = true;
 
 	constexpr int kDefaultFastIntervalMs = 40;
@@ -296,10 +358,14 @@ void MinimapCanvas::MarkDirty() {
 }
 
 void MinimapCanvas::OnDelayedUpdate(wxTimerEvent& event) {
+	++g_minimap_diag.timer_notify_count;
 	Refresh();
 }
 
 void MinimapCanvas::OnPaint(wxPaintEvent& event) {
+	++g_minimap_diag.paint_count;
+	MinimapDiagDumpIfDue();
+
 	wxBufferedPaintDC pdc(this);
 
 	pdc.SetBackground(*wxBLACK_BRUSH);
@@ -339,6 +405,14 @@ void MinimapCanvas::OnPaint(wxPaintEvent& event) {
 	}
 
 	if (g_gui.IsRenderingEnabled()) {
+		if (bitmap_dirty) ++g_minimap_diag.reason_dirty;
+		if (!minimap_bitmap.IsOk()) ++g_minimap_diag.reason_not_ok;
+		if (cached_floor != floor) ++g_minimap_diag.reason_floor;
+		if (cached_show_all_floors != show_all_floors) ++g_minimap_diag.reason_show_all;
+		if (cached_start_x != start_x || cached_start_y != start_y) ++g_minimap_diag.reason_start;
+		if (cached_width != window_width || cached_height != window_height) ++g_minimap_diag.reason_size;
+		if (cached_zoom != minimap_zoom) ++g_minimap_diag.reason_zoom;
+
 		bool needs_rebuild = bitmap_dirty || !minimap_bitmap.IsOk()
 			|| cached_floor != floor
 			|| cached_show_all_floors != show_all_floors
@@ -347,6 +421,7 @@ void MinimapCanvas::OnPaint(wxPaintEvent& event) {
 			|| cached_zoom != minimap_zoom;
 
 		if (needs_rebuild) {
+			++g_minimap_diag.rebuild_count;
 			if (!minimap_bitmap.IsOk() || minimap_bitmap.GetWidth() != window_width || minimap_bitmap.GetHeight() != window_height) {
 				minimap_bitmap = wxBitmap(window_width, window_height, 32);
 			}
@@ -503,6 +578,18 @@ void MinimapCanvas::OnMouseCaptureLost(wxMouseCaptureLostEvent& event) {
 }
 
 void MinimapCanvas::OnKey(wxKeyEvent& event) {
+	// Plain 'M' (no modifiers) is the global "toggle minimap window" menu
+	// accelerator. While the minimap is floating (a separate top-level
+	// frame), the main frame's accelerator table never sees it, so it
+	// reaches this handler instead and would get forwarded to the map
+	// canvas, which just Skip()s it back up looking for an accelerator --
+	// round-tripping the very shortcut that's manipulating this window
+	// while it has focus. Swallow it here instead of forwarding it.
+	const int code = event.GetKeyCode();
+	if ((code == 'M' || code == 'm') && !event.HasModifiers() && !event.ShiftDown()) {
+		return;
+	}
+
 	if (g_gui.GetCurrentTab() != nullptr) {
 		g_gui.GetCurrentMapTab()->GetEventHandler()->AddPendingEvent(event);
 	}
@@ -533,6 +620,18 @@ int MinimapCaptionBar::GetCaptionHeight() const {
 }
 
 void MinimapCaptionBar::UpdateChrome(bool floating, bool active) {
+	// wxEVT_AUI_RENDER fires continuously (effectively every idle/render
+	// cycle) while ANY pane is floating, and MinimapWindow::OnAuiPaneEvent
+	// calls UpdateCaptionChrome() -> here on every one of those. Calling
+	// Refresh() unconditionally turned that into a self-sustaining loop
+	// (render event -> Refresh -> repaint -> more render events -> ...)
+	// that pegs the message loop just from the minimap being floated, with
+	// no user interaction needed -- starving actual input processing and
+	// making brush painting feel laggy. Only repaint when something
+	// actually changed.
+	if (floating == pane_floating && active == pane_active) {
+		return;
+	}
 	pane_floating = floating;
 	pane_active = active;
 	Refresh();
@@ -588,6 +687,7 @@ END_EVENT_TABLE()
 
 MinimapWindow::MinimapWindow(wxWindow* parent) :
     wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(205, 150)),
+    aui_event_source(nullptr),
     caption_bar(nullptr),
     canvas(nullptr),
     title_label(nullptr),
@@ -596,6 +696,7 @@ MinimapWindow::MinimapWindow(wxWindow* parent) :
     zoom_in_button(nullptr),
     close_button(nullptr),
     last_floating_state(false),
+    last_active_state(false),
     caption_drag_pending(false),
     caption_drag_start_screen(0, 0),
     caption_drag_offset(0, 0) {
@@ -636,14 +737,21 @@ MinimapWindow::MinimapWindow(wxWindow* parent) :
 	SetSizer(root_sizer);
 
 	if (parent) {
+		aui_event_source = parent;
 		parent->Bind(wxEVT_AUI_PANE_ACTIVATED, &MinimapWindow::OnAuiPaneEvent, this);
 		parent->Bind(wxEVT_AUI_RENDER, &MinimapWindow::OnAuiPaneEvent, this);
+		parent->Bind(wxEVT_AUI_PANE_CLOSE, &MinimapWindow::OnAuiPaneClose, this);
 	}
 
 	UpdateCaptionChrome();
 }
 
 MinimapWindow::~MinimapWindow() {
+	if (aui_event_source) {
+		aui_event_source->Unbind(wxEVT_AUI_PANE_ACTIVATED, &MinimapWindow::OnAuiPaneEvent, this);
+		aui_event_source->Unbind(wxEVT_AUI_RENDER, &MinimapWindow::OnAuiPaneEvent, this);
+		aui_event_source->Unbind(wxEVT_AUI_PANE_CLOSE, &MinimapWindow::OnAuiPaneClose, this);
+	}
 }
 
 bool MinimapWindow::IsPaneFloating() const {
@@ -664,18 +772,18 @@ void MinimapWindow::StartCaptionDrag(wxMouseEvent& event) {
 		return;
 	}
 
+	if (!pane.IsFloating() && !pane.IsFloatable()) {
+		return;
+	}
+
+	// Defer the actual AUI pane drag until the mouse has moved past the drag
+	// threshold, for both the docked and the already-floating case. Starting
+	// wxAuiManager::StartPaneDrag() unconditionally on left-down (as used to
+	// happen for the floating case) fires a zero-movement AUI drag session
+	// whenever a plain click lands on the caption bar (e.g. clicking where
+	// the close button would be), which can leave AUI's drag/hint state
+	// stuck and the app increasingly laggy until restarted.
 	caption_drag_offset = ScreenToClient(wxGetMousePosition());
-
-	if (pane.IsFloating()) {
-		caption_drag_pending = false;
-		g_gui.aui_manager->StartPaneDrag(this, caption_drag_offset);
-		return;
-	}
-
-	if (!pane.IsFloatable()) {
-		return;
-	}
-
 	caption_drag_pending = true;
 	caption_drag_start_screen = wxGetMousePosition();
 	if (!HasCapture()) {
@@ -708,20 +816,23 @@ void MinimapWindow::OnCaptionDragMotion(wxMouseEvent& event) {
 		return;
 	}
 
-	pane.floating_pos = wxPoint(now.x - caption_drag_offset.x, now.y - caption_drag_offset.y);
-
-	if (pane.IsMaximized()) {
-		g_gui.aui_manager->RestorePane(pane);
-	}
-	pane.Float();
-	g_gui.aui_manager->Update();
-	UpdateCaptionChrome();
-
 	wxPoint drag_offset = caption_drag_offset;
-	if (pane.frame) {
-		const wxSize frame_size = pane.frame->GetSize();
-		if (frame_size.x <= drag_offset.x) {
-			drag_offset.x = pane.frame->FromDIP(30);
+
+	if (!pane.IsFloating()) {
+		pane.floating_pos = wxPoint(now.x - caption_drag_offset.x, now.y - caption_drag_offset.y);
+
+		if (pane.IsMaximized()) {
+			g_gui.aui_manager->RestorePane(pane);
+		}
+		pane.Float();
+		g_gui.aui_manager->Update();
+		UpdateCaptionChrome();
+
+		if (pane.frame) {
+			const wxSize frame_size = pane.frame->GetSize();
+			if (frame_size.x <= drag_offset.x) {
+				drag_offset.x = pane.frame->FromDIP(30);
+			}
 		}
 	}
 
@@ -752,6 +863,17 @@ void MinimapWindow::UpdateCaptionChrome() {
 		}
 	}
 
+	// wxEVT_AUI_RENDER (which drives most calls to this function) fires
+	// continuously while any pane is floating. Bail out immediately when
+	// nothing changed since the last call instead of re-applying colours
+	// and pushing another Refresh() every single time -- otherwise this
+	// alone is enough to keep the message loop busy just from floating the
+	// minimap, with no user interaction at all.
+	if (floating == last_floating_state && active == last_active_state) {
+		return;
+	}
+	++g_minimap_diag.chrome_applied_count;
+
 	if (caption_bar) {
 		caption_bar->UpdateChrome(floating, active);
 	}
@@ -768,13 +890,18 @@ void MinimapWindow::UpdateCaptionChrome() {
 		title_label->SetForegroundColour(text_colour);
 	}
 
+	last_active_state = active;
+
 	if (floating != last_floating_state) {
 		if (title_label) {
 			title_label->Show(!floating);
 		}
-		if (close_button) {
-			close_button->Show(!floating);
-		}
+		// Keep the close button visible and clickable even while floating.
+		// It used to be hidden here, which meant a click over its former
+		// position fell through to the caption bar's StartCaptionDrag
+		// instead of closing the pane -- the "X doesn't work while
+		// floating" bug -- and could kick off a zero-movement AUI pane
+		// drag that left the minimap laggy until the app was restarted.
 		if (caption_bar) {
 			caption_bar->Layout();
 		}
@@ -788,11 +915,31 @@ void MinimapWindow::OnSize(wxSizeEvent& event) {
 }
 
 void MinimapWindow::OnAuiPaneEvent(wxAuiManagerEvent& event) {
+	++g_minimap_diag.aui_render_events;
 	if (event.GetPane() && event.GetPane()->window == this) {
 		UpdateCaptionChrome();
 	} else if (event.GetEventType() == wxEVT_AUI_RENDER) {
 		UpdateCaptionChrome();
 	}
+}
+
+void MinimapWindow::OnAuiPaneClose(wxAuiManagerEvent& event) {
+	if (!event.GetPane() || event.GetPane()->window != this) {
+		return;
+	}
+
+	// The pane's CloseButton(false) flag only disables AUI's own drawn
+	// close button; the floating frame's native OS title-bar close (X)
+	// still fires this event. Left to AUI's default handling, closing a
+	// floating pane this way can leave the wxAuiPaneInfo bookkeeping out
+	// of sync with the actual window (still marked shown/floating with no
+	// live frame behind it), and every subsequent per-stroke minimap
+	// update while painting then does increasingly expensive/failing work
+	// against that stale pane -- which is what made painting feel laggy
+	// after using this close button. Veto AUI's default handling and route
+	// it through the same GUI::HideMinimap() path as our own close button.
+	event.Veto();
+	g_gui.HideMinimap();
 }
 
 void MinimapWindow::DelayedUpdate() {
