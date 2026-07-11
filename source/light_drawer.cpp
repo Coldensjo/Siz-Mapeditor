@@ -41,35 +41,62 @@ void LightDrawer::draw(int map_x, int map_y, int end_x, int end_y, int scroll_x,
 
 	for (int x = 0; x < w; ++x) {
 		for (int y = 0; y < h; ++y) {
-			int mx = (map_x + x);
-			int my = (map_y + y);
-			int index = (y * w + x);
-			int color_index = index * PixelFormatRGBA;
+			int color_index = (y * w + x) * PixelFormatRGBA;
 
 			buffer[color_index] = global_color.Red();
 			buffer[color_index + 1] = global_color.Green();
 			buffer[color_index + 2] = global_color.Blue();
 			buffer[color_index + 3] = 140; // global_color.Alpha();
+		}
+	}
 
-			uint8_t cover_z = 255;
-			auto cover_it = opaque_ground.find(columnKey(mx, my));
-			if (cover_it != opaque_ground.end()) {
-				cover_z = cover_it->second;
-			}
+	// Lights only affect a bounded radius (see calculateIntensity), so walk
+	// each light's own bounding box instead of every light against every
+	// pixel. That keeps cost proportional to light count * radius^2 rather
+	// than to the (potentially huge, when zoomed out) viewport area * light
+	// count, which is what made dense light sources (e.g. lava fields) crawl.
+	const int radius = static_cast<int>(MaxLightIntensity);
+	for (auto& light : lights) {
+		int lx = light.map_x - map_x;
+		int ly = light.map_y - map_y;
 
-			for (auto& light : lights) {
+		int x0 = std::max(0, lx - radius);
+		int x1 = std::min(w - 1, lx + radius);
+		int y0 = std::max(0, ly - radius);
+		int y1 = std::min(h - 1, ly + radius);
+		if (x0 > x1 || y0 > y1) {
+			continue;
+		}
+
+		wxColor light_color = colorFromEightBit(light.color);
+		uint8_t light_red = light_color.Red();
+		uint8_t light_green = light_color.Green();
+		uint8_t light_blue = light_color.Blue();
+
+		for (int y = y0; y <= y1; ++y) {
+			int my = map_y + y;
+			for (int x = x0; x <= x1; ++x) {
+				int mx = map_x + x;
+
+				uint8_t cover_z = 255;
+				auto cover_it = opaque_ground.find(columnKey(mx, my));
+				if (cover_it != opaque_ground.end()) {
+					cover_z = cover_it->second;
+				}
 				// Occluded: a higher floor's solid ground covers this column.
 				if (light.map_z > cover_z) {
 					continue;
 				}
+
 				float intensity = calculateIntensity(mx, my, light);
 				if (intensity == 0.f) {
 					continue;
 				}
-				wxColor light_color = colorFromEightBit(light.color);
-				uint8_t red = static_cast<uint8_t>(light_color.Red() * intensity);
-				uint8_t green = static_cast<uint8_t>(light_color.Green() * intensity);
-				uint8_t blue = static_cast<uint8_t>(light_color.Blue() * intensity);
+
+				int color_index = (y * w + x) * PixelFormatRGBA;
+				uint8_t red = static_cast<uint8_t>(light_red * intensity);
+				uint8_t green = static_cast<uint8_t>(light_green * intensity);
+				uint8_t blue = static_cast<uint8_t>(light_blue * intensity);
 				buffer[color_index] = std::max(buffer[color_index], red);
 				buffer[color_index + 1] = std::max(buffer[color_index + 1], green);
 				buffer[color_index + 2] = std::max(buffer[color_index + 2], blue);
