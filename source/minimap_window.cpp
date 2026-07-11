@@ -27,71 +27,11 @@
 #include "map_display.h"
 #include "minimap_window.h"
 #include <algorithm>
-#include <atomic>
-#include <fstream>
 #include <wx/aui/dockart.h>
 #include <wx/aui/framemanager.h>
-#include <wx/filename.h>
 #include <wx/rawbmp.h>
-#include <wx/stdpaths.h>
 
 namespace {
-
-// --- TEMPORARY diagnostics -------------------------------------------------
-// Counts how often each piece of minimap machinery runs, dumped to
-// "minimap_debug.log" next to the executable roughly once a second. This is
-// purely to pin down which code path is spinning while the minimap pane is
-// floating; remove once the root cause is confirmed.
-struct MinimapDiagCounters {
-	std::atomic<long> paint_count { 0 };
-	std::atomic<long> rebuild_count { 0 };
-	std::atomic<long> size_count { 0 };
-	std::atomic<long> delayed_update_count { 0 };
-	std::atomic<long> timer_notify_count { 0 };
-	std::atomic<long> aui_render_events { 0 };
-	std::atomic<long> chrome_applied_count { 0 };
-	std::atomic<long> reason_dirty { 0 };
-	std::atomic<long> reason_not_ok { 0 };
-	std::atomic<long> reason_floor { 0 };
-	std::atomic<long> reason_show_all { 0 };
-	std::atomic<long> reason_start { 0 };
-	std::atomic<long> reason_size { 0 };
-	std::atomic<long> reason_zoom { 0 };
-};
-
-MinimapDiagCounters g_minimap_diag;
-
-void MinimapDiagDumpIfDue() {
-	static std::chrono::steady_clock::time_point lastDump = std::chrono::steady_clock::now();
-	const auto now = std::chrono::steady_clock::now();
-	if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastDump).count() < 1000) {
-		return;
-	}
-	lastDump = now;
-
-	wxFileName fn(wxStandardPaths::Get().GetExecutablePath());
-	fn.SetFullName("minimap_debug.log");
-	std::ofstream out(fn.GetFullPath().ToStdString(), std::ios::app);
-	if (!out) {
-		return;
-	}
-	out << "paint=" << g_minimap_diag.paint_count.exchange(0)
-		<< " rebuild=" << g_minimap_diag.rebuild_count.exchange(0)
-		<< " size=" << g_minimap_diag.size_count.exchange(0)
-		<< " delayedUpdate=" << g_minimap_diag.delayed_update_count.exchange(0)
-		<< " timerNotify=" << g_minimap_diag.timer_notify_count.exchange(0)
-		<< " auiRender=" << g_minimap_diag.aui_render_events.exchange(0)
-		<< " chromeApplied=" << g_minimap_diag.chrome_applied_count.exchange(0)
-		<< " r_dirty=" << g_minimap_diag.reason_dirty.exchange(0)
-		<< " r_notOk=" << g_minimap_diag.reason_not_ok.exchange(0)
-		<< " r_floor=" << g_minimap_diag.reason_floor.exchange(0)
-		<< " r_showAll=" << g_minimap_diag.reason_show_all.exchange(0)
-		<< " r_start=" << g_minimap_diag.reason_start.exchange(0)
-		<< " r_size=" << g_minimap_diag.reason_size.exchange(0)
-		<< " r_zoom=" << g_minimap_diag.reason_zoom.exchange(0)
-		<< std::endl;
-}
-// --- end TEMPORARY diagnostics ----------------------------------------------
 
 void DrawLiveUserMarkers(wxDC& dc, Editor& editor, int start_x, int start_y, int floor, int window_width, int window_height, double zoom) {
 	if (!editor.IsLive()) {
@@ -314,14 +254,12 @@ void MinimapCanvas::ComputeViewBounds(Editor& editor, MapCanvas* canvas, int win
 }
 
 void MinimapCanvas::OnSize(wxSizeEvent& event) {
-	++g_minimap_diag.size_count;
 	MarkDirty();
 	Refresh();
 	event.Skip();
 }
 
 void MinimapCanvas::DelayedUpdate() {
-	++g_minimap_diag.delayed_update_count;
 	bitmap_dirty = true;
 
 	constexpr int kDefaultFastIntervalMs = 40;
@@ -358,14 +296,10 @@ void MinimapCanvas::MarkDirty() {
 }
 
 void MinimapCanvas::OnDelayedUpdate(wxTimerEvent& event) {
-	++g_minimap_diag.timer_notify_count;
 	Refresh();
 }
 
 void MinimapCanvas::OnPaint(wxPaintEvent& event) {
-	++g_minimap_diag.paint_count;
-	MinimapDiagDumpIfDue();
-
 	wxBufferedPaintDC pdc(this);
 
 	pdc.SetBackground(*wxBLACK_BRUSH);
@@ -405,14 +339,6 @@ void MinimapCanvas::OnPaint(wxPaintEvent& event) {
 	}
 
 	if (g_gui.IsRenderingEnabled()) {
-		if (bitmap_dirty) ++g_minimap_diag.reason_dirty;
-		if (!minimap_bitmap.IsOk()) ++g_minimap_diag.reason_not_ok;
-		if (cached_floor != floor) ++g_minimap_diag.reason_floor;
-		if (cached_show_all_floors != show_all_floors) ++g_minimap_diag.reason_show_all;
-		if (cached_start_x != start_x || cached_start_y != start_y) ++g_minimap_diag.reason_start;
-		if (cached_width != window_width || cached_height != window_height) ++g_minimap_diag.reason_size;
-		if (cached_zoom != minimap_zoom) ++g_minimap_diag.reason_zoom;
-
 		bool needs_rebuild = bitmap_dirty || !minimap_bitmap.IsOk()
 			|| cached_floor != floor
 			|| cached_show_all_floors != show_all_floors
@@ -421,7 +347,6 @@ void MinimapCanvas::OnPaint(wxPaintEvent& event) {
 			|| cached_zoom != minimap_zoom;
 
 		if (needs_rebuild) {
-			++g_minimap_diag.rebuild_count;
 			if (!minimap_bitmap.IsOk() || minimap_bitmap.GetWidth() != window_width || minimap_bitmap.GetHeight() != window_height) {
 				minimap_bitmap = wxBitmap(window_width, window_height, 32);
 			}
@@ -872,7 +797,6 @@ void MinimapWindow::UpdateCaptionChrome() {
 	if (floating == last_floating_state && active == last_active_state) {
 		return;
 	}
-	++g_minimap_diag.chrome_applied_count;
 
 	if (caption_bar) {
 		caption_bar->UpdateChrome(floating, active);
@@ -915,7 +839,6 @@ void MinimapWindow::OnSize(wxSizeEvent& event) {
 }
 
 void MinimapWindow::OnAuiPaneEvent(wxAuiManagerEvent& event) {
-	++g_minimap_diag.aui_render_events;
 	if (event.GetPane() && event.GetPane()->window == this) {
 		UpdateCaptionChrome();
 	} else if (event.GetEventType() == wxEVT_AUI_RENDER) {
