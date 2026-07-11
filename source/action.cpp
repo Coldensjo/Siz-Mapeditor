@@ -411,6 +411,10 @@ void BatchAction::redo() {
 void BatchAction::merge(BatchAction* other) {
 	batch.insert(batch.end(), other->batch.begin(), other->batch.end());
 	other->batch.clear();
+	// Add the incoming batch's already-known size instead of rescanning the
+	// (potentially large) combined batch on every merge during a continuous
+	// brush stroke, which made painting O(n^2) in the number of draw ticks.
+	memory_size += other->memsize();
 }
 
 ActionQueue::ActionQueue(Editor& editor) :
@@ -486,10 +490,10 @@ void ActionQueue::addBatch(BatchAction* batch, int stacking_delay) {
 		if (!actions.empty()) {
 			BatchAction* lastAction = actions.back();
 			if (lastAction->type == batch->type && g_settings.getInteger(Config::GROUP_ACTIONS) && time(nullptr) - stacking_delay < lastAction->timestamp) {
+				const size_t addedSize = batch->memsize();
 				lastAction->merge(batch);
 				lastAction->timestamp = time(nullptr);
-				memory_size -= lastAction->memsize();
-				memory_size += lastAction->memsize(true);
+				memory_size += addedSize;
 				delete batch;
 				break;
 			}
