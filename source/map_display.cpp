@@ -421,10 +421,63 @@ MapCanvas::MapCanvas(MapWindow* parent, Editor& editor, int* attriblist) :
 }
 
 MapCanvas::~MapCanvas() {
+	CloseModelessProperties();
 	delete popup_menu;
 	delete animation_timer;
 	delete drawer;
 	free(screenshot_buffer);
+}
+
+void MapCanvas::CloseModelessProperties() {
+	std::vector<wxWeakRef<ObjectPropertiesWindowBase>> windows = modeless_property_windows;
+	modeless_property_windows.clear();
+
+	for (wxWeakRef<ObjectPropertiesWindowBase>& window_ref : windows) {
+		if (ObjectPropertiesWindowBase* window = window_ref) {
+			window->Finish(0);
+		}
+	}
+}
+
+void MapCanvas::ShowObjectProperties(ObjectPropertiesWindowBase* window, Tile* edited_tile, Item* protected_item) {
+	if (!window) {
+		delete edited_tile;
+		return;
+	}
+
+	wxWeakRef<ObjectPropertiesWindowBase> window_ref(window);
+	modeless_property_windows.push_back(window_ref);
+	if (protected_item) {
+		editor.protectItemProperties(protected_item);
+	}
+
+	window->ShowModeless([this, window_ref, edited_tile, protected_item](int ret) mutable {
+		ObjectPropertiesWindowBase* completed_window = window_ref;
+		modeless_property_windows.erase(
+			std::remove_if(
+				modeless_property_windows.begin(),
+				modeless_property_windows.end(),
+				[completed_window](const wxWeakRef<ObjectPropertiesWindowBase>& candidate_ref) {
+					ObjectPropertiesWindowBase* candidate = candidate_ref;
+					return !candidate || candidate == completed_window;
+				}
+			),
+			modeless_property_windows.end()
+		);
+
+		if (protected_item) {
+			editor.releaseItemProperties(protected_item);
+		}
+
+		if (ret != 0) {
+			Action* action = editor.actionQueue->createAction(ACTION_CHANGE_PROPERTIES);
+			action->addChange(newd Change(edited_tile));
+			editor.addAction(action);
+		} else {
+			delete edited_tile;
+		}
+		g_gui.RefreshView();
+	});
 }
 
 void MapCanvas::Refresh() {
@@ -906,29 +959,23 @@ void MapCanvas::OnMouseLeftDoubleClick(wxMouseEvent& event) {
 	if (g_settings.getInteger(Config::DOUBLECLICK_PROPERTIES)) {
 		if (tile && tile->size() > 0) {
 			Tile* new_tile = tile->deepCopy(editor.map);
-			wxDialog* w = nullptr;
+			ObjectPropertiesWindowBase* w = nullptr;
+			Item* protected_item = nullptr;
 			if (new_tile->creature && g_settings.getInteger(Config::SHOW_CREATURES)) {
-				w = newd OldPropertiesWindow(g_gui.root, &editor.map, new_tile, new_tile->creature);
+				w = newd OldPropertiesWindow(this, &editor.map, new_tile, new_tile->creature);
 			} else if (Item* item = new_tile->getTopItem()) {
+				protected_item = tile->getTopItem();
 				if (editor.map.getVersion().otbm >= MAP_OTBM_4) {
-					w = newd PropertiesWindow(g_gui.root, &editor.map, new_tile, item);
+					w = newd PropertiesWindow(this, &editor.map, new_tile, item);
 				} else {
-					w = newd OldPropertiesWindow(g_gui.root, &editor.map, new_tile, item);
+					w = newd OldPropertiesWindow(this, &editor.map, new_tile, item);
 				}
 			} else {
+				delete new_tile;
 				return;
 			}
 
-			int ret = w->ShowModal();
-			if (ret != 0) {
-				Action* action = editor.actionQueue->createAction(ACTION_CHANGE_PROPERTIES);
-				action->addChange(newd Change(new_tile));
-				editor.addAction(action);
-			} else {
-				// Cancel!
-				delete new_tile;
-			}
-			w->Destroy();
+			ShowObjectProperties(w, new_tile, protected_item);
 		}
 	}
 }
@@ -3123,43 +3170,38 @@ void MapCanvas::OnProperties(wxCommandEvent& WXUNUSED(event)) {
 	ASSERT(tile->isSelected());
 	Tile* new_tile = tile->deepCopy(editor.map);
 
-	wxDialog* w = nullptr;
+	ObjectPropertiesWindowBase* w = nullptr;
+	Item* protected_item = nullptr;
 
 	if (new_tile->creature && g_settings.getInteger(Config::SHOW_CREATURES)) {
-		w = newd OldPropertiesWindow(g_gui.root, &editor.map, new_tile, new_tile->creature);
+		w = newd OldPropertiesWindow(this, &editor.map, new_tile, new_tile->creature);
 	} else {
+		ItemVector original_selected_items = tile->getSelectedItems();
 		ItemVector selected_items = new_tile->getSelectedItems();
 
 		Item* item = nullptr;
-		int count = 0;
-		for (ItemVector::iterator it = selected_items.begin(); it != selected_items.end(); ++it) {
-			++count;
-			if ((*it)->isSelected()) {
-				item = *it;
+		for (size_t i = 0; i < selected_items.size(); ++i) {
+			if (selected_items[i]->isSelected()) {
+				item = selected_items[i];
+				if (i < original_selected_items.size()) {
+					protected_item = original_selected_items[i];
+				}
 			}
 		}
 
 		if (item) {
 			if (editor.map.getVersion().otbm >= MAP_OTBM_4) {
-				w = newd PropertiesWindow(g_gui.root, &editor.map, new_tile, item);
+				w = newd PropertiesWindow(this, &editor.map, new_tile, item);
 			} else {
-				w = newd OldPropertiesWindow(g_gui.root, &editor.map, new_tile, item);
+				w = newd OldPropertiesWindow(this, &editor.map, new_tile, item);
 			}
 		} else {
+			delete new_tile;
 			return;
 		}
 	}
 
-	int ret = w->ShowModal();
-	if (ret != 0) {
-		Action* action = editor.actionQueue->createAction(ACTION_CHANGE_PROPERTIES);
-		action->addChange(newd Change(new_tile));
-		editor.addAction(action);
-	} else {
-		// Cancel!
-		delete new_tile;
-	}
-	w->Destroy();
+	ShowObjectProperties(w, new_tile, protected_item);
 }
 
 void MapCanvas::ChangeFloor(int new_floor) {

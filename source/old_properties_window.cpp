@@ -925,12 +925,12 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 		edit_creature->setAmount(amount_field->GetValue());
 		edit_creature->setRadius(radius_field->GetValue());
 	}
-	EndModal(1);
+	Finish(1);
 }
 
 void OldPropertiesWindow::OnClickCancel(wxCommandEvent& WXUNUSED(event)) {
 	// Just close this window
-	EndModal(0);
+	Finish(0);
 }
 
 void OldPropertiesWindow::Update() {

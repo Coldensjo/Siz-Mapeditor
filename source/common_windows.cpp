@@ -1295,6 +1295,52 @@ ObjectPropertiesWindowBase::ObjectPropertiesWindowBase(wxWindow* parent, wxStrin
 	////
 }
 
+ObjectPropertiesWindowBase::~ObjectPropertiesWindowBase() {
+	if (!modeless_finished && modeless_completion) {
+		modeless_finished = true;
+		auto completion = std::move(modeless_completion);
+		completion(0);
+	}
+}
+
+void ObjectPropertiesWindowBase::ShowModeless(std::function<void(int)> completion) {
+	modeless_completion = std::move(completion);
+	modeless_finished = false;
+	SetReturnCode(0);
+	Bind(wxEVT_CLOSE_WINDOW, &ObjectPropertiesWindowBase::OnModelessClose, this);
+	Show();
+}
+
+void ObjectPropertiesWindowBase::Finish(int returnCode) {
+	if (IsModal()) {
+		EndModal(returnCode);
+		return;
+	}
+
+	if (modeless_finished) {
+		return;
+	}
+
+	modeless_finished = true;
+	SetReturnCode(returnCode);
+
+	auto completion = std::move(modeless_completion);
+	if (completion) {
+		completion(returnCode);
+	}
+
+	Destroy();
+}
+
+void ObjectPropertiesWindowBase::OnModelessClose(wxCloseEvent& event) {
+	if (IsModal()) {
+		event.Skip();
+		return;
+	}
+
+	Finish(0);
+}
+
 Item* ObjectPropertiesWindowBase::getItemBeingEdited() {
 	return edit_item;
 }

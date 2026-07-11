@@ -36,7 +36,19 @@
 #include "creature.h"
 #include "live_update.h"
 
+#include <wx/choice.h>
+#include <wx/combobox.h>
+#include <wx/dataview.h>
+#include <wx/dialog.h>
+#include <wx/grid.h>
+#include <wx/listbox.h>
+#include <wx/listctrl.h>
+#include <wx/slider.h>
 #include <wx/snglinst.h>
+#include <wx/spinctrl.h>
+#include <wx/textctrl.h>
+#include <wx/treectrl.h>
+#include <wx/vlbox.h>
 
 #if defined(__LINUX__) || defined(__WINDOWS__)
 	#include <GL/glut.h>
@@ -87,6 +99,57 @@ END_EVENT_TABLE()
 #ifndef __LIVE_SERVER__
 wxIMPLEMENT_APP(Application);
 #endif
+
+namespace {
+
+bool IsMapNavigationKey(int keyCode) {
+	switch (keyCode) {
+		case WXK_NUMPAD_ADD:
+		case WXK_NUMPAD_SUBTRACT:
+		case WXK_NUMPAD_MULTIPLY:
+		case WXK_NUMPAD_DIVIDE:
+		case WXK_PAGEUP:
+		case WXK_PAGEDOWN:
+		case WXK_NUMPAD_UP:
+		case WXK_NUMPAD_DOWN:
+		case WXK_NUMPAD_LEFT:
+		case WXK_NUMPAD_RIGHT:
+		case WXK_UP:
+		case WXK_DOWN:
+		case WXK_LEFT:
+		case WXK_RIGHT:
+			return true;
+		default:
+			return false;
+	}
+}
+
+bool FocusKeepsNavigationKeys(wxWindow* focus) {
+	while (focus) {
+		if (focus->IsKindOf(CLASSINFO(wxTextCtrl)) ||
+			focus->IsKindOf(CLASSINFO(wxSpinCtrl)) ||
+			focus->IsKindOf(CLASSINFO(wxComboBox)) ||
+			focus->IsKindOf(CLASSINFO(wxChoice)) ||
+			focus->IsKindOf(CLASSINFO(wxListBox)) ||
+			focus->IsKindOf(CLASSINFO(wxVListBox)) ||
+			focus->IsKindOf(CLASSINFO(wxListCtrl)) ||
+			focus->IsKindOf(CLASSINFO(wxTreeCtrl)) ||
+			focus->IsKindOf(CLASSINFO(wxDataViewCtrl)) ||
+			focus->IsKindOf(CLASSINFO(wxGrid)) ||
+			focus->IsKindOf(CLASSINFO(wxSlider))) {
+			return true;
+		}
+
+		if (focus->IsTopLevel()) {
+			break;
+		}
+		focus = focus->GetParent();
+	}
+
+	return false;
+}
+
+} // namespace
 
 Application::~Application() {
 	// Destroy
@@ -279,6 +342,37 @@ bool Application::OnInit() {
 	// Keep track of first event loop entry
 	m_startup = true;
 	return true;
+}
+
+int Application::FilterEvent(wxEvent& event) {
+	if (event.GetEventType() != wxEVT_CHAR_HOOK || !event.IsKindOf(CLASSINFO(wxKeyEvent))) {
+		return Event_Skip;
+	}
+
+	wxKeyEvent& keyEvent = static_cast<wxKeyEvent&>(event);
+	if (!IsMapNavigationKey(keyEvent.GetKeyCode())) {
+		return Event_Skip;
+	}
+
+	wxWindow* focus = wxWindow::FindFocus();
+	if (!focus) {
+		return Event_Skip;
+	}
+
+	wxDialog* dialog = wxDynamicCast(wxGetTopLevelParent(focus), wxDialog);
+	const bool itemPropertiesDialog = dynamic_cast<ObjectPropertiesWindowBase*>(dialog) != nullptr;
+	if (!dialog || dialog->IsModal() || (!itemPropertiesDialog && FocusKeepsNavigationKeys(focus))) {
+		return Event_Skip;
+	}
+
+	if (!g_gui.GetCurrentMapTab()) {
+		return Event_Skip;
+	}
+
+	wxKeyEvent forwarded(keyEvent);
+	forwarded.SetEventType(wxEVT_KEY_DOWN);
+	g_gui.AddPendingCanvasEvent(forwarded);
+	return Event_Processed;
 }
 
 void Application::OnEventLoopEnter(wxEventLoopBase* loop) {

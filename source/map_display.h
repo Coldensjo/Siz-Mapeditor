@@ -22,6 +22,9 @@
 #include "tile.h"
 #include "creature.h"
 
+#include <vector>
+
+class ObjectPropertiesWindowBase;
 class Item;
 class Creature;
 class MapWindow;
@@ -105,6 +108,7 @@ public:
 	void OnProperties(wxCommandEvent& event);
 
 	void Refresh();
+	void CloseModelessProperties();
 
 	void ScreenToMap(int screen_x, int screen_y, int* map_x, int* map_y);
 	void MouseToMap(int* map_x, int* map_y) {
@@ -137,6 +141,7 @@ public:
 protected:
 	void getTilesToDraw(int mouse_map_x, int mouse_map_y, int floor, PositionVector* tilestodraw, PositionVector* tilestoborder, bool fill = false);
 	bool floodFill(Map* map, const Position& center, int x, int y, GroundBrush* brush, PositionVector* positions);
+	void ShowObjectProperties(ObjectPropertiesWindowBase* window, Tile* edited_tile, Item* protected_item);
 
 private:
 	enum {
@@ -198,6 +203,7 @@ private:
 	wxStopWatch refresh_watch;
 	MapPopupMenu* popup_menu;
 	AnimationTimer* animation_timer;
+	std::vector<wxWeakRef<ObjectPropertiesWindowBase>> modeless_property_windows;
 
 	friend class MapDrawer;
 

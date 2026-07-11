@@ -39,6 +39,7 @@ class Application : public wxApp {
 public:
 	~Application();
 	virtual bool OnInit();
+	virtual int FilterEvent(wxEvent& event);
 	virtual void OnEventLoopEnter(wxEventLoopBase* loop);
 	virtual void MacOpenFiles(const wxArrayString& fileNames);
 	virtual int OnExit();

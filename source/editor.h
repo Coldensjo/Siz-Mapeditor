@@ -20,6 +20,8 @@
 
 #include <wx/filename.h>
 
+#include <vector>
+
 #include "main.h"
 #include "item.h"
 #include "tile.h"
@@ -134,6 +136,9 @@ public: // Functions
 	void moveSelection(Position offset);
 	// Deletes all selected items
 	void destroySelection();
+	void protectItemProperties(Item* item);
+	void releaseItemProperties(Item* item);
+	bool isItemProtectedByProperties(const Item* item) const;
 	// Borderizes the selected region
 	void borderizeSelection();
 	// Randomizes the ground in the selected region
@@ -162,6 +167,9 @@ protected:
 	void drawInternal(const Position offset, bool alt, bool dodraw);
 	void drawInternal(const PositionVector& posvec, bool alt, bool dodraw);
 	void drawInternal(const PositionVector& todraw, PositionVector& toborder, bool alt, bool dodraw);
+
+private:
+	std::vector<Item*> property_locked_items;
 
 	Editor(const Editor&);
 	Editor& operator=(const Editor&);

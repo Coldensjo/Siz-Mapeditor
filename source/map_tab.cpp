@@ -51,6 +51,9 @@ MapTab::MapTab(const MapTab* other) :
 }
 
 MapTab::~MapTab() {
+	if (canvas) {
+		canvas->CloseModelessProperties();
+	}
 	iref->owner_count--;
 	if (iref->owner_count <= 0) {
 		delete iref->editor;

@@ -17,6 +17,7 @@
 
 #include "main.h"
 
+#include <algorithm>
 #include <set>
 #include <functional>
 #include <fstream>
@@ -201,6 +202,23 @@ LiveSocket& Editor::GetLive() const {
 
 bool Editor::IsClipboardAllowed() const {
 	return !IsLiveClient() || g_settings.getBoolean(Config::LIVE_ALLOW_CLIPBOARD);
+}
+
+void Editor::protectItemProperties(Item* item) {
+	if (item) {
+		property_locked_items.push_back(item);
+	}
+}
+
+void Editor::releaseItemProperties(Item* item) {
+	auto it = std::find(property_locked_items.begin(), property_locked_items.end(), item);
+	if (it != property_locked_items.end()) {
+		property_locked_items.erase(it);
+	}
+}
+
+bool Editor::isItemProtectedByProperties(const Item* item) const {
+	return item && std::find(property_locked_items.begin(), property_locked_items.end(), item) != property_locked_items.end();
 }
 
 LiveServer* Editor::StartLiveServer() {
@@ -1684,37 +1702,66 @@ void Editor::destroySelection() {
 	} else {
 		int tile_count = 0;
 		int item_count = 0;
+		int protected_item_count = 0;
 		PositionList tilestoborder;
 
 		BatchAction* batch = actionQueue->createBatch(ACTION_DELETE_TILES);
 		Action* action = actionQueue->createAction(batch);
+		bool has_changes = false;
 
 		for (TileSet::iterator it = selection.begin(); it != selection.end(); ++it) {
-			tile_count++;
-
 			Tile* tile = *it;
 			Tile* newtile = tile->deepCopy(map);
+			bool tile_changed = false;
 
-			ItemVector tile_selection = newtile->popSelectedItems();
-			for (ItemVector::iterator iit = tile_selection.begin(); iit != tile_selection.end(); ++iit) {
-				++item_count;
-				// Delete the items from the tile
-				delete *iit;
+			if (tile->ground && tile->ground->isSelected()) {
+				if (isItemProtectedByProperties(tile->ground)) {
+					++protected_item_count;
+				} else if (newtile->ground) {
+					++item_count;
+					delete newtile->ground;
+					newtile->ground = nullptr;
+					tile_changed = true;
+				}
+			}
+
+			size_t newtile_item_index = 0;
+			for (size_t item_index = 0; item_index < tile->items.size(); ++item_index) {
+				Item* item = tile->items[item_index];
+				if (!item->isSelected()) {
+					++newtile_item_index;
+					continue;
+				}
+
+				if (isItemProtectedByProperties(item)) {
+					++protected_item_count;
+					++newtile_item_index;
+					continue;
+				}
+
+				if (newtile_item_index < newtile->items.size()) {
+					++item_count;
+					delete newtile->items[newtile_item_index];
+					newtile->items.erase(newtile->items.begin() + newtile_item_index);
+					tile_changed = true;
+				}
 			}
 
 			if (newtile->creature && newtile->creature->isSelected()) {
 				delete newtile->creature;
 				newtile->creature = nullptr;
+				tile_changed = true;
 			}
 
 			if (newtile->spawn && newtile->spawn->isSelected()) {
 				delete newtile->spawn;
 				newtile->spawn = nullptr;
+				tile_changed = true;
 			}
 
 			// Only re-borderize the neighbourhood when ground was actually removed.
 			// Deleting plain items must not re-borderize (causes inverted borders).
-			bool ground_removed = tile->ground && tile->ground->isSelected();
+			bool ground_removed = tile->ground && tile->ground->isSelected() && !isItemProtectedByProperties(tile->ground);
 
 			if (ground_removed && g_settings.getInteger(Config::USE_AUTOMAGIC)) {
 				for (int y = -1; y <= 1; y++) {
@@ -1725,12 +1772,24 @@ void Editor::destroySelection() {
 					}
 				}
 			}
-			action->addChange(newd Change(newtile));
+
+			if (tile_changed) {
+				++tile_count;
+				has_changes = true;
+				newtile->update();
+				action->addChange(newd Change(newtile));
+			} else {
+				delete newtile;
+			}
 		}
 
-		batch->addAndCommitAction(action);
+		if (has_changes) {
+			batch->addAndCommitAction(action);
+		} else {
+			delete action;
+		}
 
-		if (g_settings.getInteger(Config::USE_AUTOMAGIC)) {
+		if (has_changes && g_settings.getInteger(Config::USE_AUTOMAGIC)) {
 			// Remove duplicates
 			tilestoborder.sort();
 			tilestoborder.unique();
@@ -1761,9 +1820,21 @@ void Editor::destroySelection() {
 			batch->addAndCommitAction(action);
 		}
 
-		addBatch(batch);
+		if (has_changes) {
+			addBatch(batch);
+		} else {
+			delete batch;
+		}
+
 		wxString ss;
-		ss << "Deleted " << tile_count << " tile" << (tile_count > 1 ? "s" : "") << " (" << item_count << " item" << (item_count > 1 ? "s" : "") << ")";
+		if (has_changes) {
+			ss << "Deleted " << tile_count << " tile" << (tile_count > 1 ? "s" : "") << " (" << item_count << " item" << (item_count > 1 ? "s" : "") << ")";
+		} else {
+			ss << "No selected items were deleted.";
+		}
+		if (protected_item_count > 0) {
+			ss << " " << protected_item_count << " item" << (protected_item_count > 1 ? "s were" : " was") << " kept because item properties are open.";
+		}
 		g_gui.SetStatusText(ss);
 	}
 }

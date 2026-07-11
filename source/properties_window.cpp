@@ -306,7 +306,7 @@ void PropertiesWindow::OnGridValueChanged(wxGridEvent& event) {
 
 void PropertiesWindow::OnClickOK(wxCommandEvent&) {
 	saveAttributesPanel();
-	EndModal(1);
+	Finish(1);
 }
 
 void PropertiesWindow::OnClickAddAttribute(wxCommandEvent&) {
@@ -326,5 +326,5 @@ void PropertiesWindow::OnClickRemoveAttribute(wxCommandEvent&) {
 }
 
 void PropertiesWindow::OnClickCancel(wxCommandEvent&) {
-	EndModal(1);
+	Finish(1);
 }

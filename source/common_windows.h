@@ -20,6 +20,8 @@
 
 #include "main.h"
 
+#include <functional>
+
 #include <wx/clrpicker.h>
 
 #include "dcbutton.h"
@@ -313,17 +315,25 @@ public:
 	ObjectPropertiesWindowBase(
 		wxWindow* parent, wxString title, wxPoint position = wxDefaultPosition
 	);
+	virtual ~ObjectPropertiesWindowBase();
+
+	void ShowModeless(std::function<void(int)> completion);
+	void Finish(int returnCode);
 
 	Item* getItemBeingEdited();
 	Creature* getCreatureBeingEdited();
 	Spawn* getSpawnBeingEdited();
 
 protected:
+	void OnModelessClose(wxCloseEvent& event);
+
 	const Map* edit_map;
 	const Tile* edit_tile;
 	Item* edit_item;
 	Creature* edit_creature;
 	Spawn* edit_spawn;
+	std::function<void(int)> modeless_completion;
+	bool modeless_finished = false;
 };
 
 /**
