@@ -30,6 +30,7 @@
 #include "table_brush.h"
 #include "town.h"
 #include "map.h"
+#include "settings.h"
 
 Tile::Tile(int x, int y, int z) :
 	location(nullptr),
@@ -223,6 +224,30 @@ Item* Tile::getTopItem() const {
 		return items.back();
 	}
 	if (ground && !ground->isMetaItem()) {
+		return ground;
+	}
+	return nullptr;
+}
+
+Item* Tile::getTopVisibleItem() const {
+	bool show_walls = g_settings.getBoolean(Config::SHOW_WALLS);
+	bool show_borders = g_settings.getBoolean(Config::SHOW_BORDERS);
+	bool show_ground = g_settings.getBoolean(Config::SHOW_GROUND);
+
+	for (ItemVector::const_reverse_iterator it = items.rbegin(); it != items.rend(); ++it) {
+		Item* item = *it;
+		if (item->isMetaItem()) {
+			continue;
+		}
+		if (item->isWall() && !show_walls) {
+			continue;
+		}
+		if (item->isBorder() && !show_borders) {
+			continue;
+		}
+		return item;
+	}
+	if (ground && !ground->isMetaItem() && show_ground) {
 		return ground;
 	}
 	return nullptr;

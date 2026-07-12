@@ -409,6 +409,7 @@ void DrawingOptions::SetDefault() {
 	show_fishable_water = false;
 	show_borders = true;
 	show_walls = true;
+	show_ground = true;
 	hide_items_when_zoomed = true;
 
 	show_towns = false;
@@ -458,6 +459,7 @@ void DrawingOptions::SetIngame() {
 	show_fishable_water = false;
 	show_borders = true;
 	show_walls = true;
+	show_ground = true;
 	hide_items_when_zoomed = false;
 
 	show_towns = false;
@@ -788,7 +790,7 @@ void MapDrawer::DrawMap() {
 
 						// Draw ground
 						uint8_t r = 160, g = 160, b = 160;
-						if (tile->ground) {
+						if (tile->ground && options.show_ground) {
 							if (tile->isBlocking() && options.show_blocking) {
 								g = g / 3 * 2;
 								b = b / 3 * 2;
@@ -1139,7 +1141,7 @@ void MapDrawer::DrawHigherFloors() {
 
 					// Position pos = tile->getPosition();
 
-					if (tile->ground) {
+					if (tile->ground && options.show_ground) {
 						if (tile->isPZ()) {
 							BlitItem(draw_x, draw_y, tile, tile->ground, false, 128, 255, 128, 96);
 						} else if (tile->isRefresh()) {
@@ -2964,7 +2966,7 @@ void MapDrawer::DrawTile(TileLocation* location) {
 			BlitSquare(draw_x, draw_y, r, g, b, 128);
 		}
 	} else {
-		if (tile->ground) {
+		if (tile->ground && options.show_ground) {
 			if (options.show_preview && zoom <= 2.0) {
 				tile->ground->animate();
 			}

@@ -105,7 +105,7 @@
 		</menu>
 		<separator />
 		<menu name="Transparency">
-			<item name="Ghost Loose Items" hotkey="G" action="GHOST_ITEMS" help="Ghost items (except ground)." />
+			<item name="Ghost Loose Items" hotkey="U" action="GHOST_ITEMS" help="Ghost items (except ground)." />
 			<item name="Ghost Items on Void" action="GHOST_ITEMS_ON_VOID" help="Ghost items that are on tiles without ground." />
 			<item name="Ghost Higher Floors" hotkey="Ctrl+L" action="GHOST_HIGHER_FLOORS" help="Ghost floors above the current floor." />
 		</menu>
@@ -156,6 +156,7 @@
 			<item name="Show Towns" action="SHOW_TOWNS" help="Show temple positions." />
 			<item name="Show Borders" action="SHOW_BORDERS" hotkey="B" help="Show ground border items on the map." />
 			<item name="Show Walls" action="SHOW_WALLS" hotkey="W" help="Show wall items on the map." />
+			<item name="Show Ground" action="SHOW_GROUND" hotkey="G" help="Show ground items on the map." />
 			<item name="Show Wall Hooks" hotkey="K" action="SHOW_WALL_HOOKS" help="Show indicators for wall hooks." />
 			<item name="Show Fishable Water" action="SHOW_FISHABLE_WATER" help="Show indicators for fishing spots." />
 		</menu>

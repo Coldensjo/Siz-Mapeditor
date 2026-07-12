@@ -122,6 +122,7 @@ struct DrawingOptions {
 	bool show_fishable_water;
 	bool show_borders;
 	bool show_walls;
+	bool show_ground;
 	bool hide_items_when_zoomed;
 	bool show_towns;
 	bool always_show_zones;

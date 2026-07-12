@@ -560,6 +560,7 @@ void MapCanvas::OnPaint(wxPaintEvent& event) {
 				options.show_fishable_water = g_settings.getBoolean(Config::SHOW_FISHABLE_WATER);
 				options.show_borders = g_settings.getBoolean(Config::SHOW_BORDERS);
 				options.show_walls = g_settings.getBoolean(Config::SHOW_WALLS);
+				options.show_ground = g_settings.getBoolean(Config::SHOW_GROUND);
 				options.hide_items_when_zoomed = g_settings.getBoolean(Config::HIDE_ITEMS_WHEN_ZOOMED);
 				options.show_towns = g_settings.getBoolean(Config::SHOW_TOWNS);
 				options.always_show_zones = g_settings.getBoolean(Config::ALWAYS_SHOW_ZONES);
@@ -745,7 +746,7 @@ void MapCanvas::UpdatePositionStatus(int x, int y) {
 		} else if (tile->creature && g_settings.getInteger(Config::SHOW_CREATURES)) {
 			ss << (tile->creature->isNpc() ? "NPC" : "Monster");
 			ss << " \"" << wxstr(tile->creature->getName()) << "\" spawntime: " << tile->creature->getSpawnTime();
-		} else if (Item* item = tile->getTopItem()) {
+		} else if (Item* item = tile->getTopVisibleItem()) {
 			ss << "Item \"" << wxstr(item->getName()) << "\"";
 			ss << " id:" << item->getID();
 			ss << " cid:" << item->getClientID();
@@ -946,7 +947,7 @@ void MapCanvas::OnMouseLeftDoubleClick(wxMouseEvent& event) {
 	Tile* tile = editor.map.getTile(mouse_map_x, mouse_map_y, floor);
 
 	if (event.AltDown() && tile) {
-		if (Item* item = tile->getTopItem()) {
+		if (Item* item = tile->getTopVisibleItem()) {
 			if (g_gui.IsDrawingMode()) {
 				g_gui.SetSelectionMode();
 			}
@@ -963,8 +964,8 @@ void MapCanvas::OnMouseLeftDoubleClick(wxMouseEvent& event) {
 			Item* protected_item = nullptr;
 			if (new_tile->creature && g_settings.getInteger(Config::SHOW_CREATURES)) {
 				w = newd OldPropertiesWindow(this, &editor.map, new_tile, new_tile->creature);
-			} else if (Item* item = new_tile->getTopItem()) {
-				protected_item = tile->getTopItem();
+			} else if (Item* item = new_tile->getTopVisibleItem()) {
+				protected_item = tile->getTopVisibleItem();
 				if (editor.map.getVersion().otbm >= MAP_OTBM_4) {
 					w = newd PropertiesWindow(this, &editor.map, new_tile, item);
 				} else {
@@ -1067,7 +1068,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 				}
 			}
 			// Fall back to item selection
-			Item* item = tile->getTopItem();
+			Item* item = tile->getTopVisibleItem();
 			if (item && item->getRAWBrush()) {
 				g_gui.SelectBrush(item->getRAWBrush(), TILESET_RAW);
 			}
@@ -1119,7 +1120,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 							editor.selection.finish(); // Finish selection session
 							editor.selection.updateSelectionCount();
 						} else {
-							Item* item = tile->getTopItem();
+							Item* item = tile->getTopVisibleItem();
 							if (item) {
 								editor.selection.start(); // Start selection session
 								if (item->isSelected()) {
@@ -1161,7 +1162,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 							drag_start_y = mouse_map_y;
 							drag_start_z = floor;
 						} else {
-							Item* item = tile->getTopItem();
+							Item* item = tile->getTopVisibleItem();
 							if (item) {
 								editor.selection.add(tile, item);
 								dragging = true;
@@ -1506,7 +1507,7 @@ void MapCanvas::OnMouseActionRelease(wxMouseEvent& event) {
 							editor.selection.updateSelectionCount();
 						}
 					} else {
-						Item* item = tile->getTopItem();
+						Item* item = tile->getTopVisibleItem();
 						if (item && !item->isSelected()) {
 							editor.selection.start(); // Start a selection session
 							editor.selection.add(tile, item);
@@ -1717,7 +1718,7 @@ void MapCanvas::OnMousePropertiesClick(wxMouseEvent& event) {
 		} else if (tile->creature && g_settings.getInteger(Config::SHOW_CREATURES)) {
 			editor.selection.add(tile, tile->creature);
 		} else {
-			Item* item = tile->getTopItem();
+			Item* item = tile->getTopVisibleItem();
 			if (item) {
 				editor.selection.add(tile, item);
 			}

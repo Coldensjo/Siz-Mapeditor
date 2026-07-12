@@ -260,6 +260,7 @@ void Settings::IO(IOMode mode) {
 	Int(SHOW_FISHABLE_WATER, 0);
 	Int(SHOW_BORDERS, 1);
 	Int(SHOW_WALLS, 1);
+	Int(SHOW_GROUND, 1);
 	Int(SHOW_TOWNS, 0);
 	Int(ALWAYS_SHOW_ZONES, 1);
 	Int(EXT_HOUSE_SHADER, 1);

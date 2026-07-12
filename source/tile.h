@@ -149,6 +149,7 @@ public: // Functions
 
 	int getIndexOf(Item* item) const;
 	Item* getTopItem() const; // Returns the topmost item, or nullptr if the tile is empty
+	Item* getTopVisibleItem() const; // Same as getTopItem, but skips items hidden by the Show Walls/Borders/Ground view settings
 	Item* getItemAt(int index) const;
 	void addItem(Item* item);
 
