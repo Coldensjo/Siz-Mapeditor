@@ -125,30 +125,23 @@ wxString BrushHoverIdText(const Brush* brush) {
 	cached_hover_label = wxEmptyString;
 
 	if (brush->isRaw()) {
-		cached_hover_label = i2ws(static_cast<const RAWBrush*>(brush)->getItemID());
-		return cached_hover_label;
+		const ItemType* itemtype = static_cast<const RAWBrush*>(brush)->getItemType();
+		if (itemtype) {
+			cached_hover_label = wxstr(itemtype->name) + wxT(" (") + i2ws(itemtype->id) + wxT(")");
+			return cached_hover_label;
+		}
 	}
 
 	const std::string& name = brush->getName();
 	if (!name.empty() && std::isdigit(static_cast<unsigned char>(name[0]))) {
 		const size_t separator = name.find(" - ");
 		if (separator != std::string::npos) {
-			cached_hover_label = wxstr(name.substr(0, separator));
+			cached_hover_label = wxstr(name.substr(separator + 3)) + wxT(" (") + wxstr(name.substr(0, separator)) + wxT(")");
 			return cached_hover_label;
 		}
 	}
 
-	const int lookId = brush->getLookID();
-	if (lookId > 0) {
-		for (uint16_t id = 100; id <= g_items.getMaxID(); ++id) {
-			const ItemType& it = g_items.getItemType(id);
-			if (it.id != 0 && it.clientID == static_cast<uint16_t>(lookId)) {
-				cached_hover_label = i2ws(it.id);
-				return cached_hover_label;
-			}
-		}
-	}
-
+	cached_hover_label = wxstr(name);
 	return cached_hover_label;
 }
 } // namespace
