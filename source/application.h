@@ -70,7 +70,6 @@ public:
 	void UpdateMenubar();
 	bool DoQueryClose();
 	bool DoQuerySave(bool doclose = true);
-	bool DoQuerySaveTileset(bool doclose = true);
 	bool LoadMap(FileName name);
 
 	void AddRecentFile(const FileName& file);
