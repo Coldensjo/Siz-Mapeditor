@@ -39,7 +39,11 @@ PaletteButton::PaletteButton(wxWindow* parent, wxWindowID id, const wxString& la
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
 	SetBackgroundColour(ThemeManager::Get().GetPalette().control);
 	if (icon.IsOk()) {
-		SetMinSize(wxSize(36, 36));
+		wxClientDC dc(this);
+		wxSize textSize = dc.GetTextExtent(GetLabelWithoutAmpersand());
+		const int padding = 6;
+		int width = padding + icon.GetWidth() + padding + textSize.GetWidth() + padding;
+		SetMinSize(wxSize(std::max(width, 36), 36));
 		SetToolTip(GetLabelWithoutAmpersand());
 	}
 }
@@ -147,41 +151,48 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 		dc.DrawRectangle(focusRect);
 	}
 	
-	if (icon.IsOk()) {
-		int iconX = (size.GetWidth() - icon.GetWidth()) / 2;
-		int iconY = (size.GetHeight() - icon.GetHeight()) / 2;
-		if (isPressed) {
-			iconX += 1;
-			iconY += 1;
-		}
-		dc.DrawBitmap(icon, iconX, iconY, true);
-		return;
-	}
-
-	// Draw text with underline
 	wxString label = GetLabelWithoutAmpersand();
 	int underlineIndex = GetUnderlineIndex();
+	wxSize textSize = label.IsEmpty() ? wxSize(0, 0) : dc.GetTextExtent(label);
+
+	int iconX = 0;
+	int iconY = 0;
+	int textX = 0;
+	int textY = 0;
+
+	if (icon.IsOk()) {
+		const int padding = 6;
+		int contentWidth = icon.GetWidth() + (label.IsEmpty() ? 0 : padding + textSize.GetWidth());
+		int startX = (size.GetWidth() - contentWidth) / 2;
+
+		iconX = startX;
+		iconY = (size.GetHeight() - icon.GetHeight()) / 2;
+		textX = startX + icon.GetWidth() + padding;
+		textY = (size.GetHeight() - textSize.GetHeight()) / 2;
+	} else {
+		textX = (size.GetWidth() - textSize.GetWidth()) / 2;
+		textY = (size.GetHeight() - textSize.GetHeight()) / 2;
+	}
+
+	if (isPressed) {
+		iconX += 1;
+		iconY += 1;
+		textX += 1;
+		textY += 1;
+	}
+
+	if (icon.IsOk()) {
+		dc.DrawBitmap(icon, iconX, iconY, true);
+	}
 
 	if (!label.IsEmpty()) {
-		// Get text metrics
-		wxSize textSize = dc.GetTextExtent(label);
-		
-		// Calculate text position (centered)
-		// Adjust for pressed state (button appears pushed down)
-		int textX = (size.GetWidth() - textSize.GetWidth()) / 2;
-		int textY = (size.GetHeight() - textSize.GetHeight()) / 2;
-		if (isPressed) {
-			textX += 1;
-			textY += 1;
-		}
-		
 		const wxColour textColour = !IsEnabled() ? palette.disabledText :
 			(isActive ? wxColour(255, 255, 255) : palette.text);
 		dc.SetTextForeground(textColour);
-		
+
 		// Draw the text
 		dc.DrawText(label, textX, textY);
-		
+
 		// Draw underline if needed
 		if (underlineIndex >= 0 && underlineIndex < static_cast<int>(label.length())) {
 			// Calculate the position of the character to underline
@@ -189,7 +200,7 @@ void PaletteButton::OnPaint(wxPaintEvent& event) {
 			wxString charToUnderline = label.SubString(underlineIndex, underlineIndex);
 			wxSize beforeSize = dc.GetTextExtent(beforeChar);
 			wxSize charSize = dc.GetTextExtent(charToUnderline);
-			
+
 			// Draw underline
 			int underlineX = textX + beforeSize.GetWidth();
 			int underlineY = textY + textSize.GetHeight() - 1;

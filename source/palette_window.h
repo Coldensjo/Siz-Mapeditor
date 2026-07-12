@@ -85,14 +85,6 @@ protected:
 	void ShowPalettePage(PaletteType type);
 	void UpdateCategoryButtonStates();
 
-	// Builds the left-side grid of tileset shortcut icons (2 columns).
-	void CreateTilesetShortcutButtons(wxSizer* button_sizer);
-	// Returns true if any brush palette holds a tileset with the given name.
-	bool HasTilesetInAnyPalette(const std::string& tilesetName) const;
-	// Jumps to the named tileset, preferring its Doodad page and falling back
-	// to Terrain/Item/RAW. Returns true if the tileset was found and selected.
-	bool GoToTileset(const std::string& tilesetName);
-
 	wxPanel* page_container;
 	PaletteButton* terrain_button;
 	PaletteButton* doodad_button;

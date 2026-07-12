@@ -49,6 +49,16 @@ public:
 		SetBackgroundColour(background);
 		sizer->Add(label, 1, wxALL, 3);
 		SetSizer(sizer);
+
+		// The tooltip is a wxSTAY_ON_TOP tool window, so it doesn't get hidden
+		// automatically when the app loses focus (e.g. alt-tabbing away) -
+		// without this it can be left floating over other windows.
+		parent->Bind(wxEVT_ACTIVATE, [this](wxActivateEvent& event) {
+			if (!event.GetActive()) {
+				HideTooltip();
+			}
+			event.Skip();
+		});
 	}
 
 	void Update(const wxString& text, const wxPoint& screenPos) {
@@ -62,9 +72,10 @@ public:
 		Fit();
 
 		const wxSize size = GetSize();
-		// Anchor at the cursor tip and extend leftward.
+		// Anchor at the cursor tip and extend leftward. Offset down 8px so the
+		// tooltip doesn't cover the item being hovered.
 		int x = screenPos.x - size.GetWidth();
-		int y = screenPos.y;
+		int y = screenPos.y + 15;
 		const wxRect display = wxGetClientDisplayRect();
 		if (x < display.GetLeft()) {
 			x = display.GetLeft();

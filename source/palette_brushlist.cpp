@@ -830,9 +830,9 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 	dc.DrawRectangle(r);
 
 	// Fixed-size cells (Small/Large icons) are 4px larger than their sprite, so
-	// they get a 2px margin and a bevel. Exact-size cells are exactly the sprite
-	// size, so any inset would clip the sprite - draw it edge to edge instead.
-	const int inset = use_actual_size ? 0 : 2;
+	// they get a 2px margin and a bevel. Exact-size cells get the same 2px
+	// padding so icons aren't drawn flush against the cell edge.
+	const int inset = 2;
 
 	if (!use_actual_size) {
 		dc.SetPen(selected ? wxPen(palette.window) : wxPen(palette.surface));
