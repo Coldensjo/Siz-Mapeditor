@@ -18,6 +18,8 @@
 #ifndef RME_MAP_H_
 #define RME_MAP_H_
 
+#include <bitset>
+
 #include "basemap.h"
 #include "tile.h"
 #include "town.h"
@@ -133,12 +135,25 @@ public:
 		unnamed = false;
 	}
 
+	// Returns the lowest unused Unique ID (>= 1000) known to the map, for the
+	// item-properties "Pick" button. The full-map scan needed to discover used
+	// IDs is expensive on huge maps, so the result is cached on the map and only
+	// rebuilt once, lazily, on first use.
+	uint16_t findFreeUniqueId();
+	// Call after assigning a new Unique ID so the cache above stays correct for
+	// interactively-set IDs without forcing a full rescan. Cheap to call even if
+	// the cache hasn't been built yet.
+	void markUniqueIdUsed(uint16_t uid);
+
 protected:
 	// Loads a map
 	bool open(const std::string identifier);
 
 protected:
 	void removeSpawnInternal(Tile* tile);
+
+	bool uniqueIdCacheBuilt = false;
+	std::bitset<0x10000> usedUniqueIdsCache;
 
 	wxArrayString warnings;
 	wxString error;

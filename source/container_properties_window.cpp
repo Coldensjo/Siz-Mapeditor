@@ -290,6 +290,61 @@ namespace {
 		return nullptr;
 	}
 
+	std::string PromptForNewBucketName(wxWindow* parent, const FavoriteBuckets& buckets);
+
+	// Adds itemId to a bucket chosen (or created) interactively; returns whether buckets was modified.
+	bool AddItemIdToBucketsInteractive(wxWindow* parent, uint16_t itemId, FavoriteBuckets& buckets) {
+		if (buckets.empty()) {
+			std::string newBucket = PromptForNewBucketName(parent, buckets);
+			if (newBucket.empty()) {
+				return false;
+			}
+
+			FavoriteBucket bucket;
+			bucket.name = newBucket;
+			bucket.items.push_back(itemId);
+			buckets.push_back(std::move(bucket));
+			return true;
+		}
+
+		wxArrayString options;
+		for (const FavoriteBucket& bucket : buckets) {
+			options.Add(wxstr(bucket.name));
+		}
+		options.Add("Create new bucket...");
+
+		wxSingleChoiceDialog dialog(parent, "Choose a favorites bucket for this item:", "Add Favorite", options);
+
+		if (dialog.ShowModal() != wxID_OK) {
+			return false;
+		}
+
+		const int selection = dialog.GetSelection();
+		if (selection == wxNOT_FOUND) {
+			return false;
+		}
+
+		if (selection == static_cast<int>(buckets.size())) {
+			std::string newBucket = PromptForNewBucketName(parent, buckets);
+			if (newBucket.empty()) {
+				return false;
+			}
+
+			FavoriteBucket bucket;
+			bucket.name = newBucket;
+			bucket.items.push_back(itemId);
+			buckets.push_back(std::move(bucket));
+			return true;
+		}
+
+		auto& items = buckets[selection].items;
+		if (std::find(items.begin(), items.end(), itemId) == items.end()) {
+			items.push_back(itemId);
+			return true;
+		}
+		return false;
+	}
+
 	std::string PromptForNewBucketName(wxWindow* parent, const FavoriteBuckets& buckets) {
 		wxTextEntryDialog dialog(parent, "Enter a name for the favorites bucket:", "Create Favorites Bucket");
 		while (dialog.ShowModal() == wxID_OK) {
@@ -388,6 +443,7 @@ EVT_MENU(CONTAINER_POPUP_MENU_REMOVE, ContainerItemButton::OnRemoveItem)
 EVT_MENU(CONTAINER_POPUP_MENU_TOGGLE_FAVORITE, ContainerItemButton::OnToggleFavorite)
 EVT_MENU(CONTAINER_POPUP_MENU_REMOVE_ALL, ContainerItemButton::OnRemoveAllItems)
 EVT_MENU(CONTAINER_POPUP_MENU_ADD_RANDOM_FAVORITES, ContainerItemButton::OnAddRandomFavorites)
+EVT_MENU(CONTAINER_POPUP_MENU_MANAGE_FAVORITES, ContainerItemButton::OnManageFavorites)
 END_EVENT_TABLE()
 
 ContainerItemButton::ContainerItemButton(wxWindow* parent, bool large, int _index, const Map* map, Item* item) :
@@ -576,59 +632,30 @@ void ContainerItemButton::OnToggleFavorite(wxCommandEvent& WXUNUSED(event)) {
 			}
 		}
 	} else {
-		if (buckets.empty()) {
-			std::string newBucket = PromptForNewBucketName(this, buckets);
-			if (newBucket.empty()) {
-				return;
-			}
-
-			FavoriteBucket bucket;
-			bucket.name = newBucket;
-			bucket.items.push_back(itemId);
-			buckets.push_back(std::move(bucket));
-			modified = true;
-		} else {
-			wxArrayString options;
-			for (const FavoriteBucket& bucket : buckets) {
-				options.Add(wxstr(bucket.name));
-			}
-			options.Add("Create new bucket...");
-
-			wxSingleChoiceDialog dialog(this, "Choose a favorites bucket for this item:", "Add Favorite", options);
-
-			if (dialog.ShowModal() != wxID_OK) {
-				return;
-			}
-
-			const int selection = dialog.GetSelection();
-			if (selection == wxNOT_FOUND) {
-				return;
-			}
-
-			if (selection == static_cast<int>(buckets.size())) {
-				std::string newBucket = PromptForNewBucketName(this, buckets);
-				if (newBucket.empty()) {
-					return;
-				}
-
-				FavoriteBucket bucket;
-				bucket.name = newBucket;
-				bucket.items.push_back(itemId);
-				buckets.push_back(std::move(bucket));
-				modified = true;
-			} else {
-				auto& items = buckets[selection].items;
-				if (std::find(items.begin(), items.end(), itemId) == items.end()) {
-					items.push_back(itemId);
-					modified = true;
-				}
-			}
-		}
+		modified = AddItemIdToBucketsInteractive(this, itemId, buckets);
 	}
 
 	if (modified) {
 		StoreContainerFavoriteBuckets(buckets);
 	}
+}
+
+void ContainerItemButton::OnManageFavorites(wxCommandEvent& WXUNUSED(event)) {
+	FindItemDialog dialog(GetParent(), "Choose Item to Favorite", true);
+
+	if (g_settings.getBoolean(Config::CONTAINER_FIND_DEFAULT_NAMES)) {
+		dialog.setSearchMode(FindItemDialog::SearchMode::Names);
+	}
+
+	if (dialog.ShowModal() == wxID_OK) {
+		const uint16_t itemId = static_cast<uint16_t>(dialog.getResultID());
+		FavoriteBuckets buckets = LoadContainerFavoriteBuckets();
+		if (AddItemIdToBucketsInteractive(this, itemId, buckets)) {
+			StoreContainerFavoriteBuckets(buckets);
+		}
+	}
+
+	dialog.Destroy();
 }
 
 void ContainerItemButton::OnRemoveAllItems(wxCommandEvent& WXUNUSED(event)) {
@@ -814,6 +841,8 @@ void ContainerItemPopupMenu::Update(ContainerItemButton* btn) {
 	if (!canAddMoreItems) {
 		addItem->Enable(false);
 	}
+
+	Append(CONTAINER_POPUP_MENU_MANAGE_FAVORITES, "Add to &Favorites...", "Choose any item and add it to a favorites bucket, whether or not it's already in this container");
 
 	if (!buckets.empty()) {
 		wxMenu* favoritesMenu = newd wxMenu();

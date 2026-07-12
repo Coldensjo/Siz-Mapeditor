@@ -32,6 +32,7 @@
 #include "gui.h"
 #include "application.h"
 #include "common_windows.h"
+#include "container_properties_window.h"
 #include "positionctrl.h"
 
 #ifdef _MSC_VER
@@ -1261,7 +1262,7 @@ void SortableListBox::DoSort() {
 // Object properties base
 
 ObjectPropertiesWindowBase::ObjectPropertiesWindowBase(wxWindow* parent, wxString title, const Map* map, const Tile* tile, Item* item, wxPoint position /* = wxDefaultPosition */) :
-	wxDialog(parent, wxID_ANY, title, position, wxSize(600, 400), wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER),
+	wxDialog(parent, wxID_ANY, dynamic_cast<Container*>(item) ? wxString("Container Properties") : title, position, wxSize(600, 400), wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER),
 	edit_map(map),
 	edit_tile(tile),
 	edit_item(item),
@@ -1343,6 +1344,41 @@ void ObjectPropertiesWindowBase::OnModelessClose(wxCloseEvent& event) {
 
 Item* ObjectPropertiesWindowBase::getItemBeingEdited() {
 	return edit_item;
+}
+
+uint16_t ObjectPropertiesWindowBase::findAvailableUniqueID() const {
+	return const_cast<Map*>(edit_map)->findFreeUniqueId();
+}
+
+wxSizer* ObjectPropertiesWindowBase::createContainerItemGrid(wxWindow* parent, Container* container, std::vector<ContainerItemButton*>& out_buttons) {
+	wxSizer* contents_sizer = newd wxBoxSizer(wxVERTICAL);
+
+	bool use_large_sprites = g_settings.getBoolean(Config::USE_LARGE_CONTAINER_ICONS);
+	int32_t maxColumns = use_large_sprites ? 6 : 12;
+
+	wxSizer* horizontal_sizer = nullptr;
+	for (uint32_t index = 0; index < container->getVolume(); ++index) {
+		if (!horizontal_sizer) {
+			horizontal_sizer = newd wxBoxSizer(wxHORIZONTAL);
+		}
+
+		Item* item = container->getItem(index);
+		ContainerItemButton* containerItemButton = newd ContainerItemButton(parent, use_large_sprites, index, edit_map, item);
+
+		out_buttons.push_back(containerItemButton);
+		horizontal_sizer->Add(containerItemButton);
+
+		if (((index + 1) % maxColumns) == 0) {
+			contents_sizer->Add(horizontal_sizer);
+			horizontal_sizer = nullptr;
+		}
+	}
+
+	if (horizontal_sizer != nullptr) {
+		contents_sizer->Add(horizontal_sizer);
+	}
+
+	return contents_sizer;
 }
 
 // ============================================================================

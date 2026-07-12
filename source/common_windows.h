@@ -29,6 +29,8 @@
 
 class GameSprite;
 class MapTab;
+class Container;
+class ContainerItemButton;
 
 /**
  * A toggle button with an item on it.
@@ -325,6 +327,13 @@ public:
 	Spawn* getSpawnBeingEdited();
 
 protected:
+	// Finds the lowest unused Unique ID (1000-65535) across the whole map.
+	uint16_t findAvailableUniqueID() const;
+
+	// Builds a row-wrapped grid of ContainerItemButton widgets for a container's contents.
+	// Column count depends on Config::USE_LARGE_CONTAINER_ICONS, matching ContainerItemButton's own sizing.
+	wxSizer* createContainerItemGrid(wxWindow* parent, Container* container, std::vector<ContainerItemButton*>& out_buttons);
+
 	void OnModelessClose(wxCloseEvent& event);
 
 	const Map* edit_map;

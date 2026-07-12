@@ -51,6 +51,7 @@ public:
 	void OnToggleFavorite(wxCommandEvent& event);
 	void OnRemoveAllItems(wxCommandEvent& event);
 	void OnAddRandomFavorites(wxCommandEvent& event);
+	void OnManageFavorites(wxCommandEvent& event);
 
 	ObjectPropertiesWindowBase* getParentContainerWindow();
 	Container* getParentContainer();

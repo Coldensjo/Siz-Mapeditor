@@ -22,6 +22,8 @@
 #include "gui_ids.h"
 #include "complexitem.h"
 #include "container_properties_window.h"
+#include "gui.h"
+#include "map.h"
 
 #include <wx/grid.h>
 
@@ -31,6 +33,7 @@ EVT_BUTTON(wxID_CANCEL, PropertiesWindow::OnClickCancel)
 
 EVT_BUTTON(ITEM_PROPERTIES_ADD_ATTRIBUTE, PropertiesWindow::OnClickAddAttribute)
 EVT_BUTTON(ITEM_PROPERTIES_REMOVE_ATTRIBUTE, PropertiesWindow::OnClickRemoveAttribute)
+EVT_BUTTON(ITEM_PROPERTIES_PICK_UNIQUE_ID, PropertiesWindow::OnClickPickUniqueID)
 
 EVT_NOTEBOOK_PAGE_CHANGED(wxID_ANY, PropertiesWindow::OnNotebookPageChanged)
 
@@ -84,12 +87,15 @@ wxWindow* PropertiesWindow::createGeneralPanel(wxWindow* parent) {
 	gridsizer->Add(newd wxStaticText(panel, wxID_ANY, "\"" + wxstr(edit_item->getName()) + "\""));
 
 	gridsizer->Add(newd wxStaticText(panel, wxID_ANY, "Action ID"));
-	wxSpinCtrl* action_id_field = newd wxSpinCtrl(panel, wxID_ANY, i2ws(edit_item->getActionID()), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getActionID());
+	action_id_field = newd wxSpinCtrl(panel, wxID_ANY, i2ws(edit_item->getActionID()), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getActionID());
 	gridsizer->Add(action_id_field, wxSizerFlags(1).Expand());
 
 	gridsizer->Add(newd wxStaticText(panel, wxID_ANY, "Unique ID"));
-	wxSpinCtrl* unique_id_field = newd wxSpinCtrl(panel, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
-	gridsizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+	wxSizer* uidSizer = newd wxBoxSizer(wxHORIZONTAL);
+	unique_id_field = newd wxSpinCtrl(panel, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
+	uidSizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+	uidSizer->Add(newd wxButton(panel, ITEM_PROPERTIES_PICK_UNIQUE_ID, "Pick", wxDefaultPosition, wxSize(-1, 20)), wxSizerFlags(0).Border(wxLEFT, 5));
+	gridsizer->Add(uidSizer, wxSizerFlags(1).Expand());
 
 	panel->SetSizerAndFit(gridsizer);
 
@@ -101,17 +107,7 @@ wxWindow* PropertiesWindow::createContainerPanel(wxWindow* parent) {
 	wxPanel* panel = newd wxPanel(parent, ITEM_PROPERTIES_CONTAINER_TAB);
 	wxSizer* topSizer = newd wxBoxSizer(wxVERTICAL);
 
-	wxSizer* gridSizer = newd wxGridSizer(6, 5, 5);
-
-	bool use_large_sprites = g_settings.getBoolean(Config::USE_LARGE_CONTAINER_ICONS);
-	for (uint32_t i = 0; i < container->getVolume(); ++i) {
-		Item* item = container->getItem(i);
-		ContainerItemButton* containerItemButton = newd ContainerItemButton(panel, use_large_sprites, i, edit_map, item);
-
-		container_items.push_back(containerItemButton);
-		gridSizer->Add(containerItemButton, wxSizerFlags(0));
-	}
-
+	wxSizer* gridSizer = createContainerItemGrid(panel, container, container_items);
 	topSizer->Add(gridSizer, wxSizerFlags(1).Expand());
 
 	/*
@@ -250,8 +246,12 @@ void PropertiesWindow::OnNotebookPageChanged(wxNotebookEvent& evt) {
 }
 
 void PropertiesWindow::saveGeneralPanel() {
-	////
+	edit_item->setActionID(action_id_field->GetValue());
+	uint16_t newUid = unique_id_field->GetValue();
+	edit_item->setUniqueID(newUid);
+	const_cast<Map*>(edit_map)->markUniqueIdUsed(newUid);
 }
+
 
 void PropertiesWindow::saveContainerPanel() {
 	////
@@ -305,8 +305,18 @@ void PropertiesWindow::OnGridValueChanged(wxGridEvent& event) {
 }
 
 void PropertiesWindow::OnClickOK(wxCommandEvent&) {
+	saveGeneralPanel();
 	saveAttributesPanel();
 	Finish(1);
+}
+
+void PropertiesWindow::OnClickPickUniqueID(wxCommandEvent&) {
+	uint16_t uid = findAvailableUniqueID();
+	if (uid == 0) {
+		g_gui.PopupDialog(this, "Error", "There are no unused Unique IDs left.", wxOK);
+		return;
+	}
+	unique_id_field->SetValue(uid);
 }
 
 void PropertiesWindow::OnClickAddAttribute(wxCommandEvent&) {

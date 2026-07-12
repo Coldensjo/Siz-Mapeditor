@@ -35,6 +35,7 @@ public:
 	void OnClickCancel(wxCommandEvent&);
 	void OnClickAddAttribute(wxCommandEvent&);
 	void OnClickRemoveAttribute(wxCommandEvent&);
+	void OnClickPickUniqueID(wxCommandEvent&);
 
 	void OnResize(wxSizeEvent&);
 	void OnNotebookPageChanged(wxNotebookEvent&);
@@ -46,6 +47,9 @@ protected:
 	// Simple pane
 	wxWindow* createGeneralPanel(wxWindow* parent);
 	void saveGeneralPanel();
+
+	wxSpinCtrl* action_id_field = nullptr;
+	wxSpinCtrl* unique_id_field = nullptr;
 
 	// Container pane
 	std::vector<ContainerItemButton*> container_items;

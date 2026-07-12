@@ -41,6 +41,63 @@ Map::~Map() {
 	////
 }
 
+namespace {
+	// Plain recursion (no std::function/dynamic_cast) since this runs over
+	// every item on the map when the Unique ID cache is first built.
+	void markUsedUniqueIds(std::bitset<0x10000>& used, Item* item) {
+		if (!item) {
+			return;
+		}
+
+		uint16_t uid = item->getUniqueID();
+		if (uid > 0) {
+			used.set(uid);
+		}
+
+		// Cheap type-flag check avoids paying for dynamic_cast's RTTI lookup on
+		// every non-container item, which is the overwhelming majority.
+		if (g_items[item->getID()].isContainer()) {
+			if (Container* container = dynamic_cast<Container*>(item)) {
+				for (Item* containedItem : container->getVector()) {
+					markUsedUniqueIds(used, containedItem);
+				}
+			}
+		}
+	}
+}
+
+void Map::markUniqueIdUsed(uint16_t uid) {
+	if (uid > 0) {
+		usedUniqueIdsCache.set(uid);
+	}
+}
+
+uint16_t Map::findFreeUniqueId() {
+	if (!uniqueIdCacheBuilt) {
+		for (MapIterator miter = begin(); miter != end(); ++miter) {
+			Tile* tile = (*miter)->get();
+			if (!tile) {
+				continue;
+			}
+
+			if (tile->ground) {
+				markUsedUniqueIds(usedUniqueIdsCache, tile->ground);
+			}
+			for (Item* item : tile->items) {
+				markUsedUniqueIds(usedUniqueIdsCache, item);
+			}
+		}
+		uniqueIdCacheBuilt = true;
+	}
+
+	for (uint32_t id = 1000; id <= 0xFFFF; ++id) {
+		if (!usedUniqueIdsCache.test(id)) {
+			return static_cast<uint16_t>(id);
+		}
+	}
+	return 0;
+}
+
 bool Map::open(const std::string file) {
 	if (file == filename) {
 		return true; // Do not reopen ourselves!

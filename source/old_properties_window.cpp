@@ -32,6 +32,7 @@
 #include "application.h"
 #include "old_properties_window.h"
 #include "container_properties_window.h"
+#include "gui_ids.h"
 
 // ============================================================================
 // Old Properties Window
@@ -40,6 +41,7 @@ BEGIN_EVENT_TABLE(OldPropertiesWindow, wxDialog)
 EVT_SET_FOCUS(OldPropertiesWindow::OnFocusChange)
 EVT_BUTTON(wxID_OK, OldPropertiesWindow::OnClickOK)
 EVT_BUTTON(wxID_CANCEL, OldPropertiesWindow::OnClickCancel)
+EVT_BUTTON(ITEM_PROPERTIES_PICK_UNIQUE_ID, OldPropertiesWindow::OnClickPickUniqueID)
 END_EVENT_TABLE()
 
 static constexpr int OUTFIT_COLOR_MAX = 133;
@@ -79,49 +81,17 @@ OldPropertiesWindow::OldPropertiesWindow(wxWindow* win_parent, const Map* map, c
 		subsizer->Add(action_id_field, wxSizerFlags(1).Expand());
 
 		subsizer->Add(newd wxStaticText(this, wxID_ANY, "Unique ID"));
+		wxSizer* uidSizer = newd wxBoxSizer(wxHORIZONTAL);
 		unique_id_field = newd wxSpinCtrl(this, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
-		subsizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(newd wxButton(this, ITEM_PROPERTIES_PICK_UNIQUE_ID, "Pick", wxDefaultPosition, wxSize(-1, 20)), wxSizerFlags(0).Border(wxLEFT, 5));
+		subsizer->Add(uidSizer, wxSizerFlags(1).Expand());
 
 		boxsizer->Add(subsizer, wxSizerFlags(0).Expand());
 
 		// Now we add the subitems!
 		wxSizer* contents_sizer = newd wxStaticBoxSizer(wxVERTICAL, this, "Contents");
-
-		bool use_large_sprites = g_settings.getBoolean(Config::USE_LARGE_CONTAINER_ICONS);
-		wxSizer* horizontal_sizer = nullptr;
-		const int additional_height_increment = (use_large_sprites ? 40 : 24);
-		int additional_height = 0;
-
-		int32_t maxColumns;
-		if (use_large_sprites) {
-			maxColumns = 6;
-		} else {
-			maxColumns = 12;
-		}
-
-		for (uint32_t index = 0; index < container->getVolume(); ++index) {
-			if (!horizontal_sizer) {
-				horizontal_sizer = newd wxBoxSizer(wxHORIZONTAL);
-			}
-
-			Item* item = container->getItem(index);
-			ContainerItemButton* containerItemButton = newd ContainerItemButton(this, use_large_sprites, index, map, item);
-
-			container_items.push_back(containerItemButton);
-			horizontal_sizer->Add(containerItemButton);
-
-			if (((index + 1) % maxColumns) == 0) {
-				contents_sizer->Add(horizontal_sizer);
-				horizontal_sizer = nullptr;
-				additional_height += additional_height_increment;
-			}
-		}
-
-		if (horizontal_sizer != nullptr) {
-			contents_sizer->Add(horizontal_sizer);
-			additional_height += additional_height_increment;
-		}
-
+		contents_sizer->Add(createContainerItemGrid(this, container, container_items));
 		boxsizer->Add(contents_sizer, wxSizerFlags(2).Expand());
 
 		topsizer->Add(boxsizer, wxSizerFlags(0).Expand().Border(wxALL, 20));
@@ -144,8 +114,11 @@ OldPropertiesWindow::OldPropertiesWindow(wxWindow* win_parent, const Map* map, c
 		subsizer->Add(action_id_field, wxSizerFlags().Expand()); // No proportion
 
 		subsizer->Add(newd wxStaticText(this, wxID_ANY, "Unique ID"));
+		wxSizer* uidSizer = newd wxBoxSizer(wxHORIZONTAL);
 		unique_id_field = newd wxSpinCtrl(this, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
-		subsizer->Add(unique_id_field, wxSizerFlags().Expand()); // No proportion
+		uidSizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(newd wxButton(this, ITEM_PROPERTIES_PICK_UNIQUE_ID, "Pick", wxDefaultPosition, wxSize(-1, 20)), wxSizerFlags(0).Border(wxLEFT, 5));
+		subsizer->Add(uidSizer, wxSizerFlags().Expand()); // No proportion
 
 		// Add subsizer without excessive vertical space
 		boxsizer->Add(subsizer, wxSizerFlags().Expand());
@@ -205,8 +178,11 @@ OldPropertiesWindow::OldPropertiesWindow(wxWindow* win_parent, const Map* map, c
 		subsizer->Add(action_id_field, wxSizerFlags(1).Expand());
 
 		subsizer->Add(newd wxStaticText(this, wxID_ANY, "Unique ID"));
+		wxSizer* uidSizer = newd wxBoxSizer(wxHORIZONTAL);
 		unique_id_field = newd wxSpinCtrl(this, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
-		subsizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(newd wxButton(this, ITEM_PROPERTIES_PICK_UNIQUE_ID, "Pick", wxDefaultPosition, wxSize(-1, 20)), wxSizerFlags(0).Border(wxLEFT, 5));
+		subsizer->Add(uidSizer, wxSizerFlags(1).Expand());
 
 		boxsizer->Add(subsizer, wxSizerFlags(1).Expand());
 
@@ -312,8 +288,11 @@ OldPropertiesWindow::OldPropertiesWindow(wxWindow* win_parent, const Map* map, c
 		subsizer->Add(action_id_field, wxSizerFlags(1).Expand());
 
 		subsizer->Add(newd wxStaticText(this, wxID_ANY, "Unique ID"));
+		wxSizer* uidSizer = newd wxBoxSizer(wxHORIZONTAL);
 		unique_id_field = newd wxSpinCtrl(this, wxID_ANY, i2ws(edit_item->getUniqueID()), wxDefaultPosition, wxSize(-1, 20), wxSP_ARROW_KEYS, 0, 0xFFFF, edit_item->getUniqueID());
-		subsizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(unique_id_field, wxSizerFlags(1).Expand());
+		uidSizer->Add(newd wxButton(this, ITEM_PROPERTIES_PICK_UNIQUE_ID, "Pick", wxDefaultPosition, wxSize(-1, 20)), wxSizerFlags(0).Border(wxLEFT, 5));
+		subsizer->Add(uidSizer, wxSizerFlags(1).Expand());
 
 		// item classification (12.81+)
 		if (g_items.MajorVersion >= 3 && g_items.MinorVersion >= 60 && (edit_item->getClassification() > 0 || edit_item->isWeapon() || edit_item->isWearableEquipment())) {
@@ -649,6 +628,7 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 			}
 
 			edit_item->setUniqueID(new_uid);
+			const_cast<Map*>(edit_map)->markUniqueIdUsed(static_cast<uint16_t>(new_uid));
 			edit_item->setActionID(new_aid);
 		} else if (edit_item->canHoldText() || edit_item->canHoldDescription()) {
 			// Book
@@ -680,6 +660,7 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 			}*/
 
 			edit_item->setUniqueID(new_uid);
+			const_cast<Map*>(edit_map)->markUniqueIdUsed(static_cast<uint16_t>(new_uid));
 			edit_item->setActionID(new_aid);
 			edit_item->setText(text);
 		} else if (edit_item->isSplash() || edit_item->isFluidContainer()) {
@@ -705,6 +686,7 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 				edit_item->setSubtype(new_type);
 			}
 			edit_item->setUniqueID(new_uid);
+			const_cast<Map*>(edit_map)->markUniqueIdUsed(static_cast<uint16_t>(new_uid));
 			edit_item->setActionID(new_aid);
 
 			// Clean up client data
@@ -909,6 +891,7 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 				podium->setOutfit(newOutfit);
 			}
 			edit_item->setUniqueID(new_uid);
+			const_cast<Map*>(edit_map)->markUniqueIdUsed(static_cast<uint16_t>(new_uid));
 			edit_item->setActionID(new_aid);
 			edit_item->setTier(new_tier);
 		}
@@ -933,6 +916,15 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 void OldPropertiesWindow::OnClickCancel(wxCommandEvent& WXUNUSED(event)) {
 	// Just close this window
 	Finish(0);
+}
+
+void OldPropertiesWindow::OnClickPickUniqueID(wxCommandEvent&) {
+	uint16_t uid = findAvailableUniqueID();
+	if (uid == 0) {
+		g_gui.PopupDialog(this, "Error", "There are no unused Unique IDs left.", wxOK);
+		return;
+	}
+	unique_id_field->SetValue(uid);
 }
 
 void OldPropertiesWindow::Update() {

@@ -36,6 +36,7 @@ public:
 
 	void OnClickOK(wxCommandEvent&);
 	void OnClickCancel(wxCommandEvent&);
+	void OnClickPickUniqueID(wxCommandEvent&);
 
 	void Update();
 
