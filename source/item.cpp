@@ -230,20 +230,16 @@ const std::string Item::getName() const {
 	if (it.isSplash()) {
 		name += " of ";
 		uint16_t fluidType = getSubtype();
-		// Convert from gameserver FluidTypes_t to mapeditor SplashType
-		uint16_t editorFluidType = convertFluidTypeFromServer(fluidType);
 		if (fluidType != 0) {
-			name += LiquidID2Name(editorFluidType);
+			name += LiquidID2Name(fluidType);
 		} else {
 			name += LiquidID2Name(LIQUID_WATER);
 		}
 	} else if (it.isFluidContainer()) {
 		uint16_t fluidType = getSubtype();
-		// Convert from gameserver FluidTypes_t to mapeditor SplashType
-		uint16_t editorFluidType = convertFluidTypeFromServer(fluidType);
 		if (fluidType != 0) {
 			name += " of ";
-			name += LiquidID2Name(editorFluidType);
+			name += LiquidID2Name(fluidType);
 		}
 	}
 	
@@ -613,121 +609,22 @@ uint16_t Item::LiquidName2ID(std::string liquid) {
 
 uint8_t Item::getLiquidColor(uint8_t type)
 {
-	uint8_t result = 0;
-	switch (type)
-	{
-		case 1:
-			result = 1;
-			break;
-		case 0:
-			result = 0;
-			break;
-		case 6:
-			result = 4;
-			break;
-		case 3:
-		case 4:
-		case 7:
-			result = 3;
-			break;
-		case 9:
-			result = 6;
-			break;
-		case 2:
-		case 10:
-			result = 7;
-			break;
-		case 5:
-		case 11:
-			result = 2;
-			break;
-		case 8:
-		case 12:
-			result = 5;
-			break;
-		default:
-			result = 0;
-			break;
-	}
-	return result;
-}
-
-uint16_t Item::convertFluidTypeFromServer(uint16_t serverFluidType)
-{
-	// Convert gameserver FluidTypes_t to mapeditor SplashType
-	// Gameserver: FLUID_NONE=0, FLUID_WATER=1, FLUID_WINE=2, FLUID_BEER=3, FLUID_MUD=4,
-	//            FLUID_BLOOD=5, FLUID_SLIME=6, FLUID_OIL=7, FLUID_URINE=8, FLUID_MILK=9,
-	//            FLUID_MANAFLUID=10, FLUID_LIFEFLUID=11, FLUID_LEMONADE=12
-	switch (serverFluidType)
-	{
-		case 0:  // FLUID_NONE
-			return LIQUID_NONE;
-		case 1:  // FLUID_WATER
-			return LIQUID_WATER;
-		case 2:  // FLUID_WINE
-			return LIQUID_WINE;
-		case 3:  // FLUID_BEER
-			return LIQUID_BEER;
-		case 4:  // FLUID_MUD
-			return LIQUID_MUD;
-		case 5:  // FLUID_BLOOD
-			return LIQUID_BLOOD;
-		case 6:  // FLUID_SLIME
-			return LIQUID_SLIME;
-		case 7:  // FLUID_OIL
-			return LIQUID_OIL;
-		case 8:  // FLUID_URINE
-			return LIQUID_URINE;
-		case 9:  // FLUID_MILK
-			return LIQUID_MILK;
-		case 10: // FLUID_MANAFLUID
-			return LIQUID_MANAFLUID;
-		case 11: // FLUID_LIFEFLUID
-			return LIQUID_LIFEFLUID;
-		case 12: // FLUID_LEMONADE
-			return LIQUID_LEMONADE;
-		default:
-			// For unknown values, try to use as-is (might be extended fluid types)
-			return serverFluidType;
-	}
-}
-
-uint16_t Item::convertFluidTypeToServer(uint16_t editorFluidType)
-{
-	// Convert mapeditor SplashType to gameserver FluidTypes_t
-	// Reverse mapping of convertFluidTypeFromServer
-	switch (editorFluidType)
-	{
-		case LIQUID_NONE:
-			return 0;  // FLUID_NONE
-		case LIQUID_WATER:
-			return 1;  // FLUID_WATER
-		case LIQUID_WINE:
-			return 2;  // FLUID_WINE
-		case LIQUID_BEER:
-			return 3;  // FLUID_BEER
-		case LIQUID_MUD:
-			return 4;  // FLUID_MUD
-		case LIQUID_BLOOD:
-			return 5;  // FLUID_BLOOD
-		case LIQUID_SLIME:
-			return 6;  // FLUID_SLIME
-		case LIQUID_OIL:
-			return 7;  // FLUID_OIL
-		case LIQUID_URINE:
-			return 8;  // FLUID_URINE
-		case LIQUID_MILK:
-			return 9;  // FLUID_MILK
-		case LIQUID_MANAFLUID:
-			return 10; // FLUID_MANAFLUID
-		case LIQUID_LIFEFLUID:
-			return 11; // FLUID_LIFEFLUID
-		case LIQUID_LEMONADE:
-			return 12; // FLUID_LEMONADE
-		default:
-			// For unknown values, try to use as-is (might be extended fluid types)
-			return editorFluidType;
-	}
+	// The item subtype stores the gameserver's FluidTypes_t value directly
+	// (see Ironcore's const.h: FluidColors_t/FluidTypes_t/fluidMap). Colors above
+	// FLUID_WHITE (mana, life, wine, ...) are the base color plus a multiple of 8,
+	// so the low 3 bits recover the base FluidColors_t, which fluidMap[] then
+	// converts into the client sprite pattern index used by the splash graphics.
+	static const uint8_t fluidMap[8] = {
+		0, // FLUID_EMPTY  -> CLIENTFLUID_EMPTY
+		1, // FLUID_BLUE   -> CLIENTFLUID_BLUE
+		5, // FLUID_RED    -> CLIENTFLUID_RED
+		3, // FLUID_BROWN  -> CLIENTFLUID_BROWN_1
+		6, // FLUID_GREEN  -> CLIENTFLUID_GREEN
+		8, // FLUID_YELLOW -> CLIENTFLUID_YELLOW
+		9, // FLUID_WHITE  -> CLIENTFLUID_WHITE
+		2, // FLUID_PURPLE -> CLIENTFLUID_PURPLE
+	};
+	return fluidMap[type & 7];
 }
 
 // ============================================================================

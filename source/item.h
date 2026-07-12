@@ -144,8 +144,6 @@ public:
 	static std::string LiquidID2Name(uint16_t id);
 	static uint16_t LiquidName2ID(std::string id);
 	static uint8_t getLiquidColor(uint8_t type);
-	static uint16_t convertFluidTypeFromServer(uint16_t serverFluidType);
-	static uint16_t convertFluidTypeToServer(uint16_t editorFluidType);
 
 	// IDs
 	uint16_t getID() const {

@@ -179,14 +179,17 @@ OldPropertiesWindow::OldPropertiesWindow(wxWindow* win_parent, const Map* map, c
 			splash_type_field->Append(wxstr(Item::LiquidID2Name(LIQUID_NONE)), newd int32_t(LIQUID_NONE));
 		}
 
+		std::set<std::string> addedLiquidNames;
 		for (SplashType splashType = LIQUID_FIRST; splashType != LIQUID_LAST; ++splashType) {
-			splash_type_field->Append(wxstr(Item::LiquidID2Name(splashType)), newd int32_t(splashType));
+			const std::string& name = Item::LiquidID2Name(splashType);
+			if (name == "Unknown" || !addedLiquidNames.insert(name).second) {
+				continue;
+			}
+			splash_type_field->Append(wxstr(name), newd int32_t(splashType));
 		}
 
 		if (item->getSubtype()) {
-			// Convert from gameserver FluidTypes_t to mapeditor SplashType
-			uint16_t editorFluidType = Item::convertFluidTypeFromServer(item->getSubtype());
-			const std::string& what = Item::LiquidID2Name(editorFluidType);
+			const std::string& what = Item::LiquidID2Name(item->getSubtype());
 			if (what == "Unknown") {
 				splash_type_field->Append(wxstr(Item::LiquidID2Name(LIQUID_NONE)), newd int32_t(LIQUID_NONE));
 			}
@@ -684,8 +687,7 @@ void OldPropertiesWindow::OnClickOK(wxCommandEvent& WXUNUSED(event)) {
 			int new_uid = unique_id_field->GetValue();
 			int new_aid = action_id_field->GetValue();
 			int* editor_type = reinterpret_cast<int*>(splash_type_field->GetClientData(splash_type_field->GetSelection()));
-			// Convert from mapeditor SplashType to gameserver FluidTypes_t
-			uint16_t new_type = Item::convertFluidTypeToServer(*editor_type);
+			uint16_t new_type = static_cast<uint16_t>(*editor_type);
 
 			if ((new_uid < 1000 || new_uid > 0xFFFF) && new_uid != 0) {
 				g_gui.PopupDialog(this, "Error", "Unique ID must be between 1000 and 65535.", wxOK);
