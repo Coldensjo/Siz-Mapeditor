@@ -822,25 +822,27 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 		return;
 	}
 
+	// Fixed-size cells (Small/Large icons) are 4px larger than their sprite so
+	// each icon keeps a 2px margin on every side. Exact-size cells use the same
+	// margin so icons are not drawn flush against neighbouring cells.
+	const int margin = 2;
+	wxRect inner = r;
+	inner.Deflate(margin);
+
 	// Background fill (honours the configurable icon background shade)
 	const int bgshade = g_settings.getInteger(Config::ICON_BACKGROUND);
 	wxColour fill = (bgshade < 0) ? palette.control : wxColour(bgshade, bgshade, bgshade);
 	dc.SetBrush(wxBrush(fill));
 	dc.SetPen(*wxTRANSPARENT_PEN);
-	dc.DrawRectangle(r);
-
-	// Fixed-size cells (Small/Large icons) are 4px larger than their sprite, so
-	// they get a 2px margin and a bevel. Exact-size cells get the same 2px
-	// padding so icons aren't drawn flush against the cell edge.
-	const int inset = 2;
+	dc.DrawRectangle(inner);
 
 	if (!use_actual_size) {
 		dc.SetPen(selected ? wxPen(palette.window) : wxPen(palette.surface));
-		dc.DrawLine(r.GetX(), r.GetY(), r.GetRight(), r.GetY());
-		dc.DrawLine(r.GetX(), r.GetY(), r.GetX(), r.GetBottom());
+		dc.DrawLine(inner.GetX(), inner.GetY(), inner.GetRight(), inner.GetY());
+		dc.DrawLine(inner.GetX(), inner.GetY(), inner.GetX(), inner.GetBottom());
 		dc.SetPen(selected ? wxPen(palette.surface) : wxPen(palette.border));
-		dc.DrawLine(r.GetX(), r.GetBottom(), r.GetRight(), r.GetBottom());
-		dc.DrawLine(r.GetRight(), r.GetY(), r.GetRight(), r.GetBottom());
+		dc.DrawLine(inner.GetX(), inner.GetBottom(), inner.GetRight(), inner.GetBottom());
+		dc.DrawLine(inner.GetRight(), inner.GetY(), inner.GetRight(), inner.GetBottom());
 	}
 
 	if (Sprite* spr = g_gui.gfx.getSprite(cell.brush->getLookID())) {
@@ -850,24 +852,22 @@ void BrushIconBox::DrawCell(wxDC& dc, const Cell& cell, bool selected) const {
 		} else if (icon_size == RENDER_SIZE_16x16) {
 			sprite_size = SPRITE_SIZE_16x16;
 		}
-		const int draw_w = r.GetWidth() - 2 * inset;
-		const int draw_h = r.GetHeight() - 2 * inset;
-		spr->DrawTo(&dc, sprite_size, r.GetX() + inset, r.GetY() + inset, draw_w, draw_h);
+		spr->DrawTo(&dc, sprite_size, inner.GetX(), inner.GetY(), inner.GetWidth(), inner.GetHeight());
 
 		if (selected && g_settings.getInteger(Config::USE_GUI_SELECTION_SHADOW)) {
 			if (Sprite* marker = g_gui.gfx.getSprite(EDITOR_SPRITE_SELECTION_MARKER)) {
 				SpriteSize overlay_size = (sprite_size == SPRITE_SIZE_ACTUAL) ? SPRITE_SIZE_32x32 : sprite_size;
-				marker->DrawTo(&dc, overlay_size, r.GetX() + inset, r.GetY() + inset, draw_w, draw_h);
+				marker->DrawTo(&dc, overlay_size, inner.GetX(), inner.GetY(), inner.GetWidth(), inner.GetHeight());
 			}
 		}
 	}
 
-	// Exact-size cells draw the sprite edge to edge, so mark selection with a
-	// highlight rectangle on top rather than an (absent) bevel.
+	// Exact-size cells draw the sprite edge to edge inside the margin, so mark
+	// selection with a highlight rectangle on top rather than an (absent) bevel.
 	if (use_actual_size && selected) {
 		dc.SetBrush(*wxTRANSPARENT_BRUSH);
 		dc.SetPen(wxPen(palette.selection, 2));
-		dc.DrawRectangle(r.GetX(), r.GetY(), r.GetWidth(), r.GetHeight());
+		dc.DrawRectangle(inner);
 	}
 }
 
