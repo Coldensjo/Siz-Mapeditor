@@ -118,6 +118,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) : frame(frame) {
 	MAKE_ACTION(GOTO_POSITION, wxITEM_NORMAL, OnGotoPosition);
 	MAKE_ACTION(JUMP_TO_BRUSH, wxITEM_NORMAL, OnJumpToBrush);
 	MAKE_ACTION(JUMP_TO_ITEM_BRUSH, wxITEM_NORMAL, OnJumpToItemBrush);
+	MAKE_ACTION(FIND_BRUSH_WINDOW, wxITEM_NORMAL, OnFindBrushWindow);
 
 	MAKE_ACTION(CUT, wxITEM_NORMAL, OnCut);
 	MAKE_ACTION(COPY, wxITEM_NORMAL, OnCopy);
@@ -445,6 +446,7 @@ void MainMenuBar::Update() {
 	EnableItem(GOTO_POSITION, has_map);
 	EnableItem(JUMP_TO_BRUSH, loaded);
 	EnableItem(JUMP_TO_ITEM_BRUSH, loaded);
+	EnableItem(FIND_BRUSH_WINDOW, loaded);
 
 	EnableItem(MAP_REMOVE_ITEMS, is_host);
 	EnableItem(MAP_REMOVE_CORPSES, is_local);
@@ -1726,6 +1728,14 @@ void MainMenuBar::OnJumpToBrush(wxCommandEvent& WXUNUSED(event)) {
 		g_gui.SelectBrush(brush, TILESET_UNKNOWN);
 	}
 	delete dlg;
+}
+
+void MainMenuBar::OnFindBrushWindow(wxCommandEvent& WXUNUSED(event)) {
+	if (!g_gui.IsVersionLoaded()) {
+		return;
+	}
+
+	g_gui.ShowFindBrushWindow();
 }
 
 void MainMenuBar::OnJumpToItemBrush(wxCommandEvent& WXUNUSED(event)) {

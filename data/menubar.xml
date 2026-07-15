@@ -171,6 +171,7 @@
 		<item name="Go to Position..." hotkey="Ctrl+G" action="GOTO_POSITION" help="Go to a specific XYZ position." />
 		<item name="Jump to Brush..." hotkey="J" action="JUMP_TO_BRUSH" help="Jump to a brush." />
 		<item name="Jump to Item..." hotkey="Ctrl+J" action="JUMP_TO_ITEM_BRUSH" help="Jump to an item brush (RAW palette)." />
+		<item name="Find Brush..." hotkey="F" action="FIND_BRUSH_WINDOW" help="Open a dockable window to search for brushes by name without closing it." />
 		<item name="Select House Exit..." hotkey="Z" action="SELECT_EXIT_BUTTON" help="Activate Select Exit mode in House palette." />
 		<separator />
 		<menu name="Floor">

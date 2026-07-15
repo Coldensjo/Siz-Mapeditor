@@ -262,6 +262,8 @@
     <ClCompile Include="..\..\source\result_window.cpp" />
     <ClInclude Include="..\..\source\comments_window.h" />
     <ClCompile Include="..\..\source\comments_window.cpp" />
+    <ClInclude Include="..\..\source\find_brush_window.h" />
+    <ClCompile Include="..\..\source\find_brush_window.cpp" />
     <ClInclude Include="..\..\source\map_display.h" />
     <ClCompile Include="..\..\source\map_display.cpp" />
     <ClInclude Include="..\..\source\map_drawer.h" />

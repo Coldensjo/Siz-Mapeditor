@@ -37,6 +37,7 @@
 #include "result_window.h"
 #include "comments_window.h"
 #include "minimap_window.h"
+#include "find_brush_window.h"
 #include "palette_window.h"
 #include "map_display.h"
 #include "application.h"
@@ -473,6 +474,7 @@ GUI::GUI() :
 	gem(nullptr),
 	search_result_window(nullptr),
 	comments_window(nullptr),
+	find_brush_window(nullptr),
 	secondary_map(nullptr),
 	doodad_buffer_map(nullptr),
 
@@ -840,6 +842,13 @@ void GUI::UnloadVersion() {
 
 	if (loaded_version != CLIENT_VERSION_NONE) {
 		// g_gui.UnloadVersion();
+		// Drop any Brush*/RAWBrush* the Find Brush window is holding from a
+		// previous search before they're freed below - otherwise the next
+		// AUI layout pass resizes the panel, triggers BrushIconBox::OnSize,
+		// and dereferences dangling pointers.
+		if (find_brush_window) {
+			find_brush_window->InvalidateResults();
+		}
 		g_materials.clear();
 		g_brushes.clear();
 		g_items.clear();
@@ -1618,6 +1627,26 @@ void GUI::RefreshCommentsWindow() {
 	if (comments_window) {
 		comments_window->ReloadList();
 	}
+}
+
+FindBrushWindow* GUI::ShowFindBrushWindow() {
+	if (find_brush_window == nullptr) {
+		find_brush_window = newd FindBrushWindow(root);
+		aui_manager->AddPane(find_brush_window, wxAuiPaneInfo().Caption("Find Brush").TopDockable(false).BottomDockable(false));
+		aui_manager->Update();
+		find_brush_window->FocusSearch();
+	} else if (!aui_manager->GetPane(find_brush_window).IsShown()) {
+		aui_manager->GetPane(find_brush_window).Show();
+		aui_manager->Update();
+		find_brush_window->ResetSearch();
+	} else {
+		find_brush_window->FocusSearch();
+	}
+	return find_brush_window;
+}
+
+bool GUI::IsFindBrushWindowShown() const {
+	return find_brush_window && aui_manager->GetPane(find_brush_window).IsShown();
 }
 
 //=============================================================================

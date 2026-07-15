@@ -50,6 +50,7 @@ class MapCanvas;
 
 class SearchResultWindow;
 class CommentsWindow;
+class FindBrushWindow;
 class MinimapWindow;
 class LiveSocket;
 class PaletteWindow;
@@ -219,6 +220,11 @@ public:
 	void HideCommentsWindow();
 	bool IsCommentsWindowShown() const;
 	void RefreshCommentsWindow();
+
+	// Find Brush window: a non-modal, dockable brush search panel (press F).
+	// Unlike "Jump to Brush" it stays open after picking a brush.
+	FindBrushWindow* ShowFindBrushWindow();
+	bool IsFindBrushWindowShown() const;
 
 	// Minimap
 	void CreateMinimap();
@@ -442,6 +448,7 @@ public:
 	DCButton* gem; // The small gem in the lower-right corner
 	SearchResultWindow* search_result_window;
 	CommentsWindow* comments_window;
+	FindBrushWindow* find_brush_window;
 	GraphicManager gfx;
 
 	BaseMap* secondary_map; // A buffer map

@@ -83,6 +83,7 @@ namespace MenuBar {
 		GOTO_POSITION,
 		JUMP_TO_BRUSH,
 		JUMP_TO_ITEM_BRUSH,
+		FIND_BRUSH_WINDOW,
 		CLEAR_INVALID_HOUSES,
 		CLEAR_MODIFIED_STATE,
 		CUT,
@@ -242,6 +243,7 @@ public:
 	void OnMoveSelectionDown(wxCommandEvent& event);
 	void OnJumpToBrush(wxCommandEvent& event);
 	void OnJumpToItemBrush(wxCommandEvent& event);
+	void OnFindBrushWindow(wxCommandEvent& event);
 	void OnGotoPreviousPosition(wxCommandEvent& event);
 	void OnGotoPosition(wxCommandEvent& event);
 	void OnMapRemoveItems(wxCommandEvent& event);
