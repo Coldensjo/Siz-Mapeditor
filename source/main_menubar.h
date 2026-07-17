@@ -211,6 +211,17 @@ public:
 	void CheckItem(MenuBar::ActionID id, bool enable);
 	bool IsItemChecked(MenuBar::ActionID id) const;
 
+#ifdef __WXGTK__
+	// wxGTK fires accelerator-table hotkeys as a synthetic wxEVT_MENU sent
+	// straight to the handler, without going through the real wxMenuItem
+	// the way a genuine click (or a native Windows accelerator) does - so
+	// checkable items never get their checked state flipped and handlers
+	// that trust IsItemChecked() see stale state. Called from
+	// MainFrame::OnCharHook, before the accelerator table processes the
+	// same key, to flip the checkbox first.
+	void PreToggleGtkCheckHotkey(const wxKeyEvent& event);
+#endif
+
 	// Event handlers for all menu buttons
 	// File Menu
 	void OnNew(wxCommandEvent& event);
@@ -346,6 +357,13 @@ protected:
 	bool checking_programmaticly;
 
 	std::map<MenuBar::ActionID, std::list<wxMenuItem*>> items;
+
+#ifdef __WXGTK__
+	// Source of truth for the frame-level accelerator table built in Load();
+	// also searched by PreToggleGtkCheckHotkey() to find which action (if
+	// any) a given keypress maps to.
+	std::vector<wxAcceleratorEntry> gtk_hotkey_entries;
+#endif
 
 	// Hardcoded recent files
 	wxFileHistory recentFiles;

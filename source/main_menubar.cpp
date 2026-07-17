@@ -350,6 +350,42 @@ bool MainMenuBar::IsItemChecked(MenuBar::ActionID id) const {
 	return false;
 }
 
+#ifdef __WXGTK__
+void MainMenuBar::PreToggleGtkCheckHotkey(const wxKeyEvent& event) {
+	int flags = wxACCEL_NORMAL;
+	if (event.ControlDown()) {
+		flags |= wxACCEL_CTRL;
+	}
+	if (event.ShiftDown()) {
+		flags |= wxACCEL_SHIFT;
+	}
+	if (event.AltDown()) {
+		flags |= wxACCEL_ALT;
+	}
+
+	for (const wxAcceleratorEntry& entry : gtk_hotkey_entries) {
+		if (entry.GetFlags() != flags || entry.GetKeyCode() != event.GetKeyCode()) {
+			continue;
+		}
+
+		MenuBar::ActionID id = static_cast<MenuBar::ActionID>(entry.GetCommand() - MAIN_FRAME_MENU);
+		std::map<MenuBar::ActionID, std::list<wxMenuItem*>>::iterator fi = items.find(id);
+		if (fi == items.end()) {
+			return;
+		}
+
+		// Only checkable items suffer the desync; anything else (e.g.
+		// GOTO_PREVIOUS_POSITION) reaches its handler correctly via the
+		// accelerator table alone and must be left untouched here.
+		bool isCheckable = !fi->second.empty() && fi->second.front()->IsCheckable();
+		if (isCheckable) {
+			CheckItem(id, !IsItemChecked(id));
+		}
+		return;
+	}
+}
+#endif
+
 void MainMenuBar::Update() {
 	using namespace MenuBar;
 	// This updates all buttons and sets them to proper enabled/disabled state
@@ -648,63 +684,62 @@ bool MainMenuBar::Load(const FileName& path, wxArrayString& warnings, wxString& 
 		}
 	}
 
-#ifdef __LINUX__
-	const int count = 48;
-	wxAcceleratorEntry entries[count];
+#ifdef __WXGTK__
+	gtk_hotkey_entries.clear();
 	// Edit
-	entries[0].Set(wxACCEL_CTRL, (int)'Z', MAIN_FRAME_MENU + MenuBar::UNDO);
-	entries[1].Set(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'Z', MAIN_FRAME_MENU + MenuBar::REDO);
-	entries[2].Set(wxACCEL_CTRL, (int)'F', MAIN_FRAME_MENU + MenuBar::FIND_ITEM);
-	entries[3].Set(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'C', MAIN_FRAME_MENU + MenuBar::FIND_CREATURE);
-	entries[4].Set(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'F', MAIN_FRAME_MENU + MenuBar::REPLACE_ITEMS);
-	entries[5].Set(wxACCEL_NORMAL, (int)'A', MAIN_FRAME_MENU + MenuBar::AUTOMAGIC);
-	entries[6].Set(wxACCEL_CTRL, (int)'B', MAIN_FRAME_MENU + MenuBar::BORDERIZE_SELECTION);
-	entries[7].Set(wxACCEL_NORMAL, (int)'P', MAIN_FRAME_MENU + MenuBar::GOTO_PREVIOUS_POSITION);
-	entries[8].Set(wxACCEL_CTRL, (int)'G', MAIN_FRAME_MENU + MenuBar::GOTO_POSITION);
-	entries[9].Set(wxACCEL_NORMAL, (int)'J', MAIN_FRAME_MENU + MenuBar::JUMP_TO_BRUSH);
-	entries[10].Set(wxACCEL_CTRL, (int)'X', MAIN_FRAME_MENU + MenuBar::CUT);
-	entries[11].Set(wxACCEL_CTRL, (int)'C', MAIN_FRAME_MENU + MenuBar::COPY);
-	entries[12].Set(wxACCEL_CTRL, (int)'V', MAIN_FRAME_MENU + MenuBar::PASTE);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'Z', MAIN_FRAME_MENU + MenuBar::UNDO);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'Z', MAIN_FRAME_MENU + MenuBar::REDO);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'F', MAIN_FRAME_MENU + MenuBar::FIND_ITEM);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'C', MAIN_FRAME_MENU + MenuBar::FIND_CREATURE);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL | wxACCEL_SHIFT, (int)'F', MAIN_FRAME_MENU + MenuBar::REPLACE_ITEMS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'A', MAIN_FRAME_MENU + MenuBar::AUTOMAGIC);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'B', MAIN_FRAME_MENU + MenuBar::BORDERIZE_SELECTION);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'P', MAIN_FRAME_MENU + MenuBar::GOTO_PREVIOUS_POSITION);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'G', MAIN_FRAME_MENU + MenuBar::GOTO_POSITION);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'J', MAIN_FRAME_MENU + MenuBar::JUMP_TO_BRUSH);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'X', MAIN_FRAME_MENU + MenuBar::CUT);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'C', MAIN_FRAME_MENU + MenuBar::COPY);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'V', MAIN_FRAME_MENU + MenuBar::PASTE);
 	// View
-	entries[13].Set(wxACCEL_CTRL, (int)'=', MAIN_FRAME_MENU + MenuBar::ZOOM_IN);
-	entries[14].Set(wxACCEL_CTRL, (int)'-', MAIN_FRAME_MENU + MenuBar::ZOOM_OUT);
-	entries[15].Set(wxACCEL_CTRL, (int)'0', MAIN_FRAME_MENU + MenuBar::ZOOM_NORMAL);
-	entries[16].Set(wxACCEL_NORMAL, (int)'Q', MAIN_FRAME_MENU + MenuBar::SHOW_SHADE);
-	entries[17].Set(wxACCEL_CTRL, (int)'W', MAIN_FRAME_MENU + MenuBar::SHOW_ALL_FLOORS);
-	entries[18].Set(wxACCEL_NORMAL, (int)'Q', MAIN_FRAME_MENU + MenuBar::GHOST_ITEMS);
-	entries[19].Set(wxACCEL_CTRL, (int)'L', MAIN_FRAME_MENU + MenuBar::GHOST_HIGHER_FLOORS);
-	entries[20].Set(wxACCEL_SHIFT, (int)'I', MAIN_FRAME_MENU + MenuBar::SHOW_INGAME_BOX);
-	entries[21].Set(wxACCEL_SHIFT, (int)'L', MAIN_FRAME_MENU + MenuBar::SHOW_LIGHTS);
-	entries[22].Set(wxACCEL_SHIFT, (int)'G', MAIN_FRAME_MENU + MenuBar::SHOW_GRID);
-	entries[23].Set(wxACCEL_NORMAL, (int)'V', MAIN_FRAME_MENU + MenuBar::HIGHLIGHT_ITEMS);
-	entries[24].Set(wxACCEL_NORMAL, (int)'X', MAIN_FRAME_MENU + MenuBar::HIGHLIGHT_LOCKED_DOORS);
-	entries[25].Set(wxACCEL_NORMAL, (int)'F', MAIN_FRAME_MENU + MenuBar::SHOW_CREATURES);
-	entries[26].Set(wxACCEL_NORMAL, (int)'S', MAIN_FRAME_MENU + MenuBar::SHOW_SPAWNS);
-	entries[27].Set(wxACCEL_NORMAL, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_SPECIAL);
-	entries[28].Set(wxACCEL_SHIFT, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_AS_MINIMAP);
-	entries[29].Set(wxACCEL_CTRL, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_ONLY_COLORS);
-	entries[30].Set(wxACCEL_CTRL, (int)'M', MAIN_FRAME_MENU + MenuBar::SHOW_ONLY_MODIFIED);
-	entries[31].Set(wxACCEL_CTRL, (int)'H', MAIN_FRAME_MENU + MenuBar::SHOW_HOUSES);
-	entries[32].Set(wxACCEL_NORMAL, (int)'O', MAIN_FRAME_MENU + MenuBar::SHOW_PATHING);
-	entries[33].Set(wxACCEL_NORMAL, (int)'Y', MAIN_FRAME_MENU + MenuBar::SHOW_TOOLTIPS);
-	entries[34].Set(wxACCEL_NORMAL, (int)'L', MAIN_FRAME_MENU + MenuBar::SHOW_PREVIEW);
-	entries[35].Set(wxACCEL_NORMAL, (int)'K', MAIN_FRAME_MENU + MenuBar::SHOW_WALL_HOOKS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'=', MAIN_FRAME_MENU + MenuBar::ZOOM_IN);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'-', MAIN_FRAME_MENU + MenuBar::ZOOM_OUT);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'0', MAIN_FRAME_MENU + MenuBar::ZOOM_NORMAL);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'Q', MAIN_FRAME_MENU + MenuBar::SHOW_SHADE);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'W', MAIN_FRAME_MENU + MenuBar::SHOW_ALL_FLOORS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'Q', MAIN_FRAME_MENU + MenuBar::GHOST_ITEMS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'L', MAIN_FRAME_MENU + MenuBar::GHOST_HIGHER_FLOORS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_SHIFT, (int)'I', MAIN_FRAME_MENU + MenuBar::SHOW_INGAME_BOX);
+	gtk_hotkey_entries.emplace_back(wxACCEL_SHIFT, (int)'L', MAIN_FRAME_MENU + MenuBar::SHOW_LIGHTS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_SHIFT, (int)'G', MAIN_FRAME_MENU + MenuBar::SHOW_GRID);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'V', MAIN_FRAME_MENU + MenuBar::HIGHLIGHT_ITEMS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'X', MAIN_FRAME_MENU + MenuBar::HIGHLIGHT_LOCKED_DOORS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'F', MAIN_FRAME_MENU + MenuBar::SHOW_CREATURES);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'S', MAIN_FRAME_MENU + MenuBar::SHOW_SPAWNS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_SPECIAL);
+	gtk_hotkey_entries.emplace_back(wxACCEL_SHIFT, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_AS_MINIMAP);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'E', MAIN_FRAME_MENU + MenuBar::SHOW_ONLY_COLORS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'M', MAIN_FRAME_MENU + MenuBar::SHOW_ONLY_MODIFIED);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL, (int)'H', MAIN_FRAME_MENU + MenuBar::SHOW_HOUSES);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'O', MAIN_FRAME_MENU + MenuBar::SHOW_PATHING);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'Y', MAIN_FRAME_MENU + MenuBar::SHOW_TOOLTIPS);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'L', MAIN_FRAME_MENU + MenuBar::SHOW_PREVIEW);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'K', MAIN_FRAME_MENU + MenuBar::SHOW_WALL_HOOKS);
 
 	// Window
-	entries[36].Set(wxACCEL_NORMAL, (int)'M', MAIN_FRAME_MENU + MenuBar::WIN_MINIMAP);
-	entries[37].Set(wxACCEL_NORMAL, (int)'T', MAIN_FRAME_MENU + MenuBar::SELECT_TERRAIN);
-	entries[38].Set(wxACCEL_NORMAL, (int)'D', MAIN_FRAME_MENU + MenuBar::SELECT_DOODAD);
-	entries[39].Set(wxACCEL_NORMAL, (int)'I', MAIN_FRAME_MENU + MenuBar::SELECT_ITEM);
-	entries[40].Set(wxACCEL_NORMAL, (int)'H', MAIN_FRAME_MENU + MenuBar::SELECT_HOUSE);
-	entries[41].Set(wxACCEL_NORMAL, (int)'C', MAIN_FRAME_MENU + MenuBar::SELECT_CREATURE);
-	entries[42].Set(wxACCEL_NORMAL, (int)'R', MAIN_FRAME_MENU + MenuBar::SELECT_RAW);
-	entries[44].Set(wxACCEL_NORMAL, (int)'Z', MAIN_FRAME_MENU + MenuBar::SELECT_EXIT_BUTTON);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'M', MAIN_FRAME_MENU + MenuBar::WIN_MINIMAP);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'T', MAIN_FRAME_MENU + MenuBar::SELECT_TERRAIN);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'D', MAIN_FRAME_MENU + MenuBar::SELECT_DOODAD);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'I', MAIN_FRAME_MENU + MenuBar::SELECT_ITEM);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'H', MAIN_FRAME_MENU + MenuBar::SELECT_HOUSE);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'C', MAIN_FRAME_MENU + MenuBar::SELECT_CREATURE);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'R', MAIN_FRAME_MENU + MenuBar::SELECT_RAW);
+	gtk_hotkey_entries.emplace_back(wxACCEL_NORMAL, (int)'Z', MAIN_FRAME_MENU + MenuBar::SELECT_EXIT_BUTTON);
 
 	// Edit (selection floor movement)
-	entries[46].Set(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_UP, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_UP);
-	entries[47].Set(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_DOWN, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_DOWN);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_UP, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_UP);
+	gtk_hotkey_entries.emplace_back(wxACCEL_CTRL | wxACCEL_SHIFT, WXK_DOWN, MAIN_FRAME_MENU + MenuBar::MOVE_SELECTION_DOWN);
 
-	wxAcceleratorTable accelerator(count, entries);
+	wxAcceleratorTable accelerator(static_cast<int>(gtk_hotkey_entries.size()), gtk_hotkey_entries.data());
 	frame->SetAcceleratorTable(accelerator);
 #endif
 

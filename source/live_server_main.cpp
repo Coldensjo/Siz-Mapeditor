@@ -727,7 +727,7 @@ void drainPendingCommands() {
 class MapServerApp : public wxAppConsole {
 public:
 	bool OnInit() override {
-#if defined(__LINUX__) || defined(__WINDOWS__)
+#if defined(__WXGTK__) || defined(__WINDOWS__)
 		int glutArgc = 1;
 		char* glutArgv[1] = { const_cast<char*>("MapServer") };
 		glutInit(&glutArgc, glutArgv);

@@ -181,7 +181,7 @@ AboutWindow::AboutWindow(wxWindow* parent) :
 	about <<
 #ifdef __WINDOWS__
 		"Windows";
-#elif __LINUX__
+#elif defined(__WXGTK__)
 		"Linux";
 #elif __APPLE__
 		"macOS";
