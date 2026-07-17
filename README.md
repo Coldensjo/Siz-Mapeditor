@@ -1,4 +1,4 @@
-# Siz Mapeditor
+# Tilera
 
 Remere's Map Editor fork with a standalone **MapServer** for live collaborative map editing.
 

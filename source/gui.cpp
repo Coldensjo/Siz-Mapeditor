@@ -2180,21 +2180,21 @@ void GUI::SetTitle(wxString title) {
 #endif
 #ifdef __EXPERIMENTAL__
 	if (title != "") {
-		g_gui.root->SetTitle(title << " - Siz Map Editor BETA" << TITLE_APPEND);
+		g_gui.root->SetTitle(title << " - Tilera BETA" << TITLE_APPEND);
 	} else {
-		g_gui.root->SetTitle(wxString("Siz Map Editor BETA") << TITLE_APPEND);
+		g_gui.root->SetTitle(wxString("Tilera BETA") << TITLE_APPEND);
 	}
 #elif __SNAPSHOT__
 	if (title != "") {
-		g_gui.root->SetTitle(title << " - Siz Map Editor - SNAPSHOT" << TITLE_APPEND);
+		g_gui.root->SetTitle(title << " - Tilera - SNAPSHOT" << TITLE_APPEND);
 	} else {
-		g_gui.root->SetTitle(wxString("Siz Map Editor - SNAPSHOT") << TITLE_APPEND);
+		g_gui.root->SetTitle(wxString("Tilera - SNAPSHOT") << TITLE_APPEND);
 	}
 #else
 	if (!title.empty()) {
-		g_gui.root->SetTitle(title << " - Siz Map Editor" << TITLE_APPEND);
+		g_gui.root->SetTitle(title << " - Tilera" << TITLE_APPEND);
 	} else {
-		g_gui.root->SetTitle(wxString("Siz Map Editor") << TITLE_APPEND);
+		g_gui.root->SetTitle(wxString("Tilera") << TITLE_APPEND);
 	}
 #endif
 }

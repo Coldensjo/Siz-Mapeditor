@@ -175,7 +175,7 @@ AboutWindow::AboutWindow(wxWindow* parent) :
 	game_panel(nullptr) {
 	wxString about;
 
-	about << "Siz Map Editor\n";
+	about << "Tilera\n";
 
 	about << "Version " << __W_RME_VERSION__ << " for ";
 	about <<

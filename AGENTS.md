@@ -1,4 +1,4 @@
-# AI agent instructions — building Siz Map Editor
+# AI agent instructions — building Tilera
 
 The canonical build is the Visual Studio solution under `vcproj/` (Windows, MSVC v143). A community/experimental Linux build also exists via `CMakeLists.txt` at the repo root (system packages instead of vcpkg; see `README.md` → Build → Linux). The Linux CMake build is not the primary target — treat `vcproj/Editor.sln` as authoritative for Editor version bumps, project-file changes, and Windows-specific behavior. When editing `source/`, keep changes portable (the codebase is a Remere's Map Editor fork and is largely cross-platform already); prefer `wxCHECK_VERSION(...)` guards over unconditionally using APIs only present in newer wxWidgets, since the Linux build currently targets wxWidgets 3.2.
 
@@ -60,7 +60,7 @@ $env:VCPKG_ROOT = "E:\vcpkg"   # adjust to your path
 The `.vcxproj` files enable manifest mode (`VcpkgEnableManifest=true`). Dependencies from `vcpkg.json` are installed automatically on the first build. No separate `vcpkg install` step is required, but you may pre-install manually:
 
 ```powershell
-cd C:\path\to\SizMapeditor
+cd C:\path\to\Tilera
 & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows
 ```
 
@@ -86,7 +86,7 @@ To build a single target: right-click **Editor** or **MapServer** → **Build**.
 From the **repo root**, find MSBuild with `vswhere`, then build the solution:
 
 ```powershell
-cd C:\path\to\SizMapeditor   # repo root — required
+cd C:\path\to\Tilera   # repo root — required
 
 $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
   -latest -requires Microsoft.Component.MSBuild `
@@ -98,8 +98,8 @@ $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere
 A successful build ends with lines like (paths must be under the **repo root**, not `vcproj\`):
 
 ```text
-Editor.vcxproj -> C:\path\to\SizMapeditor\Editor_x64.exe
-MapServer.vcxproj -> C:\path\to\SizMapeditor\MapServer_x64.exe
+Editor.vcxproj -> C:\path\to\Tilera\Editor_x64.exe
+MapServer.vcxproj -> C:\path\to\Tilera\MapServer_x64.exe
 ```
 
 ### Build one project only
