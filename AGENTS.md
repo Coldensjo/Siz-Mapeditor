@@ -1,6 +1,6 @@
 # AI agent instructions — building Siz Map Editor
 
-This is a **Windows-only** C++ project. There is no CMake, Makefile, or cross-platform build. Use the Visual Studio solution under `vcproj/`.
+The canonical build is the Visual Studio solution under `vcproj/` (Windows, MSVC v143). A community/experimental Linux build also exists via `CMakeLists.txt` at the repo root (system packages instead of vcpkg; see `README.md` → Build → Linux). The Linux CMake build is not the primary target — treat `vcproj/Editor.sln` as authoritative for Editor version bumps, project-file changes, and Windows-specific behavior. When editing `source/`, keep changes portable (the codebase is a Remere's Map Editor fork and is largely cross-platform already); prefer `wxCHECK_VERSION(...)` guards over unconditionally using APIs only present in newer wxWidgets, since the Linux build currently targets wxWidgets 3.2.
 
 ## Become a specialized agent
 
@@ -194,9 +194,9 @@ Hard-coded fallback library paths in `.vcxproj` (e.g. `C:\vcpkg\...`) are develo
 
 ## Do not
 
-- Attempt to build on Linux/macOS (Windows-only).
-- Add CMake or other build systems unless explicitly requested.
-- Commit build artifacts: `*.exe`, `*.pdb`, `*.obj`, `vcproj/Project/x64/`, `.vs/`.
+- Attempt to build on macOS (unsupported; only Windows and Linux have build systems).
+- Add further build systems beyond `vcproj/` (Windows) and `CMakeLists.txt` (Linux) unless explicitly requested.
+- Commit build artifacts: `*.exe`, `*.pdb`, `*.obj`, `vcproj/Project/x64/`, `.vs/`, `build/`, `Editor`, `MapServer`.
 - Expect `data/` alone to provide Tibia client sprites; runtime needs separate client asset paths (see `README.md`).
 
 ## More documentation

@@ -541,7 +541,14 @@ int MinimapCaptionBar::GetCaptionHeight() const {
 		return FromDIP(22);
 	}
 	wxAuiDockArt* art = g_gui.aui_manager->GetArtProvider();
-	return art ? art->GetMetricForWindow(wxAUI_DOCKART_CAPTION_SIZE, const_cast<MinimapCaptionBar*>(this)) : FromDIP(22);
+	if (!art) {
+		return FromDIP(22);
+	}
+#if wxCHECK_VERSION(3, 3, 0)
+	return art->GetMetricForWindow(wxAUI_DOCKART_CAPTION_SIZE, const_cast<MinimapCaptionBar*>(this));
+#else
+	return art->GetMetric(wxAUI_DOCKART_CAPTION_SIZE);
+#endif
 }
 
 void MinimapCaptionBar::UpdateChrome(bool floating, bool active) {

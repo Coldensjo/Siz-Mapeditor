@@ -5,6 +5,7 @@ data/user
 editor.cfg
 mapserver.cfg
 *.txt
+!CMakeLists.txt
 
 # exe and dll
 *.dll
@@ -79,3 +80,8 @@ xcuserdata
 # vcpkg
 /vcpkg_installed/
 /data
+
+# CMake (Linux build)
+/build/
+/Editor
+/MapServer

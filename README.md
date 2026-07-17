@@ -4,6 +4,8 @@ Remere's Map Editor fork with a standalone **MapServer** for live collaborative 
 
 ## Build
 
+### Windows
+
 **Requirements**
 
 - Visual Studio 2022 (MSVC v143)
@@ -15,6 +17,27 @@ Remere's Map Editor fork with a standalone **MapServer** for live collaborative 
 2. Open `vcproj/Editor.sln` in Visual Studio.
 3. Select **Release | x64**.
 4. Build the solution (builds both `Editor_x64.exe` and `MapServer_x64.exe`).
+
+### Linux
+
+Built via CMake (`CMakeLists.txt` at repo root) against system packages instead of vcpkg.
+
+**Requirements** (Ubuntu/Debian package names)
+
+```
+sudo apt-get install -y build-essential cmake libwxgtk3.2-dev libwxgtk-media3.2-dev \
+  freeglut3-dev libgl-dev libboost-dev libboost-thread-dev nlohmann-json3-dev \
+  libasio-dev libtomlplusplus-dev libarchive-dev libfmt-dev
+```
+
+**Steps**
+
+```sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j"$(nproc)"
+```
+
+Outputs `Editor` and `MapServer` in the repo root, alongside `data/`.
 
 ### Start the server
 

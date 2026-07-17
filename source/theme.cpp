@@ -26,6 +26,7 @@ ThemePalette DarkPalette() {
 	};
 }
 
+#if wxCHECK_VERSION(3, 3, 0)
 wxApp::Appearance AppearanceFor(ThemeMode mode) {
 	switch (mode) {
 		case ThemeMode::Light:
@@ -37,6 +38,7 @@ wxApp::Appearance AppearanceFor(ThemeMode mode) {
 			return wxApp::Appearance::Dark;
 	}
 }
+#endif
 
 void ApplyPaletteToAui(wxAuiManager* manager, const ThemePalette& palette);
 
@@ -117,7 +119,11 @@ ThemeMode ThemeManager::ModeFromChoice(int choice) {
 
 ThemePalette ThemeManager::PaletteFor(ThemeMode mode) {
 	if (mode == ThemeMode::System) {
+#if wxCHECK_VERSION(3, 3, 0)
 		mode = wxSystemSettings::GetAppearance().AreAppsDark() ? ThemeMode::Dark : ThemeMode::Light;
+#else
+		mode = wxSystemSettings::GetAppearance().IsDark() ? ThemeMode::Dark : ThemeMode::Light;
+#endif
 	}
 
 	if (mode != ThemeMode::Light) {
@@ -147,9 +153,11 @@ const ThemePalette& ThemeManager::GetPalette() const {
 
 bool ThemeManager::Apply(ThemeMode newMode, wxWindow* root) {
 	const ThemeMode requestedMode = NormalizeMode(static_cast<int>(newMode));
+#if wxCHECK_VERSION(3, 3, 0)
 	if (wxTheApp && wxTheApp->SetAppearance(AppearanceFor(requestedMode)) == wxApp::AppearanceResult::Failure) {
 		return false;
 	}
+#endif
 
 	const ThemePalette requestedPalette = PaletteFor(requestedMode);
 	mode = requestedMode;
