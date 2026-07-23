@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(SizMapeditor CXX)
+project(Tilera CXX)
 
 # Linux/native build. The canonical Windows build is vcproj/Editor.sln (see AGENTS.md).
 # This CMake build targets Linux using system packages (apt) instead of vcpkg.

@@ -50,7 +50,7 @@
 #include <wx/treectrl.h>
 #include <wx/vlbox.h>
 
-#if defined(__LINUX__) || defined(__WINDOWS__)
+#if defined(__WXGTK__) || defined(__WINDOWS__)
 	#include <GL/glut.h>
 #endif
 
@@ -187,7 +187,7 @@ bool Application::OnInit() {
 	wxAppConsole::SetInstance(this);
 	wxArtProvider::Push(new ArtProvider());
 
-#if defined(__LINUX__) || defined(__WINDOWS__)
+#if defined(__WXGTK__) || defined(__WINDOWS__)
 	int argc = 1;
 	char* argv[1] = { wxString(this->argv[0]).char_str() };
 	glutInit(&argc, argv);
@@ -535,6 +535,9 @@ void MainFrame::OnCharHook(wxKeyEvent& event) {
 		g_gui.SetStatusText(wxString::Format("Make script menu %s", enabled ? "enabled" : "disabled"));
 		return;
 	}
+#ifdef __WXGTK__
+	menu_bar->PreToggleGtkCheckHotkey(event);
+#endif
 	event.Skip();
 }
 

@@ -18,14 +18,14 @@
 #ifndef RME_DEFINITIONS_H_
 #define RME_DEFINITIONS_H_
 
-#define __W_RME_APPLICATION_NAME__ wxString("Siz Map Editor")
-#define __RME_APPLICATION_NAME__ std::string("Siz Map Editor")
+#define __W_RME_APPLICATION_NAME__ wxString("Tilera")
+#define __RME_APPLICATION_NAME__ std::string("Tilera")
 
 // Version info
 // xxyyzzt (major, minor, subversion)
 #define __RME_VERSION_MAJOR__ 2
 #define __RME_VERSION_MINOR__ 5
-#define __RME_SUBVERSION__ 3
+#define __RME_SUBVERSION__ 1
 
 #define MAKE_VERSION_ID(major, minor, subversion) \
 	((major) * 10000000 + (minor) * 100000 + (subversion) * 1000)
