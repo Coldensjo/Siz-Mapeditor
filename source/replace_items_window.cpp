@@ -206,7 +206,7 @@ wxCoord ReplaceItemsListBox::OnMeasureItem(size_t WXUNUSED(index)) const {
 // ReplaceItemsDialog
 
 ReplaceItemsDialog::ReplaceItemsDialog(wxWindow* parent, bool selectionOnly) :
-	wxDialog(parent, wxID_ANY, (selectionOnly ? "Replace Items on Selection" : "Replace Items"), wxDefaultPosition, wxSize(500, 480), wxDEFAULT_DIALOG_STYLE),
+	wxDialog(parent, wxID_ANY, (selectionOnly ? "Replace Items on Selection" : "Replace Items"), wxDefaultPosition, wxSize(500, 510), wxDEFAULT_DIALOG_STYLE),
 	selectionOnly(selectionOnly),
 	replaceIdStart(0),
 	replaceIdEnd(0),
@@ -253,6 +253,15 @@ ReplaceItemsDialog::ReplaceItemsDialog(wxWindow* parent, bool selectionOnly) :
 	items_sizer->Add(progress, 0, wxALL, 5);
 
 	sizer->Add(items_sizer, 1, wxALL | wxEXPAND, 5);
+
+	wxBoxSizer* options_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+	selection_only_checkbox = new wxCheckBox(this, wxID_ANY, wxT("Replace within selection"));
+	selection_only_checkbox->SetValue(selectionOnly);
+	selection_only_checkbox->SetToolTip(wxT("Only replace items on tiles that are part of the current selection"));
+	options_sizer->Add(selection_only_checkbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+
+	sizer->Add(options_sizer, 0, wxLEFT | wxRIGHT | wxEXPAND, 5);
 
 	wxBoxSizer* buttons_sizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -623,6 +632,7 @@ void ReplaceItemsDialog::OnExecuteButtonClicked(wxCommandEvent& WXUNUSED(event))
 	with_button->Enable(false);
 	secondary_button->Enable(false);
 	secondary_above_checkbox->Enable(false);
+	selection_only_checkbox->Enable(false);
 	add_button->Enable(false);
 	remove_button->Enable(false);
 	execute_button->Enable(false);
@@ -635,13 +645,14 @@ void ReplaceItemsDialog::OnExecuteButtonClicked(wxCommandEvent& WXUNUSED(event))
 	}
 
 	Editor* editor = tab->GetEditor();
+	const bool onSelection = selection_only_checkbox->GetValue();
 
 	int done = 0;
 	for (const ReplacingItem& info : items) {
 		ItemFinder finder(info.replaceId, info.replaceIdEnd, (uint32_t)g_settings.getInteger(Config::REPLACE_SIZE));
 
 		// search on map
-		foreach_ItemOnMap(editor->map, finder, selectionOnly);
+		foreach_ItemOnMap(editor->map, finder, onSelection);
 
 		uint32_t total = 0;
 		std::vector<std::pair<Tile*, Item*>>& result = finder.result;
@@ -703,6 +714,7 @@ void ReplaceItemsDialog::OnExecuteButtonClicked(wxCommandEvent& WXUNUSED(event))
 
 	tab->Refresh();
 	close_button->Enable(true);
+	selection_only_checkbox->Enable(true);
 	UpdateWidgets();
 }
 

@@ -160,6 +160,7 @@ private:
 	wxGauge* progress;
 	wxStaticBitmap* arrow_bitmap;
 	wxCheckBox* secondary_above_checkbox;
+	wxCheckBox* selection_only_checkbox;
 	wxButton* add_button;
 	wxButton* edit_button;
 	wxButton* duplicate_button;
