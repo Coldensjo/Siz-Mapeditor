@@ -167,6 +167,7 @@ private:
 
 	bool dragging;
 	bool boundbox_selection;
+	bool boundbox_deselection;
 	bool screendragging;
 	bool isPasting() const;
 	bool drawing;

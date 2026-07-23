@@ -1201,7 +1201,11 @@ void MapDrawer::DrawSelectionBox() {
 	glEnable(GL_LINE_STIPPLE);
 	glLineStipple(1, 0xf0);
 	glLineWidth(1.0);
-	glColor4f(1.0, 1.0, 1.0, 1.0);
+	if (canvas->boundbox_deselection) {
+		glColor4f(1.0f, 0.35f, 0.35f, 1.0f); // red box = rectangular deselect
+	} else {
+		glColor4f(1.0, 1.0, 1.0, 1.0);
+	}
 	glBegin(GL_LINES);
 	for (int i = 0; i < 4; i++) {
 		glVertex2f(lines[i][0], lines[i][1]);

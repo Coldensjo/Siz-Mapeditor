@@ -388,6 +388,7 @@ MapCanvas::MapCanvas(MapWindow* parent, Editor& editor, int* attriblist) :
 	cursor_y(-1),
 	dragging(false),
 	boundbox_selection(false),
+	boundbox_deselection(false),
 	screendragging(false),
 	drawing(false),
 	dragging_draw(false),
@@ -831,7 +832,7 @@ void MapCanvas::OnMouseMove(wxMouseEvent& event) {
 
 				int move_x = std::abs(last_click_map_x - mouse_map_x);
 				int move_y = std::abs(last_click_map_y - mouse_map_y);
-				ss << "Selection " << move_x + 1 << ":" << move_y + 1;
+				ss << (boundbox_deselection ? "Deselection " : "Selection ") << move_x + 1 << ":" << move_y + 1;
 				g_gui.SetStatusText(ss);
 			}
 
@@ -1089,6 +1090,7 @@ void MapCanvas::OnMouseActionClick(wxMouseEvent& event) {
 		} else {
 			do {
 				boundbox_selection = false;
+				boundbox_deselection = false;
 				if (event.ShiftDown()) {
 					boundbox_selection = true;
 
@@ -1521,6 +1523,7 @@ void MapCanvas::OnMouseActionRelease(wxMouseEvent& event) {
 		editor.actionQueue->resetTimer();
 		dragging = false;
 		boundbox_selection = false;
+		boundbox_deselection = false;
 	} else if (g_gui.GetCurrentBrush()) { // Drawing mode
 		Brush* brush = g_gui.GetCurrentBrush();
 		if (dragging_draw) {
@@ -1693,15 +1696,11 @@ void MapCanvas::OnMousePropertiesClick(wxMouseEvent& event) {
 	EndPasting();
 
 	boundbox_selection = false;
+	boundbox_deselection = false;
 	if (event.ShiftDown()) {
+		// Shift + right drag = rectangular deselect; keep the current selection intact
 		boundbox_selection = true;
-
-		if (!event.ControlDown()) {
-			editor.selection.start(); // Start selection session
-			editor.selection.clear(); // Clear out selection
-			editor.selection.finish(); // End selection session
-			editor.selection.updateSelectionCount();
-		}
+		boundbox_deselection = true;
 	} else if (!tile) {
 		editor.selection.start(); // Start selection session
 		editor.selection.clear(); // Clear out selection
@@ -1749,141 +1748,131 @@ void MapCanvas::OnMousePropertiesRelease(wxMouseEvent& event) {
 		g_gui.SetSelectionMode();
 	}
 
+	bool did_boundbox_deselect = false;
 	if (boundbox_selection) {
-		if (mouse_map_x == last_click_map_x && mouse_map_y == last_click_map_y && event.ControlDown()) {
-			// Mouse hasn't move, do control+shift thingy!
-			Tile* tile = editor.map.getTile(mouse_map_x, mouse_map_y, floor);
-			if (tile) {
-				editor.selection.start(); // Start a selection session
-				if (tile->isSelected()) {
-					editor.selection.remove(tile);
-				} else {
-					editor.selection.add(tile);
-				}
-				editor.selection.finish(); // Finish the selection session
-				editor.selection.updateSelectionCount();
-			}
-		} else {
-			// The cursor has moved, do some boundboxing!
-			if (last_click_map_x > mouse_map_x) {
-				int tmp = mouse_map_x;
-				mouse_map_x = last_click_map_x;
-				last_click_map_x = tmp;
-			}
-			if (last_click_map_y > mouse_map_y) {
-				int tmp = mouse_map_y;
-				mouse_map_y = last_click_map_y;
-				last_click_map_y = tmp;
-			}
+		// Shift + right drag = rectangular deselect (zero-size box deselects a single tile)
+		did_boundbox_deselect = true;
+		if (last_click_map_x > mouse_map_x) {
+			int tmp = mouse_map_x;
+			mouse_map_x = last_click_map_x;
+			last_click_map_x = tmp;
+		}
+		if (last_click_map_y > mouse_map_y) {
+			int tmp = mouse_map_y;
+			mouse_map_y = last_click_map_y;
+			last_click_map_y = tmp;
+		}
 
-			editor.selection.start(); // Start a selection session
-			switch (g_settings.getInteger(Config::SELECTION_TYPE)) {
-				case SELECT_CURRENT_FLOOR: {
-					for (int x = last_click_map_x; x <= mouse_map_x; x++) {
-						for (int y = last_click_map_y; y <= mouse_map_y; y++) {
-							Tile* tile = editor.map.getTile(x, y, floor);
-							if (!tile) {
+		editor.selection.start(); // Start a selection session
+		switch (g_settings.getInteger(Config::SELECTION_TYPE)) {
+			case SELECT_CURRENT_FLOOR: {
+				for (int x = last_click_map_x; x <= mouse_map_x; x++) {
+					for (int y = last_click_map_y; y <= mouse_map_y; y++) {
+						Tile* tile = editor.map.getTile(x, y, floor);
+						if (!tile || !tile->isSelected()) {
+							continue;
+						}
+						editor.selection.remove(tile);
+					}
+				}
+				break;
+			}
+			case SELECT_ALL_FLOORS: {
+				int start_x, start_y, start_z;
+				int end_x, end_y, end_z;
+
+				start_x = last_click_map_x;
+				start_y = last_click_map_y;
+				start_z = MAP_MAX_LAYER;
+				end_x = mouse_map_x;
+				end_y = mouse_map_y;
+				end_z = floor;
+
+				if (g_settings.getInteger(Config::COMPENSATED_SELECT)) {
+					start_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+					start_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+
+					end_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+					end_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+				}
+
+				for (int z = start_z; z >= end_z; z--) {
+					for (int x = start_x; x <= end_x; x++) {
+						for (int y = start_y; y <= end_y; y++) {
+							Tile* tile = editor.map.getTile(x, y, z);
+							if (!tile || !tile->isSelected()) {
 								continue;
 							}
-							editor.selection.add(tile);
+							editor.selection.remove(tile);
 						}
 					}
-					break;
+					if (z <= GROUND_LAYER && g_settings.getInteger(Config::COMPENSATED_SELECT)) {
+						start_x++;
+						start_y++;
+						end_x++;
+						end_y++;
+					}
 				}
-				case SELECT_ALL_FLOORS: {
-					int start_x, start_y, start_z;
-					int end_x, end_y, end_z;
-
-					start_x = last_click_map_x;
-					start_y = last_click_map_y;
-					start_z = MAP_MAX_LAYER;
-					end_x = mouse_map_x;
-					end_y = mouse_map_y;
-					end_z = floor;
-
-					if (g_settings.getInteger(Config::COMPENSATED_SELECT)) {
-						start_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-						start_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-
-						end_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-						end_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-					}
-
-					for (int z = start_z; z >= end_z; z--) {
-						for (int x = start_x; x <= end_x; x++) {
-							for (int y = start_y; y <= end_y; y++) {
-								Tile* tile = editor.map.getTile(x, y, z);
-								if (!tile) {
-									continue;
-								}
-								editor.selection.add(tile);
-							}
-						}
-						if (z <= GROUND_LAYER && g_settings.getInteger(Config::COMPENSATED_SELECT)) {
-							start_x++;
-							start_y++;
-							end_x++;
-							end_y++;
-						}
-					}
-					break;
-				}
-				case SELECT_VISIBLE_FLOORS: {
-					int start_x, start_y, start_z;
-					int end_x, end_y, end_z;
-
-					start_x = last_click_map_x;
-					start_y = last_click_map_y;
-					if (floor <= GROUND_LAYER) {
-						start_z = GROUND_LAYER;
-					} else {
-						start_z = std::min(MAP_MAX_LAYER, floor + 2);
-					}
-					end_x = mouse_map_x;
-					end_y = mouse_map_y;
-					end_z = floor;
-
-					if (g_settings.getInteger(Config::COMPENSATED_SELECT)) {
-						start_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-						start_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-
-						end_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-						end_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
-					}
-
-					for (int z = start_z; z >= end_z; z--) {
-						for (int x = start_x; x <= end_x; x++) {
-							for (int y = start_y; y <= end_y; y++) {
-								Tile* tile = editor.map.getTile(x, y, z);
-								if (!tile) {
-									continue;
-								}
-								editor.selection.add(tile);
-							}
-						}
-						if (z <= GROUND_LAYER && g_settings.getInteger(Config::COMPENSATED_SELECT)) {
-							start_x++;
-							start_y++;
-							end_x++;
-							end_y++;
-						}
-					}
-					break;
-				}
+				break;
 			}
-			editor.selection.finish(); // Finish the selection session
-			editor.selection.updateSelectionCount();
+			case SELECT_VISIBLE_FLOORS: {
+				int start_x, start_y, start_z;
+				int end_x, end_y, end_z;
+
+				start_x = last_click_map_x;
+				start_y = last_click_map_y;
+				if (floor <= GROUND_LAYER) {
+					start_z = GROUND_LAYER;
+				} else {
+					start_z = std::min(MAP_MAX_LAYER, floor + 2);
+				}
+				end_x = mouse_map_x;
+				end_y = mouse_map_y;
+				end_z = floor;
+
+				if (g_settings.getInteger(Config::COMPENSATED_SELECT)) {
+					start_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+					start_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+
+					end_x -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+					end_y -= (floor < GROUND_LAYER ? GROUND_LAYER - floor : 0);
+				}
+
+				for (int z = start_z; z >= end_z; z--) {
+					for (int x = start_x; x <= end_x; x++) {
+						for (int y = start_y; y <= end_y; y++) {
+							Tile* tile = editor.map.getTile(x, y, z);
+							if (!tile || !tile->isSelected()) {
+								continue;
+							}
+							editor.selection.remove(tile);
+						}
+					}
+					if (z <= GROUND_LAYER && g_settings.getInteger(Config::COMPENSATED_SELECT)) {
+						start_x++;
+						start_y++;
+						end_x++;
+						end_y++;
+					}
+				}
+				break;
+			}
 		}
+		editor.selection.finish(); // Finish the selection session
+		editor.selection.updateSelectionCount();
 	} else if (event.ControlDown()) {
 		// Nothing
 	}
 
-	popup_menu->Update(Position(mouse_map_x, mouse_map_y, floor));
-	PopupMenu(popup_menu);
+	if (!did_boundbox_deselect) {
+		popup_menu->Update(Position(mouse_map_x, mouse_map_y, floor));
+		PopupMenu(popup_menu);
+	}
 
 	editor.actionQueue->resetTimer();
 	dragging = false;
 	boundbox_selection = false;
+	boundbox_deselection = false;
 
 	last_cursor_map_x = mouse_map_x;
 	last_cursor_map_y = mouse_map_y;
@@ -1950,9 +1939,10 @@ void MapCanvas::OnLoseMouse(wxMouseEvent& event) {
 }
 
 void MapCanvas::OnGainMouse(wxMouseEvent& event) {
-	if (!event.LeftIsDown()) {
+	if (!event.LeftIsDown() && !event.RightIsDown()) {
 		dragging = false;
 		boundbox_selection = false;
+		boundbox_deselection = false;
 		drawing = false;
 	}
 	if (!event.MiddleIsDown()) {
@@ -3220,6 +3210,7 @@ void MapCanvas::ChangeFloor(int new_floor) {
 void MapCanvas::EnterDrawingMode() {
 	dragging = false;
 	boundbox_selection = false;
+	boundbox_deselection = false;
 	EndPasting();
 	Refresh();
 }
@@ -3253,6 +3244,7 @@ void MapCanvas::Reset() {
 
 	dragging = false;
 	boundbox_selection = false;
+	boundbox_deselection = false;
 	screendragging = false;
 	drawing = false;
 	dragging_draw = false;
